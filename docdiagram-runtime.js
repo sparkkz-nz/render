@@ -30,8 +30,15 @@
   function parseScalar(value) {
     const trimmed = value.trim();
 
-    if ((trimmed.startsWith("\"") && trimmed.endsWith("\"")) ||
-        (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    if (trimmed.startsWith("\"") && trimmed.endsWith("\"")) {
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        throw new Error(`Invalid quoted scalar: ${trimmed}`);
+      }
+    }
+
+    if (trimmed.startsWith("'") && trimmed.endsWith("'")) {
       return trimmed.slice(1, -1);
     }
 
@@ -368,7 +375,7 @@
 
   function persistDiagramModels() {
     let diagramIndex = 0;
-    const source = getSource().replace(
+    const source = getSource().replaceAll("\r\n", "\n").replace(
       /^```diagram\s*\n([\s\S]*?)^```$/gm,
       () => {
         const diagram = diagramModels[diagramIndex];
