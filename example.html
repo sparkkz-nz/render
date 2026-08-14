@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Payments architecture</title>
+  <script src="file:///Users/stuart.parkinson/hacks/render/docdiagram-runtime.js" defer></script>
+</head>
+<body>
+  <template id="source" type="text/markdown">
+# Payments architecture
+
+The Payments API owns the payment-intent lifecycle and persists the resulting
+state.
+
+- Diagram placement is intentional and stored in source.
+- The visual output is SVG, so it remains crisp at any zoom level.
+
+```diagram
+version: 1
+id: payment-flow
+canvas:
+  width: 1000
+  height: 560
+nodes:
+  - id: web-app
+    label: Customer web app
+    type: application
+    position: { x: 70, y: 230 }
+    size: { width: 190, height: 80 }
+  - id: payments-api
+    label: Payments API
+    type: service
+    position: { x: 400, y: 230 }
+    size: { width: 200, height: 80 }
+  - id: payments-db
+    label: Payments DB
+    type: datastore
+    position: { x: 740, y: 230 }
+    size: { width: 190, height: 80 }
+edges:
+  - source: web-app
+    target: payments-api
+    label: POST /payments
+    route: orthogonal
+  - source: payments-api
+    target: payments-db
+    label: Create payment intent
+    route: orthogonal
+```
+  </template>
+
+  <main id="rendered-document"></main>
+</body>
+</html>
