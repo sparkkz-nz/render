@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>External script proof of concept</title>
+  <script
+    src="https://xero-internal-actions-poc.github.io/render/hello-runtime.js"
+    defer
+    onerror="document.querySelector('#status').textContent = 'The external script did not load.'">
+  </script>
+</head>
+<body>
+  <h1>External script proof of concept</h1>
+  <p id="status">Loading the external script...</p>
+</body>
+</html>
