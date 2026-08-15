@@ -17,12 +17,21 @@ vm.runInContext(runtime, context, { filename: "docdiagram-runtime.js" });
 
 const {
   nodeTypes,
+  nodeColorPalettes,
   nodeShapes,
   edgeAnchors,
   edgeRoutes,
   edgeMarkerStyles,
   getTheme,
   getGridSize,
+  expandCanvasForNode,
+  createUniqueNodeId,
+  getDefaultNodePosition,
+  createNode,
+  createConnector,
+  reconnectConnector,
+  deleteConnector,
+  deleteNode,
   getNodeEffectiveStyle,
   getEdgeEffectiveStyle,
   getEdgeMarkerStyle,
@@ -40,6 +49,7 @@ const {
   setNodeShape,
   setNodeSubtitle,
   setNodeStyleOverride,
+  setNodeColorPalette,
   setNodeSize,
   setEdgeLabel,
   setEdgeRoute,
@@ -54,7 +64,8 @@ const {
   getNodeGeometry,
   renderNodeBody,
   buildEdgePath,
-  buildEdgeInspectorFields
+  buildEdgeInspectorFields,
+  clampZoom
 } = context.globalThis.DocDiagramCore;
 
 function readTemplateSource(filePath) {
@@ -70,6 +81,72 @@ test("extracts document frontmatter without treating it as Markdown content", ()
 
   assert.equal(document.frontmatter.theme, "dark");
   assert.equal(document.content, "\n# Payments");
+});
+
+test("diagram markup provides compact view-mode zoom and edit controls", () => {
+  const markup = renderDiagram([
+    "canvas:",
+    "  width: 800",
+    "  height: 500",
+    "nodes:",
+    "  - id: api",
+    "    type: application",
+    "    shape: rounded-rectangle",
+    "    label: API",
+    "    position: { x: 100, y: 100 }",
+    "    size: { width: 190, height: 80 }",
+    "edges:"
+  ].join("\n"), 0);
+
+  assert.match(markup, /class="docdiagram-diagram-toolbar"/);
+  assert.match(markup, /class="docdiagram-icon-button docdiagram-zoom-in"/);
+  assert.match(markup, /class="docdiagram-icon-button docdiagram-zoom-out"/);
+  assert.match(markup, /class="docdiagram-icon-button docdiagram-fit"/);
+  assert.match(markup, /class="docdiagram-icon-button docdiagram-start-editing"/);
+  assert.match(markup, /aria-label="Zoom in"/);
+  assert.match(markup, /aria-label="Zoom to fit"/);
+  assert.match(markup, /aria-label="Edit diagram"/);
+});
+
+test("clampZoom limits diagram zoom to supported discrete bounds", () => {
+  assert.equal(clampZoom(10), 25);
+  assert.equal(clampZoom(125), 125);
+  assert.equal(clampZoom(250), 200);
+});
+
+test("expanding a canvas keeps a moved node and padding inside its bounds", () => {
+  const diagram = {
+    canvas: { width: 800, height: 500 },
+    nodes: [],
+    edges: []
+  };
+  const node = {
+    position: { x: 760, y: 470 },
+    size: { width: 190, height: 80 }
+  };
+
+  expandCanvasForNode(diagram, node);
+
+  assert.equal(diagram.canvas.width, 990);
+  assert.equal(diagram.canvas.height, 590);
+});
+
+test("expanding a canvas left or up shifts every node into positive coordinates", () => {
+  const diagram = {
+    canvas: { width: 800, height: 500 },
+    nodes: [
+      { id: "moved", position: { x: -100, y: -60 }, size: { width: 190, height: 80 } },
+      { id: "existing", position: { x: 300, y: 200 }, size: { width: 190, height: 80 } }
+    ],
+    edges: []
+  };
+
+  expandCanvasForNode(diagram, diagram.nodes[0]);
+
+  assert.equal(JSON.stringify(diagram.nodes[0].position), JSON.stringify({ x: 40, y: 40 }));
+  assert.equal(JSON.stringify(diagram.nodes[1].position), JSON.stringify({ x: 440, y: 300 }));
+  assert.equal(diagram.canvas.width, 940);
+  assert.equal(diagram.canvas.height, 600);
 });
 
 test("resolves the actual example document's dark theme", () => {
@@ -98,6 +175,81 @@ test("uses an opt-in canvas grid to normalize positions and dimensions", () => {
   assert.equal(clampNodeSize(118, 120, 5), 120);
   assert.equal(clampNodeSize(123, 120, 5), 125);
   assert.equal(clampNodeSize(58, 60, 5), 60);
+});
+
+test("creates uniquely identified default nodes at a grid-aligned available position", () => {
+  const diagram = {
+    canvas: { width: 600, height: 300, grid: 10 },
+    nodes: [{
+      id: "new-node",
+      label: "Existing",
+      type: "service",
+      shape: "rounded-rectangle",
+      position: { x: 200, y: 110 },
+      size: { width: 190, height: 80 }
+    }],
+    edges: []
+  };
+
+  assert.equal(createUniqueNodeId(diagram.nodes), "new-node-2");
+  assert.equal(JSON.stringify(getDefaultNodePosition(diagram)), JSON.stringify({ x: 210, y: 190 }));
+  const node = createNode(diagram);
+
+  assert.equal(JSON.stringify(node), JSON.stringify({
+    id: "new-node-2",
+    label: "New node",
+    type: "application",
+    shape: "rounded-rectangle",
+    position: { x: 210, y: 190 },
+    size: { width: 190, height: 80 }
+  }));
+});
+
+test("creates, reconnects, and deletes connectors without dangling endpoints", () => {
+  const diagram = {
+    canvas: {},
+    nodes: [
+      { id: "api", label: "API", shape: "rounded-rectangle" },
+      { id: "db", label: "DB", shape: "database" },
+      { id: "cache", label: "Cache", shape: "rounded-rectangle" }
+    ],
+    edges: []
+  };
+  const edge = createConnector(diagram, "api", "right", "db", "left");
+
+  assert.equal(JSON.stringify(edge), JSON.stringify({
+    source: "api",
+    target: "db",
+    sourceAnchor: "right",
+    targetAnchor: "left",
+    route: "orthogonal",
+    end: "arrow"
+  }));
+  reconnectConnector(edge, "target", "cache", "top");
+  assert.equal(edge.target, "cache");
+  assert.equal(edge.targetAnchor, "top");
+  assert.deepEqual(deleteConnector(diagram, 0), edge);
+  assert.equal(diagram.edges.length, 0);
+  assert.equal(deleteConnector(diagram, 3), null);
+});
+
+test("cascade deletion and every lifecycle mutation preserve a serializable diagram", () => {
+  const diagram = {
+    canvas: { width: 600, height: 300 },
+    nodes: [
+      { id: "api", label: "API", type: "service", shape: "rounded-rectangle", position: { x: 20, y: 40 }, size: { width: 190, height: 80 } },
+      { id: "db", label: "DB", type: "datastore", shape: "database", position: { x: 320, y: 40 }, size: { width: 190, height: 80 } }
+    ],
+    edges: []
+  };
+  const created = createNode(diagram);
+  const edge = createConnector(diagram, "api", "right", created.id, "left");
+  reconnectConnector(edge, "target", "db", "top");
+
+  assert.equal(JSON.stringify(parseDiagram(serializeDiagram(diagram))), JSON.stringify(diagram));
+  assert.equal(JSON.stringify(deleteNode(diagram, "db").deletedEdges), JSON.stringify([edge]));
+  assert.equal(JSON.stringify(parseDiagram(serializeDiagram(diagram))), JSON.stringify(diagram));
+  assert.equal(diagram.edges.some((candidate) => candidate.source === "db" || candidate.target === "db"), false);
 });
 
 test("parses and serializes diagram themes and style overrides", () => {
@@ -216,6 +368,19 @@ test("nodeTypes, nodeShapes, edgeAnchors, edgeRoutes, and edgeMarkerStyles expos
   assert.equal(JSON.stringify([...edgeAnchors]), JSON.stringify(["top", "right", "bottom", "left"]));
   assert.equal(JSON.stringify([...edgeRoutes]), JSON.stringify(["orthogonal", "straight", "curved"]));
   assert.equal(JSON.stringify([...edgeMarkerStyles]), JSON.stringify(["none", "arrow", "circle"]));
+});
+
+test("node color palettes replace manual fill, stroke, and text overrides together", () => {
+  const node = {
+    type: "application",
+    style: { fill: "#ffffff", stroke: "#000000", text: "#222222" }
+  };
+
+  setNodeColorPalette(node, "dark", "pink");
+
+  assert.equal(node.style.fill, nodeColorPalettes.pink.dark.fill);
+  assert.equal(node.style.stroke, nodeColorPalettes.pink.dark.stroke);
+  assert.equal(node.style.text, nodeColorPalettes.pink.dark.text);
 });
 
 test("requires supported node shapes and explicit edge anchors without retaining style.width aliases", () => {

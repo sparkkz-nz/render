@@ -9,8 +9,20 @@
   let selectedEdge = null;
   let editingNode = null;
   let editingEdge = null;
+  let connectionDrag = null;
   let documentTheme = "light";
+  let documentFormat = "centered";
+  let savedSource = "";
+  let editSessionSource = null;
+  const diagramZooms = new Map();
   const minimumNodeSize = { width: 120, height: 60 };
+  const defaultNode = {
+    type: "application",
+    shape: "rounded-rectangle",
+    label: "New node",
+    width: 190,
+    height: 80
+  };
   const nodeTypes = ["application", "service", "datastore", "note"];
   const nodeShapes = [
     "rounded-rectangle",
@@ -27,24 +39,66 @@
   const edgeRoutes = ["orthogonal", "straight", "curved"];
   const edgeMarkerStyles = ["none", "arrow", "circle"];
   const edgeMarkerDefaults = { start: "none", end: "arrow" };
+  const nodeColorPalettes = {
+    pink: {
+      label: "Pink",
+      light: { fill: "#F6C5D8", stroke: "#9D174D", text: "#9D174D" },
+      dark: { fill: "#9D174D", stroke: "#FBCFE8", text: "#FBCFE8" }
+    },
+    red: {
+      label: "Red",
+      light: { fill: "#FECACA", stroke: "#B91C1C", text: "#B91C1C" },
+      dark: { fill: "#B91C1C", stroke: "#FEE2E2", text: "#FEE2E2" }
+    },
+    orange: {
+      label: "Orange",
+      light: { fill: "#FED7AA", stroke: "#C2410C", text: "#9A3412" },
+      dark: { fill: "#C2410C", stroke: "#FFEDD5", text: "#FFEDD5" }
+    },
+    yellow: {
+      label: "Yellow",
+      light: { fill: "#FEF08A", stroke: "#A16207", text: "#854D0E" },
+      dark: { fill: "#A16207", stroke: "#FEF9C3", text: "#FEF9C3" }
+    },
+    green: {
+      label: "Green",
+      light: { fill: "#BBF7D0", stroke: "#15803D", text: "#166534" },
+      dark: { fill: "#15803D", stroke: "#DCFCE7", text: "#DCFCE7" }
+    },
+    cyan: {
+      label: "Cyan",
+      light: { fill: "#A5F3FC", stroke: "#0E7490", text: "#155E75" },
+      dark: { fill: "#0E7490", stroke: "#CFFAFE", text: "#CFFAFE" }
+    },
+    blue: {
+      label: "Blue",
+      light: { fill: "#BFDBFE", stroke: "#1D4ED8", text: "#1E3A8A" },
+      dark: { fill: "#1D4ED8", stroke: "#DBEAFE", text: "#DBEAFE" }
+    },
+    purple: {
+      label: "Purple",
+      light: { fill: "#DDD6FE", stroke: "#6D28D9", text: "#5B21B6" },
+      dark: { fill: "#6D28D9", stroke: "#EDE9FE", text: "#EDE9FE" }
+    }
+  };
 
   const diagramThemes = {
     light: {
       edge: { stroke: "#52616B", strokeWidth: 2, text: "#3E4A54" },
       node: {
-        application: { fill: "#EAF2FF", stroke: "#3574C7", strokeWidth: 2, text: "#17202A", subtitleText: "#52616B" },
-        service: { fill: "#E9F8F0", stroke: "#24824A", strokeWidth: 2, text: "#17202A", subtitleText: "#52616B" },
-        datastore: { fill: "#F7F1FF", stroke: "#7A4CC2", strokeWidth: 2, text: "#17202A", subtitleText: "#52616B" },
-        note: { fill: "#FFF8DF", stroke: "#9B7B00", strokeWidth: 2, text: "#17202A", subtitleText: "#52616B" }
+        application: { fill: "#EAF2FF", stroke: "#3574C7", strokeWidth: 2, text: "#17202A" },
+        service: { fill: "#E9F8F0", stroke: "#24824A", strokeWidth: 2, text: "#17202A" },
+        datastore: { fill: "#F7F1FF", stroke: "#7A4CC2", strokeWidth: 2, text: "#17202A" },
+        note: { fill: "#FFF8DF", stroke: "#9B7B00", strokeWidth: 2, text: "#17202A" }
       }
     },
     dark: {
       edge: { stroke: "#B8C7D5", strokeWidth: 2, text: "#D9E4ED" },
       node: {
-        application: { fill: "#193A61", stroke: "#71AEF7", strokeWidth: 2, text: "#F3F8FC", subtitleText: "#C5D5E5" },
-        service: { fill: "#164A38", stroke: "#66D39A", strokeWidth: 2, text: "#F3F8FC", subtitleText: "#C5D5E5" },
-        datastore: { fill: "#3D285D", stroke: "#B796FF", strokeWidth: 2, text: "#F3F8FC", subtitleText: "#C5D5E5" },
-        note: { fill: "#594819", stroke: "#F1CC58", strokeWidth: 2, text: "#F3F8FC", subtitleText: "#DDE7EF" }
+        application: { fill: "#193A61", stroke: "#71AEF7", strokeWidth: 2, text: "#F3F8FC" },
+        service: { fill: "#164A38", stroke: "#66D39A", strokeWidth: 2, text: "#F3F8FC" },
+        datastore: { fill: "#3D285D", stroke: "#B796FF", strokeWidth: 2, text: "#F3F8FC" },
+        note: { fill: "#594819", stroke: "#F1CC58", strokeWidth: 2, text: "#F3F8FC" }
       }
     }
   };
@@ -263,6 +317,152 @@
     const snapped = snapToGrid(value, grid);
     const snappedMinimum = grid ? Math.ceil(minimum / grid) * grid : minimum;
     return Math.max(snappedMinimum, snapped);
+  }
+
+  function getNodeBounds(node) {
+    return {
+      x: Number(node.position?.x) || 0,
+      y: Number(node.position?.y) || 0,
+      width: Number(node.size?.width) || defaultNode.width,
+      height: Number(node.size?.height) || defaultNode.height
+    };
+  }
+
+  function expandCanvasForNode(diagram, node, padding = 40) {
+    const width = Number(diagram.canvas?.width) || 1000;
+    const height = Number(diagram.canvas?.height) || 560;
+    const nodes = diagram.nodes.includes(node) ? diagram.nodes : [...diagram.nodes, node];
+    const bounds = nodes.map(getNodeBounds);
+    const minimumX = Math.min(0, ...bounds.map((candidate) => candidate.x));
+    const minimumY = Math.min(0, ...bounds.map((candidate) => candidate.y));
+    const shiftX = minimumX < 0 ? padding - minimumX : 0;
+    const shiftY = minimumY < 0 ? padding - minimumY : 0;
+
+    if (shiftX || shiftY) {
+      for (const candidate of diagram.nodes) {
+        candidate.position = {
+          ...candidate.position,
+          x: (Number(candidate.position?.x) || 0) + shiftX,
+          y: (Number(candidate.position?.y) || 0) + shiftY
+        };
+      }
+    }
+
+    const expandedBounds = nodes.map(getNodeBounds);
+    diagram.canvas = {
+      ...diagram.canvas,
+      width: Math.max(width + shiftX, ...expandedBounds.map((candidate) => candidate.x + candidate.width + padding)),
+      height: Math.max(height + shiftY, ...expandedBounds.map((candidate) => candidate.y + candidate.height + padding))
+    };
+    return diagram;
+  }
+
+  function rectanglesOverlap(first, second) {
+    return first.x < second.x + second.width &&
+      first.x + first.width > second.x &&
+      first.y < second.y + second.height &&
+      first.y + first.height > second.y;
+  }
+
+  function createUniqueNodeId(nodes, base = "new-node") {
+    const ids = new Set(nodes.map((node) => node.id));
+    if (!ids.has(base)) {
+      return base;
+    }
+
+    let suffix = 2;
+    while (ids.has(`${base}-${suffix}`)) {
+      suffix += 1;
+    }
+    return `${base}-${suffix}`;
+  }
+
+  function getDefaultNodePosition(diagram) {
+    const width = Number(diagram.canvas?.width) || 1000;
+    const height = Number(diagram.canvas?.height) || 560;
+    const grid = getGridSize(diagram);
+    const start = {
+      x: snapToGrid(Math.max(0, (width - defaultNode.width) / 2), grid),
+      y: snapToGrid(Math.max(0, (height - defaultNode.height) / 2), grid)
+    };
+    const step = grid || 20;
+
+    for (let offset = 0; offset <= Math.max(width, height); offset += step) {
+      for (const candidate of [
+        { x: start.x + offset, y: start.y },
+        { x: start.x - offset, y: start.y },
+        { x: start.x, y: start.y + offset },
+        { x: start.x, y: start.y - offset }
+      ]) {
+        if (candidate.x < 0 || candidate.y < 0 ||
+          candidate.x + defaultNode.width > width || candidate.y + defaultNode.height > height) {
+          continue;
+        }
+        if (!diagram.nodes.some((node) => rectanglesOverlap(
+          { ...candidate, width: defaultNode.width, height: defaultNode.height },
+          getNodeBounds(node)
+        ))) {
+          return candidate;
+        }
+      }
+    }
+
+    return start;
+  }
+
+  function createNode(diagram) {
+    const node = {
+      id: createUniqueNodeId(diagram.nodes),
+      label: defaultNode.label,
+      type: defaultNode.type,
+      shape: defaultNode.shape,
+      position: getDefaultNodePosition(diagram),
+      size: { width: defaultNode.width, height: defaultNode.height }
+    };
+    diagram.nodes.push(node);
+    return node;
+  }
+
+  function createConnector(diagram, source, sourceAnchor, target, targetAnchor) {
+    const edge = {
+      source,
+      target,
+      sourceAnchor,
+      targetAnchor,
+      route: "orthogonal",
+      end: "arrow"
+    };
+    diagram.edges.push(edge);
+    return edge;
+  }
+
+  function reconnectConnector(edge, endpoint, nodeId, anchor) {
+    if (endpoint === "source") {
+      edge.source = nodeId;
+      edge.sourceAnchor = anchor;
+    } else {
+      edge.target = nodeId;
+      edge.targetAnchor = anchor;
+    }
+    return edge;
+  }
+
+  function deleteConnector(diagram, edgeIndex) {
+    if (edgeIndex < 0 || edgeIndex >= diagram.edges.length) {
+      return null;
+    }
+    return diagram.edges.splice(edgeIndex, 1)[0];
+  }
+
+  function deleteNode(diagram, nodeId) {
+    const nodeIndex = diagram.nodes.findIndex((node) => node.id === nodeId);
+    if (nodeIndex === -1) {
+      return { node: null, deletedEdges: [] };
+    }
+    const deletedEdges = diagram.edges.filter((edge) => edge.source === nodeId || edge.target === nodeId);
+    diagram.nodes.splice(nodeIndex, 1);
+    diagram.edges = diagram.edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId);
+    return { node: nodeId, deletedEdges };
   }
 
   function splitTextLines(value) {
@@ -571,6 +771,7 @@
 
     const edgeLabelLineHeight = 16;
     const edgeMarkerDefs = [];
+    const edgeEndpointMarkup = [];
 
     const edgeMarkup = diagram.edges.map((edge, edgeIndex) => {
       const sourceNode = nodes.get(edge.source);
@@ -627,6 +828,13 @@
         edgeMarkerDefs.push(buildEdgeMarkerDef(endMarkerId, endMarkerStyle, "end", style.stroke, strokeWidth));
       }
 
+      if (isSelected && editMode) {
+        edgeEndpointMarkup.push(
+          `<circle class="docdiagram-edge-endpoint" data-diagram-index="${diagramIndex}" data-edge-index="${edgeIndex}" data-endpoint="source" cx="${sourceAnchor.x}" cy="${sourceAnchor.y}" r="7"/>`,
+          `<circle class="docdiagram-edge-endpoint" data-diagram-index="${diagramIndex}" data-edge-index="${edgeIndex}" data-endpoint="target" cx="${targetAnchor.x}" cy="${targetAnchor.y}" r="7"/>`
+        );
+      }
+
       const markerAttributes = [
         startMarkerStyle !== "none" ? ` marker-start="url(#${startMarkerId})"` : "",
         endMarkerStyle !== "none" ? ` marker-end="url(#${endMarkerId})"` : ""
@@ -666,10 +874,16 @@
           ? `<foreignObject class="docdiagram-inline-editor-host" x="${geometry.textBounds.x}" y="${geometry.textBounds.y}" width="${geometry.textBounds.width}" height="${geometry.textBounds.height}"><textarea class="docdiagram-inline-editor docdiagram-inline-editor-node" aria-label="Edit node label. Press Enter for a new line. Press Control or Command plus Enter to save. Press Escape to cancel.">${escapeHtml(node.label)}</textarea></foreignObject>`
           : renderTextBlock(layout.centerX, layout.labelStartY, layout.labelLines, layout.labelLineHeight, "docdiagram-node-label", style.text),
         !isEditing && layout.subtitleLines.length
-          ? renderTextBlock(layout.centerX, layout.subtitleStartY, layout.subtitleLines, layout.subtitleLineHeight, "docdiagram-node-subtitle", style.subtitleText)
+          ? renderTextBlock(layout.centerX, layout.subtitleStartY, layout.subtitleLines, layout.subtitleLineHeight, "docdiagram-node-subtitle", style.text)
           : "",
         isSelected && editMode && !isEditing
           ? `<rect class="docdiagram-resize-handle" x="${x + nodeWidth - 7}" y="${y + nodeHeight - 7}" width="14" height="14" rx="3"/>`
+          : "",
+        isSelected && editMode && !isEditing
+          ? edgeAnchors.map((anchor) => {
+            const point = geometry.anchors[anchor];
+            return `<circle class="docdiagram-connection-port" data-anchor="${anchor}" cx="${point.x}" cy="${point.y}" r="7" aria-label="${anchor} connection port"/>`;
+          }).join("")
           : "",
         `</g>`
       ].join("");
@@ -677,10 +891,22 @@
 
     return [
       `<figure class="docdiagram" data-diagram-index="${diagramIndex}">`,
-      `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Architecture diagram" data-diagram-index="${diagramIndex}">`,
+      `<div class="docdiagram-diagram-toolbar" role="toolbar" aria-label="Diagram controls">`,
+      `<button type="button" class="docdiagram-icon-button docdiagram-zoom-in" data-diagram-index="${diagramIndex}" aria-label="Zoom in" title="Zoom in">+</button>`,
+      `<button type="button" class="docdiagram-icon-button docdiagram-zoom-out" data-diagram-index="${diagramIndex}" aria-label="Zoom out" title="Zoom out">−</button>`,
+      `<button type="button" class="docdiagram-icon-button docdiagram-fit" data-diagram-index="${diagramIndex}" aria-label="Zoom to fit" title="Zoom to fit">⊡</button>`,
+      editMode
+        ? `<button type="button" class="docdiagram-icon-button docdiagram-done-editing" aria-label="Done editing" title="Done editing">✓</button><button type="button" class="docdiagram-icon-button docdiagram-cancel-editing" aria-label="Cancel editing and discard changes" title="Cancel editing and discard changes">×</button><button type="button" class="docdiagram-icon-button docdiagram-create-node" data-diagram-index="${diagramIndex}" aria-label="New node" title="New node">+</button>`
+        : `<button type="button" class="docdiagram-icon-button docdiagram-start-editing" aria-label="Edit diagram" title="Edit diagram">✎</button>`,
+      `</div>`,
+      `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Architecture diagram" data-diagram-index="${diagramIndex}" style="width: ${diagramZooms.get(diagramIndex) || 100}%">`,
       `<defs>${edgeMarkerDefs.join("")}</defs>`,
       edgeMarkup,
+      connectionDrag?.diagramIndex === diagramIndex
+        ? `<path class="docdiagram-connection-preview${connectionDrag.invalid ? " docdiagram-connection-invalid" : ""}" d="${buildEdgePath(connectionDrag.start, connectionDrag.current, connectionDrag.sourceAnchor, connectionDrag.targetAnchor || connectionDrag.sourceAnchor, "straight").path}"/>`
+        : "",
       nodeMarkup,
+      edgeEndpointMarkup.join(""),
       `</svg>`,
       `</figure>`
     ].join("");
@@ -964,6 +1190,20 @@
     return node;
   }
 
+  function setNodeColorPalette(node, tone, hue) {
+    const preset = nodeColorPalettes[hue]?.[tone];
+    if (!preset) {
+      return node;
+    }
+    node.style = {
+      ...node.style,
+      fill: preset.fill,
+      stroke: preset.stroke,
+      text: preset.text
+    };
+    return node;
+  }
+
   function setNodeSize(diagram, node, dimension, rawValue) {
     const grid = getGridSize(diagram);
     const minimum = dimension === "width" ? minimumNodeSize.width : minimumNodeSize.height;
@@ -1019,6 +1259,7 @@
     toolbar.className = "docdiagram-toolbar";
     toolbar.dataset.editing = String(editMode);
     toolbar.dataset.theme = documentTheme;
+    toolbar.dataset.format = documentFormat;
 
     const node = editMode ? getSelectedNode() : null;
     const edge = editMode && !node ? getSelectedEdge() : null;
@@ -1029,13 +1270,19 @@
         : null;
 
     toolbar.innerHTML = [
-      `<button type="button" class="docdiagram-edit-toggle">${editMode ? "Finish editing" : "Edit diagram"}</button>`,
-      `<label class="docdiagram-theme-control">Theme`,
-      `<select class="docdiagram-theme-select">`,
+      `<button type="button" class="docdiagram-menu-toggle" aria-label="Document menu" aria-expanded="false" title="Document menu">☰</button>`,
+      `<div class="docdiagram-menu" hidden>`,
+      `<label class="docdiagram-theme-control">Theme<select class="docdiagram-theme-select">`,
       `<option value="light"${documentTheme === "light" ? " selected" : ""}>Light</option>`,
       `<option value="dark"${documentTheme === "dark" ? " selected" : ""}>Dark</option>`,
       `</select></label>`,
-      `<button type="button" class="docdiagram-save"${editMode ? "" : " hidden"}>Save a copy</button>`,
+      `<label class="docdiagram-theme-control">Format<select class="docdiagram-format-select">`,
+      `<option value="centered"${documentFormat === "centered" ? " selected" : ""}>Centered</option>`,
+      `<option value="full-width"${documentFormat === "full-width" ? " selected" : ""}>Full width</option>`,
+      `</select></label>`,
+      `<button type="button" class="docdiagram-save">Save As</button>`,
+      `<button type="button" class="docdiagram-offline-save" disabled>Save for Offline (coming soon)</button>`,
+      `</div>`,
       node
         ? `<div class="docdiagram-inspector" data-kind="node">${buildNodeInspectorFields(inspectorDiagram, node)}</div>`
         : edge
@@ -1043,33 +1290,123 @@
           : ""
     ].join("");
 
-    const editButton = toolbar.querySelector(".docdiagram-edit-toggle");
+    const menuToggle = toolbar.querySelector(".docdiagram-menu-toggle");
+    const menu = toolbar.querySelector(".docdiagram-menu");
     const saveButton = toolbar.querySelector(".docdiagram-save");
     const themeSelect = toolbar.querySelector(".docdiagram-theme-select");
+    const formatSelect = toolbar.querySelector(".docdiagram-format-select");
 
-    editButton.addEventListener("click", () => {
-      editMode = !editMode;
-      selectedNode = null;
-      selectedEdge = null;
-      editingNode = null;
-      editingEdge = null;
-      renderDocument();
+    menuToggle.addEventListener("click", () => {
+      const open = menu.hidden;
+      menu.hidden = !open;
+      menuToggle.setAttribute("aria-expanded", String(open));
     });
 
     saveButton.addEventListener("click", downloadDocument);
-
     themeSelect.addEventListener("change", () => {
       setSource(setFrontmatterTheme(getSource(), themeSelect.value));
       renderDocument();
     });
+    formatSelect.addEventListener("change", () => {
+      documentFormat = formatSelect.value;
+      renderDocument();
+    });
+
+    outputElement.before(toolbar);
 
     if (node) {
       wireNodeInspector(toolbar, selectedNode.diagramIndex, selectedNode.nodeId);
+      positionInspector(selectedNode.diagramIndex);
     } else if (edge) {
       wireEdgeInspector(toolbar, selectedEdge.diagramIndex, selectedEdge.edgeIndex);
+      positionInspector(selectedEdge.diagramIndex);
     }
 
-    outputElement.before(toolbar);
+    function positionInspector(diagramIndex) {
+      const inspector = document.querySelector(".docdiagram-inspector");
+      const diagram = outputElement.querySelector(`.docdiagram[data-diagram-index="${diagramIndex}"]`);
+      if (!inspector || !diagram) {
+        return;
+      }
+      inspector.style.top = `${Math.max(16, diagram.getBoundingClientRect().top)}px`;
+    }
+
+    wireChromeControls(toolbar);
+  }
+
+  function isDirty() {
+    return getSource() !== savedSource;
+  }
+
+  function clampZoom(value) {
+    return Math.min(200, Math.max(25, Number(value) || 100));
+  }
+
+  function clearEditorState() {
+    selectedNode = null;
+    selectedEdge = null;
+    editingNode = null;
+    editingEdge = null;
+  }
+
+  function exitEditing(discard) {
+    if (discard && editSessionSource !== null) {
+      setSource(editSessionSource);
+    } else if (!discard && isDirty()) {
+      globalThis.confirm("Save changes before leaving edit mode?") && downloadDocument();
+    }
+    editMode = false;
+    editSessionSource = null;
+    clearEditorState();
+    renderDocument();
+  }
+
+  function createNewNode(diagramIndex) {
+    const diagram = diagramModels[diagramIndex];
+    if (!diagram) {
+      return;
+    }
+    const node = createNode(diagram);
+    selectedNode = { diagramIndex, nodeId: node.id };
+    selectedEdge = null;
+    persistDiagramModels();
+    renderDocument();
+  }
+
+  function wireChromeControls(toolbar) {
+    for (const button of outputElement.querySelectorAll(".docdiagram-zoom-in, .docdiagram-zoom-out")) {
+      button.addEventListener("click", () => {
+        const diagramIndex = Number(button.dataset.diagramIndex);
+        const current = diagramZooms.get(diagramIndex) || 100;
+        const direction = button.classList.contains("docdiagram-zoom-in") ? 25 : -25;
+        diagramZooms.set(diagramIndex, clampZoom(current + direction));
+        renderDocument();
+      });
+    }
+    for (const button of outputElement.querySelectorAll(".docdiagram-fit")) {
+      button.addEventListener("click", () => {
+        diagramZooms.set(Number(button.dataset.diagramIndex), 100);
+        renderDocument();
+      });
+    }
+
+    for (const button of outputElement.querySelectorAll(".docdiagram-start-editing")) {
+      button.addEventListener("click", () => {
+        editSessionSource = getSource();
+        editMode = true;
+        clearEditorState();
+        renderDocument();
+      });
+    }
+    for (const button of outputElement.querySelectorAll(".docdiagram-done-editing")) {
+      button.addEventListener("click", () => exitEditing(false));
+    }
+    for (const button of outputElement.querySelectorAll(".docdiagram-cancel-editing")) {
+      button.addEventListener("click", () => exitEditing(true));
+    }
+    for (const button of outputElement.querySelectorAll(".docdiagram-create-node")) {
+      button.addEventListener("click", () => createNewNode(Number(button.dataset.diagramIndex)));
+    }
   }
 
   function buildNodeInspectorFields(diagram, node) {
@@ -1080,12 +1417,24 @@
     const widthMinimum = grid ? Math.ceil(minimumNodeSize.width / grid) * grid : minimumNodeSize.width;
     const heightMinimum = grid ? Math.ceil(minimumNodeSize.height / grid) * grid : minimumNodeSize.height;
     const step = grid || 1;
+    const matchingPalette = Object.entries(nodeColorPalettes).find(([, palette]) =>
+      [palette.light, palette.dark].some((preset) =>
+        preset.fill.toLowerCase() === style.fill.toLowerCase() &&
+        preset.stroke.toLowerCase() === style.stroke.toLowerCase() &&
+        preset.text.toLowerCase() === style.text.toLowerCase()
+      )
+    );
+    const matchingHue = matchingPalette?.[0] || "blue";
+    const matchingTone = matchingPalette && matchingPalette[1].light.fill.toLowerCase() === style.fill.toLowerCase()
+      ? "light"
+      : "dark";
 
     return [
       `<label class="docdiagram-field docdiagram-field-wide">Label<textarea class="docdiagram-inspector-label docdiagram-inspector-textarea" rows="2">${escapeHtml(node.label)}</textarea></label>`,
       `<label class="docdiagram-field docdiagram-field-wide">Subtitle<textarea class="docdiagram-inspector-subtitle docdiagram-inspector-textarea" rows="2">${escapeHtml(node.subtitle || "")}</textarea></label>`,
-      `<label class="docdiagram-field">Type<select class="docdiagram-inspector-type">${nodeTypes.map(
-        (type) => `<option value="${type}"${type === node.type ? " selected" : ""}>${type}</option>`
+      `<label class="docdiagram-field">Tone<select class="docdiagram-inspector-tone"><option value="light"${matchingTone === "light" ? " selected" : ""}>Light</option><option value="dark"${matchingTone === "dark" ? " selected" : ""}>Dark</option></select></label>`,
+      `<label class="docdiagram-field">Colour<select class="docdiagram-inspector-colour">${Object.entries(nodeColorPalettes).map(
+        ([name, palette]) => `<option value="${name}"${name === matchingHue ? " selected" : ""}>${palette.label}</option>`
       ).join("")}</select></label>`,
       `<label class="docdiagram-field">Shape<select class="docdiagram-inspector-shape">${nodeShapes.map(
         (shape) => `<option value="${shape}"${shape === node.shape ? " selected" : ""}>${shape}</option>`
@@ -1150,9 +1499,13 @@
       withNode((diagram, node) => setNodeSubtitle(node, event.target.value));
     });
 
-    container.querySelector(".docdiagram-inspector-type").addEventListener("change", (event) => {
-      withNode((diagram, node) => setNodeType(node, event.target.value));
-    });
+    const toneSelect = container.querySelector(".docdiagram-inspector-tone");
+    const colourSelect = container.querySelector(".docdiagram-inspector-colour");
+    const applyColourPalette = () => {
+      withNode((diagram, node) => setNodeColorPalette(node, toneSelect.value, colourSelect.value));
+    };
+    toneSelect.addEventListener("change", applyColourPalette);
+    colourSelect.addEventListener("change", applyColourPalette);
 
     container.querySelector(".docdiagram-inspector-shape").addEventListener("change", (event) => {
       withNode((diagram, node) => setNodeShape(node, event.target.value));
@@ -1254,6 +1607,28 @@
     selectedEdge = null;
     editingNode = null;
     editingEdge = null;
+    renderDocument();
+  }
+
+  function deleteSelected() {
+    if (selectedNode) {
+      const { diagramIndex, nodeId } = selectedNode;
+      const diagram = diagramModels[diagramIndex];
+      const attachedEdges = diagram?.edges.filter((edge) => edge.source === nodeId || edge.target === nodeId) || [];
+      if (attachedEdges.length && !globalThis.confirm(`Delete this node and its ${attachedEdges.length} attached connector${attachedEdges.length === 1 ? "" : "s"}?`)) {
+        return;
+      }
+      deleteNode(diagram, nodeId);
+    } else if (selectedEdge) {
+      deleteConnector(diagramModels[selectedEdge.diagramIndex], selectedEdge.edgeIndex);
+    } else {
+      return;
+    }
+    selectedNode = null;
+    selectedEdge = null;
+    editingNode = null;
+    editingEdge = null;
+    persistDiagramModels();
     renderDocument();
   }
 
@@ -1365,6 +1740,7 @@
       svg.removeEventListener("pointercancel", finish);
 
       if (resized) {
+        expandCanvasForNode(diagram, node);
         selectedNode = { diagramIndex, nodeId };
         selectedEdge = null;
         editingNode = null;
@@ -1372,6 +1748,116 @@
         persistDiagramModels();
         renderDocument();
       }
+    }
+
+    svg.addEventListener("pointermove", move);
+    svg.addEventListener("pointerup", finish);
+    svg.addEventListener("pointercancel", finish);
+  }
+
+  function getNodePortPoint(node, anchor) {
+    const bounds = getNodeBounds(node);
+    return getNodeGeometry(node, bounds.x, bounds.y, bounds.width, bounds.height).anchors[anchor];
+  }
+
+  function addConnectionTargetPorts(svg, diagramIndex) {
+    const diagram = diagramModels[diagramIndex];
+    for (const node of diagram.nodes) {
+      for (const anchor of edgeAnchors) {
+        const point = getNodePortPoint(node, anchor);
+        const port = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        port.setAttribute("class", "docdiagram-connection-port docdiagram-connection-target-port");
+        port.dataset.nodeId = node.id;
+        port.dataset.anchor = anchor;
+        port.setAttribute("cx", point.x);
+        port.setAttribute("cy", point.y);
+        port.setAttribute("r", "7");
+        svg.append(port);
+      }
+    }
+  }
+
+  function beginConnectionDrag(svg, event, drag) {
+    event.preventDefault();
+    event.stopPropagation();
+    connectionDrag = { ...drag, current: svgPoint(svg, event), invalid: false };
+    addConnectionTargetPorts(svg, drag.diagramIndex);
+    const preview = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    preview.setAttribute("class", "docdiagram-connection-preview");
+    svg.append(preview);
+
+    if (event.isTrusted) {
+      svg.setPointerCapture(event.pointerId);
+    }
+
+    function getDropPort(pointerEvent) {
+      const hitPort = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY)
+        ?.closest(".docdiagram-connection-port");
+      if (hitPort) {
+        return hitPort;
+      }
+      return [...svg.querySelectorAll(".docdiagram-connection-port")].find((port) => {
+        const bounds = port.getBoundingClientRect();
+        return pointerEvent.clientX >= bounds.left && pointerEvent.clientX <= bounds.right &&
+          pointerEvent.clientY >= bounds.top && pointerEvent.clientY <= bounds.bottom;
+      }) || null;
+    }
+
+    function move(moveEvent) {
+      const point = svgPoint(svg, moveEvent);
+      const candidate = getDropPort(moveEvent);
+      connectionDrag.current = point;
+      connectionDrag.invalid = !candidate;
+      const targetAnchor = candidate?.dataset.anchor || connectionDrag.sourceAnchor;
+      preview.setAttribute("d", buildEdgePath(
+        connectionDrag.start,
+        point,
+        connectionDrag.sourceAnchor,
+        targetAnchor,
+        "straight"
+      ).path);
+      preview.classList.toggle("docdiagram-connection-invalid", connectionDrag.invalid);
+    }
+
+    function finish(finishEvent) {
+      if (finishEvent.isTrusted && svg.hasPointerCapture(finishEvent.pointerId)) {
+        svg.releasePointerCapture(finishEvent.pointerId);
+      }
+      svg.removeEventListener("pointermove", move);
+      svg.removeEventListener("pointerup", finish);
+      svg.removeEventListener("pointercancel", finish);
+
+      const target = getDropPort(finishEvent);
+      const dragState = connectionDrag;
+      connectionDrag = null;
+      if (target && dragState) {
+        const diagram = diagramModels[dragState.diagramIndex];
+        if (dragState.reconnect) {
+          reconnectConnector(
+            diagram.edges[dragState.edgeIndex],
+            dragState.endpoint,
+            target.dataset.nodeId || target.closest(".docdiagram-node")?.dataset.nodeId,
+            target.dataset.anchor
+          );
+          selectedEdge = { diagramIndex: dragState.diagramIndex, edgeIndex: dragState.edgeIndex };
+          selectedNode = null;
+        } else {
+          const targetNodeId = target.dataset.nodeId || target.closest(".docdiagram-node")?.dataset.nodeId;
+          if (targetNodeId) {
+            const edge = createConnector(
+              diagram,
+              dragState.sourceNodeId,
+              dragState.sourceAnchor,
+              targetNodeId,
+              target.dataset.anchor
+            );
+            selectedEdge = { diagramIndex: dragState.diagramIndex, edgeIndex: diagram.edges.indexOf(edge) };
+            selectedNode = null;
+          }
+        }
+        persistDiagramModels();
+      }
+      renderDocument();
     }
 
     svg.addEventListener("pointermove", move);
@@ -1398,6 +1884,55 @@
       editingNode = null;
     }
     renderDocument();
+  }
+
+  function beginCanvasPan(svg, event) {
+    const frame = svg.closest(".docdiagram");
+    if (!frame) {
+      return;
+    }
+
+    event.preventDefault();
+    const start = {
+      clientX: event.clientX,
+      clientY: event.clientY,
+      scrollLeft: frame.scrollLeft,
+      scrollTop: frame.scrollTop
+    };
+    frame.classList.add("docdiagram-panning");
+
+    if (event.isTrusted) {
+      svg.setPointerCapture(event.pointerId);
+    }
+
+    function move(moveEvent) {
+      frame.scrollLeft = start.scrollLeft - (moveEvent.clientX - start.clientX);
+      frame.scrollTop = start.scrollTop - (moveEvent.clientY - start.clientY);
+    }
+
+    function finish(finishEvent) {
+      if (finishEvent.isTrusted && svg.hasPointerCapture(finishEvent.pointerId)) {
+        svg.releasePointerCapture(finishEvent.pointerId);
+      }
+      frame.classList.remove("docdiagram-panning");
+      svg.removeEventListener("pointermove", move);
+      svg.removeEventListener("pointerup", finish);
+      svg.removeEventListener("pointercancel", finish);
+    }
+
+    svg.addEventListener("pointermove", move);
+    svg.addEventListener("pointerup", finish);
+    svg.addEventListener("pointercancel", finish);
+  }
+
+  function enableCanvasPanning() {
+    for (const svg of outputElement.querySelectorAll(".docdiagram svg")) {
+      svg.addEventListener("pointerdown", (event) => {
+        if (event.target === svg) {
+          beginCanvasPan(svg, event);
+        }
+      });
+    }
   }
 
   function enableEditing() {
@@ -1435,6 +1970,41 @@
       });
 
       svg.addEventListener("pointerdown", (event) => {
+        const port = event.target.closest(".docdiagram-connection-port");
+        if (port) {
+          const group = port.closest(".docdiagram-node");
+          const diagramIndex = Number(group?.dataset.diagramIndex ?? svg.dataset.diagramIndex);
+          const nodeId = port.dataset.nodeId || group?.dataset.nodeId;
+          const node = diagramModels[diagramIndex].nodes.find((candidate) => candidate.id === nodeId);
+          if (node) {
+            beginConnectionDrag(svg, event, {
+              diagramIndex,
+              sourceNodeId: nodeId,
+              sourceAnchor: port.dataset.anchor,
+              start: getNodePortPoint(node, port.dataset.anchor)
+            });
+          }
+          return;
+        }
+
+        const endpoint = event.target.closest(".docdiagram-edge-endpoint");
+        if (endpoint) {
+          const diagramIndex = Number(endpoint.dataset.diagramIndex);
+          const edgeIndex = Number(endpoint.dataset.edgeIndex);
+          const edge = diagramModels[diagramIndex].edges[edgeIndex];
+          const endpointName = endpoint.dataset.endpoint;
+          const node = diagramModels[diagramIndex].nodes.find((candidate) => candidate.id === edge[endpointName]);
+          beginConnectionDrag(svg, event, {
+            diagramIndex,
+            edgeIndex,
+            endpoint: endpointName,
+            reconnect: true,
+            sourceAnchor: edge[`${endpointName}Anchor`],
+            start: getNodePortPoint(node, edge[`${endpointName}Anchor`])
+          });
+          return;
+        }
+
         const resizeHandle = event.target.closest(".docdiagram-resize-handle");
         if (resizeHandle) {
           resizeNode(svg, event, resizeHandle.closest(".docdiagram-node"));
@@ -1485,6 +2055,7 @@
           svg.removeEventListener("pointercancel", finish);
 
           if (moved) {
+            expandCanvasForNode(diagramModels[diagramIndex], node);
             selectedNode = { diagramIndex, nodeId };
             selectedEdge = null;
             editingNode = null;
@@ -1539,6 +2110,22 @@
       editor.focus();
       editor.select();
     }
+
+    if (!outputElement.dataset.deleteShortcutBound) {
+      outputElement.dataset.deleteShortcutBound = "true";
+      document.addEventListener("keydown", (event) => {
+        if (!editMode || (event.key !== "Delete" && event.key !== "Backspace")) {
+          return;
+        }
+        if (event.target.matches("input, textarea, select, [contenteditable]")) {
+          return;
+        }
+        if (selectedNode || selectedEdge) {
+          event.preventDefault();
+          deleteSelected();
+        }
+      });
+    }
   }
 
   function downloadDocument() {
@@ -1561,6 +2148,7 @@
     link.download = `${title || "document"}-edited.html`;
     link.click();
     URL.revokeObjectURL(link.href);
+    savedSource = getSource();
   }
 
   function applyPageTheme(theme) {
@@ -1576,7 +2164,23 @@
     }
   }
 
+  function closeDocumentMenu() {
+    const menu = document.querySelector(".docdiagram-menu");
+    const toggle = document.querySelector(".docdiagram-menu-toggle");
+    if (!menu || !toggle) {
+      return;
+    }
+    menu.hidden = true;
+    toggle.setAttribute("aria-expanded", "false");
+  }
+
   function renderDocument() {
+    const scrollPositions = new Map(
+      [...outputElement.querySelectorAll(".docdiagram")].map((diagram) => [
+        Number(diagram.dataset.diagramIndex),
+        { left: diagram.scrollLeft, top: diagram.scrollTop }
+      ])
+    );
     diagramModels.length = 0;
     let parsedDocument;
     try {
@@ -1590,13 +2194,23 @@
     }
 
     outputElement.dataset.theme = documentTheme;
+    outputElement.dataset.format = documentFormat;
     applyPageTheme(documentTheme);
     outputElement.innerHTML = renderMarkdown(parsedDocument.content);
     removeToolbarChrome();
     createToolbar();
+    enableCanvasPanning();
 
     if (editMode) {
       enableEditing();
+    }
+
+    for (const diagram of outputElement.querySelectorAll(".docdiagram")) {
+      const position = scrollPositions.get(Number(diagram.dataset.diagramIndex));
+      if (position) {
+        diagram.scrollLeft = position.left;
+        diagram.scrollTop = position.top;
+      }
     }
   }
 
@@ -1627,6 +2241,10 @@
         margin: 0 auto;
         max-width: 1100px;
         padding: 2rem;
+      }
+      #rendered-document[data-format="full-width"] {
+        margin: 0;
+        max-width: none;
       }
       #rendered-document pre {
         background: var(--docdiagram-code-background);
@@ -1660,11 +2278,19 @@
         background: var(--docdiagram-background);
         color: var(--docdiagram-text);
         display: flex;
-        flex-wrap: wrap;
-        gap: .75rem;
-        margin: 1.5rem auto 0;
+        justify-content: flex-end;
+        margin: 0;
         max-width: 1100px;
-        padding: .75rem 2rem;
+        padding: .5rem 2rem;
+        position: fixed;
+        right: 0;
+        top: 0;
+        z-index: 40;
+      }
+      .docdiagram-toolbar[data-format="full-width"] {
+        margin-left: 0;
+        margin-right: 0;
+        max-width: none;
       }
       .docdiagram-toolbar button,
       .docdiagram-toolbar input,
@@ -1682,39 +2308,82 @@
       .docdiagram-toolbar button:hover {
         background: var(--docdiagram-control-hover);
       }
-      .docdiagram-theme-control {
-        align-items: flex-start;
-        color: var(--docdiagram-muted);
+      .docdiagram-toolbar button:disabled {
+        cursor: not-allowed;
+        opacity: .6;
+      }
+      .docdiagram-menu {
+        background: var(--docdiagram-background);
+        border: 1px solid var(--docdiagram-border);
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgb(21 41 62 / 18%);
         display: flex;
         flex-direction: column;
-        font-size: .72rem;
-        gap: .15rem;
+        gap: .6rem;
+        padding: .75rem;
+        position: absolute;
+        right: 2rem;
+        top: calc(100% + .25rem);
+        z-index: 20;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 1rem;
+      }
+      .docdiagram-menu[hidden] {
+        display: none;
+      }
+      .docdiagram-theme-control {
+        align-items: center;
+        color: var(--docdiagram-muted);
+        display: flex;
+        font-size: .9rem;
+        gap: .75rem;
+        justify-content: space-between;
       }
       .docdiagram-inspector {
-        align-items: center;
-        border-left: 1px solid var(--docdiagram-border);
-        display: flex;
-        flex-wrap: wrap;
-        gap: .6rem;
-        margin-left: .25rem;
-        padding-left: .85rem;
-      }
-      .docdiagram-field {
-        align-items: flex-start;
-        color: var(--docdiagram-muted);
+        background: var(--docdiagram-background);
+        border: 1px solid var(--docdiagram-border);
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgb(21 41 62 / 18%);
         display: flex;
         flex-direction: column;
-        font-size: .72rem;
-        gap: .15rem;
+        gap: .6rem;
+        max-height: calc(100vh - 5.5rem);
+        overflow-y: auto;
+        padding: 1rem;
+        position: fixed;
+        right: 1rem;
+        top: 1rem;
+        width: min(19rem, calc(100vw - 2rem));
+        z-index: 30;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 1rem;
+      }
+      .docdiagram-field {
+        align-items: center;
+        color: var(--docdiagram-muted);
+        display: flex;
+        flex-direction: row;
+        font-size: .9rem;
+        gap: .75rem;
+        justify-content: space-between;
+        width: 100%;
       }
       .docdiagram-field-wide {
-        flex-basis: 100%;
+        width: 100%;
       }
       .docdiagram-field input,
       .docdiagram-field select,
       .docdiagram-field textarea {
+        background: var(--docdiagram-control-background);
+        border: 1px solid var(--docdiagram-border);
+        border-radius: 6px;
+        color: var(--docdiagram-text);
         font-size: .85rem;
         padding: .3rem .4rem;
+      }
+      .docdiagram-field select,
+      .docdiagram-field input:not([type="color"]) {
+        min-width: 9rem;
       }
       .docdiagram-field input[type="color"] {
         height: 1.9rem;
@@ -1737,13 +2406,43 @@
         border-radius: 12px;
         box-shadow: 0 2px 8px rgb(21 41 62 / 8%);
         margin: 1.5rem 0;
+        height: min(70vh, 42rem);
         overflow: auto;
         padding: 1rem;
+        position: relative;
+      }
+      .docdiagram-panning svg {
+        cursor: grabbing;
+      }
+      .docdiagram-diagram-toolbar {
+        display: flex;
+        gap: .35rem;
+        justify-content: flex-end;
+        margin-bottom: .5rem;
+        box-sizing: border-box;
+        left: 0;
+        position: sticky;
+        right: 0;
+        top: 0;
+        width: 100%;
+        z-index: 10;
+      }
+      .docdiagram-icon-button {
+        background: var(--docdiagram-control-background);
+        border: 1px solid var(--docdiagram-border);
+        border-radius: 6px;
+        color: var(--docdiagram-text);
+        cursor: pointer;
+        font: inherit;
+        height: 2rem;
+        padding: 0;
+        width: 2rem;
+      }
+      .docdiagram-icon-button:hover {
+        background: var(--docdiagram-control-hover);
       }
       .docdiagram svg {
         display: block;
-        min-width: 720px;
-        width: 100%;
       }
       .docdiagram-edge {
         fill: none;
@@ -1776,10 +2475,33 @@
         stroke: #3574c7;
         stroke-width: 2;
       }
+      .docdiagram-connection-port,
+      .docdiagram-edge-endpoint {
+        cursor: crosshair;
+        fill: #ffffff;
+        stroke: #3574c7;
+        stroke-width: 2;
+      }
+      .docdiagram-connection-target-port {
+        fill: #eaf2ff;
+      }
+      .docdiagram-connection-preview {
+        fill: none;
+        pointer-events: none;
+        stroke: #3574c7;
+        stroke-dasharray: 6 4;
+        stroke-width: 2;
+      }
+      .docdiagram-connection-preview.docdiagram-connection-invalid {
+        stroke: #d53f3f;
+      }
       .docdiagram-node {
         cursor: default;
       }
       .docdiagram-toolbar[data-editing="true"] + #rendered-document .docdiagram-node {
+        cursor: grab;
+      }
+      #rendered-document .docdiagram svg {
         cursor: grab;
       }
       .docdiagram-toolbar[data-editing="true"] + #rendered-document .docdiagram-node:has(.docdiagram-inline-editor) {
@@ -1825,12 +2547,21 @@
   globalThis.DocDiagramCore = {
     diagramThemes,
     nodeTypes,
+    nodeColorPalettes,
     nodeShapes,
     edgeAnchors,
     edgeRoutes,
     edgeMarkerStyles,
     getTheme,
     getGridSize,
+    expandCanvasForNode,
+    createUniqueNodeId,
+    getDefaultNodePosition,
+    createNode,
+    createConnector,
+    reconnectConnector,
+    deleteConnector,
+    deleteNode,
     getNodeEffectiveStyle,
     getEdgeEffectiveStyle,
     getEdgeMarkerStyle,
@@ -1848,6 +2579,7 @@
     setNodeShape,
     setNodeSubtitle,
     setNodeStyleOverride,
+    setNodeColorPalette,
     setNodeSize,
     setEdgeLabel,
     setEdgeRoute,
@@ -1862,11 +2594,31 @@
     getNodeGeometry,
     renderNodeBody,
     buildEdgePath,
-    buildEdgeInspectorFields
+    buildEdgeInspectorFields,
+    clampZoom
   };
 
   if (sourceElement && outputElement) {
     injectStyles();
+    savedSource = getSource();
+    globalThis.addEventListener("beforeunload", (event) => {
+      if (!isDirty()) {
+        return;
+      }
+      event.preventDefault();
+      event.returnValue = "";
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeDocumentMenu();
+      }
+    });
+    document.addEventListener("pointerdown", (event) => {
+      const toolbar = document.querySelector(".docdiagram-toolbar");
+      if (toolbar && !toolbar.contains(event.target)) {
+        closeDocumentMenu();
+      }
+    });
     renderDocument();
   }
 }());
