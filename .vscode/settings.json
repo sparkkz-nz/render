@@ -1,10 +1,10 @@
 {
     "chat.tools.terminal.autoApprove": {
-        "/^node --check docdiagram-runtime\\.js && node --test test/docdiagram-runtime\\.test\\.js$/": {
+        "/^node --check render-runtime\\.js && node --test test/render-runtime\\.test\\.js$/": {
             "approve": true,
             "matchCommandLine": true
         },
-        "/^node --test test/docdiagram-runtime\\.test\\.js$/": {
+        "/^node --test test/render-runtime\\.test\\.js$/": {
             "approve": true,
             "matchCommandLine": true
         }

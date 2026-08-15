@@ -5,7 +5,7 @@ const test = require("node:test");
 const vm = require("node:vm");
 
 const runtime = fs.readFileSync(
-  path.resolve(__dirname, "..", "docdiagram-runtime.js"),
+  path.resolve(__dirname, "..", "render-runtime.js"),
   "utf8"
 );
 const context = vm.createContext({
@@ -13,7 +13,7 @@ const context = vm.createContext({
   globalThis: {}
 });
 
-vm.runInContext(runtime, context, { filename: "docdiagram-runtime.js" });
+vm.runInContext(runtime, context, { filename: "render-runtime.js" });
 
 const {
   nodeTypes,

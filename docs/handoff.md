@@ -67,7 +67,7 @@ The proof of concept now supports:
 - **Save a copy**, which downloads an updated HTML document.
 
 The main sample is [example.html](../example.html), driven by
-[docdiagram-runtime.js](../docdiagram-runtime.js). It demonstrates required
+[render-runtime.js](../render-runtime.js). It demonstrates required
 node shapes, explicit non-default connector anchors, the `curved` route, a
 node subtitle, multiline labels, an edge `style.strokeWidth` override, and
 non-default edge endpoint markers.
@@ -91,7 +91,7 @@ recolors/rethickens the selected edge, and the change survives a rerender.
 machine-specific absolute file URL:
 
 ```text
-file:///Users/stuart.parkinson/hacks/render/docdiagram-runtime.js
+file:///Users/stuart.parkinson/hacks/render/render-runtime.js
 ```
 
 This means saved development copies can be opened from another local folder on
@@ -101,8 +101,8 @@ replace it with an immutable public runtime URL as described in
 
 ## Validation completed
 
-- `node --check docdiagram-runtime.js`
-- `node --test test/docdiagram-runtime.test.js` — 42 tests covering helpers,
+- `node --check render-runtime.js`
+- `node --test test/render-runtime.test.js` — 42 tests covering helpers,
   frontmatter persistence, node/edge YAML round-trip, the new `subtitle`
   field (including multiline round-trip), multiline node label/subtitle/edge
   label rendering as stacked `<tspan>`s, absence of `node.type` as SVG text,

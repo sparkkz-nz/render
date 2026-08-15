@@ -6,7 +6,7 @@ During development, keep the document and its runtime together and load the
 runtime by relative path:
 
 ```html
-<script src="./docdiagram-runtime.js" defer></script>
+<script src="./render-runtime.js" defer></script>
 ```
 
 This allows the HTML document to be opened locally without a network
@@ -17,7 +17,7 @@ folder, use this machine-specific absolute file URL instead:
 
 ```html
 <script
-  src="file:///Users/stuart.parkinson/hacks/render/docdiagram-runtime.js"
+  src="file:///Users/stuart.parkinson/hacks/render/render-runtime.js"
   defer>
 </script>
 ```
@@ -30,7 +30,7 @@ GitHub Pages site and use its absolute URL:
 
 ```html
 <script
-  src="https://sparkkz-makes.github.io/render/docdiagram-runtime-1.0.0.js"
+  src="https://sparkkz-nz.github.io/render/releases/v1.0.0/render-runtime.js"
   defer>
 </script>
 ```
@@ -42,9 +42,9 @@ the runtime version with which they were tested.
 Examples:
 
 ```text
-docdiagram-runtime-0.1.0.js
-docdiagram-runtime-0.2.0.js
-docdiagram-runtime-1.0.0.js
+releases/v0.1.0/render-runtime.js
+releases/v0.2.0/render-runtime.js
+releases/v1.0.0/render-runtime.js
 ```
 
 ## Offline export

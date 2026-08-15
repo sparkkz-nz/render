@@ -24,7 +24,7 @@ flowchart LR
   htmlDocument[HTML document<br/>Portable document shell]
   sourceTemplate[(template#source<br/>Markdown + frontmatter<br/>diagram YAML)]
   browser([Browser<br/>DOM, SVG, events,<br/>File download API])
-  runtime[docdiagram-runtime.js<br/>Parser, renderer,<br/>editor controller]
+  runtime[render-runtime.js<br/>Parser, renderer,<br/>editor controller]
   renderedOutput[#rendered-document<br/>Prose, controls,<br/>interactive SVG]
   hostedRuntime>Versioned runtime URL<br/>Optional shared distribution]
 
@@ -47,7 +47,7 @@ flowchart LR
 
 ## Runtime modules and responsibilities
 
-The application is implemented primarily in `docdiagram-runtime.js`, wrapped in
+The application is implemented primarily in `render-runtime.js`, wrapped in
 an IIFE so its internal state does not leak into a document page. A deliberately
 small `DocDiagramCore` export exposes parsing, layout, serialization, and
 mutation helpers for Node tests.
@@ -188,7 +188,7 @@ to the canvas grid.
 
 For local development, a document may reference a local `file://` runtime URL.
 That is convenient but machine-specific. For portable sharing, point the script
-tag at an immutable hosted version of `docdiagram-runtime.js`. The downloaded
+tag at an immutable hosted version of `render-runtime.js`. The downloaded
 HTML then carries its Markdown and diagram source while retrieving a known
 renderer implementation when opened.
 
@@ -224,7 +224,7 @@ YAML serialization and multiline round trips, themes and styles, SVG markup,
 and per-edge marker isolation. Run the targeted suite with:
 
 ```sh
-node --test test/docdiagram-runtime.test.js
+node --test test/render-runtime.test.js
 ```
 
 For a browser validation, open this document or `example.html`, confirm that

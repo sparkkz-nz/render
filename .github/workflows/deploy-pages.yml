@@ -1,0 +1,69 @@
+name: Deploy runtime to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main and release tags
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Test runtime
+        run: node --test test/render-runtime.test.js
+
+      - name: Build Pages site
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          site_dir="$RUNNER_TEMP/pages-site"
+          mkdir -p "$site_dir/releases"
+          cp render-runtime.js "$site_dir/render-runtime.js"
+          cp hello.html hello-runtime.js "$site_dir/"
+          cp pages/index.html "$site_dir/index.html"
+
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            release_dir="$site_dir/releases/$tag"
+            mkdir -p "$release_dir"
+            git show "$tag:render-runtime.js" > "$release_dir/render-runtime.js"
+          done < <(git tag --list "v*" --sort=version:refname)
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/pages-site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

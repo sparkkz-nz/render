@@ -48,7 +48,7 @@ content and references a rendering runtime through a script element.
 During development, use a relative script URL:
 
 ```html
-<script src="./docdiagram-runtime.js" defer></script>
+<script src="./render-runtime.js" defer></script>
 ```
 
 For distribution, use an immutable versioned runtime URL hosted from
@@ -56,7 +56,7 @@ For distribution, use an immutable versioned runtime URL hosted from
 
 ```html
 <script
-  src="https://sparkkz-makes.github.io/render/docdiagram-runtime-1.0.0.js"
+  src="https://sparkkz-nz.github.io/render/releases/v1.0.0/render-runtime.js"
   defer>
 </script>
 ```
