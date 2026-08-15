@@ -23,6 +23,13 @@ const {
   edgeMarkerStyles,
   getTheme,
   getGridSize,
+  createUniqueNodeId,
+  getDefaultNodePosition,
+  createNode,
+  createConnector,
+  reconnectConnector,
+  deleteConnector,
+  deleteNode,
   getNodeEffectiveStyle,
   getEdgeEffectiveStyle,
   getEdgeMarkerStyle,
@@ -98,6 +105,81 @@ test("uses an opt-in canvas grid to normalize positions and dimensions", () => {
   assert.equal(clampNodeSize(118, 120, 5), 120);
   assert.equal(clampNodeSize(123, 120, 5), 125);
   assert.equal(clampNodeSize(58, 60, 5), 60);
+});
+
+test("creates uniquely identified default nodes at a grid-aligned available position", () => {
+  const diagram = {
+    canvas: { width: 600, height: 300, grid: 10 },
+    nodes: [{
+      id: "new-node",
+      label: "Existing",
+      type: "service",
+      shape: "rounded-rectangle",
+      position: { x: 200, y: 110 },
+      size: { width: 190, height: 80 }
+    }],
+    edges: []
+  };
+
+  assert.equal(createUniqueNodeId(diagram.nodes), "new-node-2");
+  assert.equal(JSON.stringify(getDefaultNodePosition(diagram)), JSON.stringify({ x: 210, y: 190 }));
+  const node = createNode(diagram);
+
+  assert.equal(JSON.stringify(node), JSON.stringify({
+    id: "new-node-2",
+    label: "New node",
+    type: "application",
+    shape: "rounded-rectangle",
+    position: { x: 210, y: 190 },
+    size: { width: 190, height: 80 }
+  }));
+});
+
+test("creates, reconnects, and deletes connectors without dangling endpoints", () => {
+  const diagram = {
+    canvas: {},
+    nodes: [
+      { id: "api", label: "API", shape: "rounded-rectangle" },
+      { id: "db", label: "DB", shape: "database" },
+      { id: "cache", label: "Cache", shape: "rounded-rectangle" }
+    ],
+    edges: []
+  };
+  const edge = createConnector(diagram, "api", "right", "db", "left");
+
+  assert.equal(JSON.stringify(edge), JSON.stringify({
+    source: "api",
+    target: "db",
+    sourceAnchor: "right",
+    targetAnchor: "left",
+    route: "orthogonal",
+    end: "arrow"
+  }));
+  reconnectConnector(edge, "target", "cache", "top");
+  assert.equal(edge.target, "cache");
+  assert.equal(edge.targetAnchor, "top");
+  assert.deepEqual(deleteConnector(diagram, 0), edge);
+  assert.equal(diagram.edges.length, 0);
+  assert.equal(deleteConnector(diagram, 3), null);
+});
+
+test("cascade deletion and every lifecycle mutation preserve a serializable diagram", () => {
+  const diagram = {
+    canvas: { width: 600, height: 300 },
+    nodes: [
+      { id: "api", label: "API", type: "service", shape: "rounded-rectangle", position: { x: 20, y: 40 }, size: { width: 190, height: 80 } },
+      { id: "db", label: "DB", type: "datastore", shape: "database", position: { x: 320, y: 40 }, size: { width: 190, height: 80 } }
+    ],
+    edges: []
+  };
+  const created = createNode(diagram);
+  const edge = createConnector(diagram, "api", "right", created.id, "left");
+  reconnectConnector(edge, "target", "db", "top");
+
+  assert.equal(JSON.stringify(parseDiagram(serializeDiagram(diagram))), JSON.stringify(diagram));
+  assert.equal(JSON.stringify(deleteNode(diagram, "db").deletedEdges), JSON.stringify([edge]));
+  assert.equal(JSON.stringify(parseDiagram(serializeDiagram(diagram))), JSON.stringify(diagram));
+  assert.equal(diagram.edges.some((candidate) => candidate.source === "db" || candidate.target === "db"), false);
 });
 
 test("parses and serializes diagram themes and style overrides", () => {

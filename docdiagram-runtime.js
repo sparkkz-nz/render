@@ -9,8 +9,16 @@
   let selectedEdge = null;
   let editingNode = null;
   let editingEdge = null;
+  let connectionDrag = null;
   let documentTheme = "light";
   const minimumNodeSize = { width: 120, height: 60 };
+  const defaultNode = {
+    type: "application",
+    shape: "rounded-rectangle",
+    label: "New node",
+    width: 190,
+    height: 80
+  };
   const nodeTypes = ["application", "service", "datastore", "note"];
   const nodeShapes = [
     "rounded-rectangle",
@@ -263,6 +271,123 @@
     const snapped = snapToGrid(value, grid);
     const snappedMinimum = grid ? Math.ceil(minimum / grid) * grid : minimum;
     return Math.max(snappedMinimum, snapped);
+  }
+
+  function getNodeBounds(node) {
+    return {
+      x: Number(node.position?.x) || 0,
+      y: Number(node.position?.y) || 0,
+      width: Number(node.size?.width) || defaultNode.width,
+      height: Number(node.size?.height) || defaultNode.height
+    };
+  }
+
+  function rectanglesOverlap(first, second) {
+    return first.x < second.x + second.width &&
+      first.x + first.width > second.x &&
+      first.y < second.y + second.height &&
+      first.y + first.height > second.y;
+  }
+
+  function createUniqueNodeId(nodes, base = "new-node") {
+    const ids = new Set(nodes.map((node) => node.id));
+    if (!ids.has(base)) {
+      return base;
+    }
+
+    let suffix = 2;
+    while (ids.has(`${base}-${suffix}`)) {
+      suffix += 1;
+    }
+    return `${base}-${suffix}`;
+  }
+
+  function getDefaultNodePosition(diagram) {
+    const width = Number(diagram.canvas?.width) || 1000;
+    const height = Number(diagram.canvas?.height) || 560;
+    const grid = getGridSize(diagram);
+    const start = {
+      x: snapToGrid(Math.max(0, (width - defaultNode.width) / 2), grid),
+      y: snapToGrid(Math.max(0, (height - defaultNode.height) / 2), grid)
+    };
+    const step = grid || 20;
+
+    for (let offset = 0; offset <= Math.max(width, height); offset += step) {
+      for (const candidate of [
+        { x: start.x + offset, y: start.y },
+        { x: start.x - offset, y: start.y },
+        { x: start.x, y: start.y + offset },
+        { x: start.x, y: start.y - offset }
+      ]) {
+        if (candidate.x < 0 || candidate.y < 0 ||
+          candidate.x + defaultNode.width > width || candidate.y + defaultNode.height > height) {
+          continue;
+        }
+        if (!diagram.nodes.some((node) => rectanglesOverlap(
+          { ...candidate, width: defaultNode.width, height: defaultNode.height },
+          getNodeBounds(node)
+        ))) {
+          return candidate;
+        }
+      }
+    }
+
+    return start;
+  }
+
+  function createNode(diagram) {
+    const node = {
+      id: createUniqueNodeId(diagram.nodes),
+      label: defaultNode.label,
+      type: defaultNode.type,
+      shape: defaultNode.shape,
+      position: getDefaultNodePosition(diagram),
+      size: { width: defaultNode.width, height: defaultNode.height }
+    };
+    diagram.nodes.push(node);
+    return node;
+  }
+
+  function createConnector(diagram, source, sourceAnchor, target, targetAnchor) {
+    const edge = {
+      source,
+      target,
+      sourceAnchor,
+      targetAnchor,
+      route: "orthogonal",
+      end: "arrow"
+    };
+    diagram.edges.push(edge);
+    return edge;
+  }
+
+  function reconnectConnector(edge, endpoint, nodeId, anchor) {
+    if (endpoint === "source") {
+      edge.source = nodeId;
+      edge.sourceAnchor = anchor;
+    } else {
+      edge.target = nodeId;
+      edge.targetAnchor = anchor;
+    }
+    return edge;
+  }
+
+  function deleteConnector(diagram, edgeIndex) {
+    if (edgeIndex < 0 || edgeIndex >= diagram.edges.length) {
+      return null;
+    }
+    return diagram.edges.splice(edgeIndex, 1)[0];
+  }
+
+  function deleteNode(diagram, nodeId) {
+    const nodeIndex = diagram.nodes.findIndex((node) => node.id === nodeId);
+    if (nodeIndex === -1) {
+      return { node: null, deletedEdges: [] };
+    }
+    const deletedEdges = diagram.edges.filter((edge) => edge.source === nodeId || edge.target === nodeId);
+    diagram.nodes.splice(nodeIndex, 1);
+    diagram.edges = diagram.edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId);
+    return { node: nodeId, deletedEdges };
   }
 
   function splitTextLines(value) {
@@ -571,6 +696,7 @@
 
     const edgeLabelLineHeight = 16;
     const edgeMarkerDefs = [];
+    const edgeEndpointMarkup = [];
 
     const edgeMarkup = diagram.edges.map((edge, edgeIndex) => {
       const sourceNode = nodes.get(edge.source);
@@ -627,6 +753,13 @@
         edgeMarkerDefs.push(buildEdgeMarkerDef(endMarkerId, endMarkerStyle, "end", style.stroke, strokeWidth));
       }
 
+      if (isSelected && editMode) {
+        edgeEndpointMarkup.push(
+          `<circle class="docdiagram-edge-endpoint" data-diagram-index="${diagramIndex}" data-edge-index="${edgeIndex}" data-endpoint="source" cx="${sourceAnchor.x}" cy="${sourceAnchor.y}" r="7"/>`,
+          `<circle class="docdiagram-edge-endpoint" data-diagram-index="${diagramIndex}" data-edge-index="${edgeIndex}" data-endpoint="target" cx="${targetAnchor.x}" cy="${targetAnchor.y}" r="7"/>`
+        );
+      }
+
       const markerAttributes = [
         startMarkerStyle !== "none" ? ` marker-start="url(#${startMarkerId})"` : "",
         endMarkerStyle !== "none" ? ` marker-end="url(#${endMarkerId})"` : ""
@@ -671,6 +804,12 @@
         isSelected && editMode && !isEditing
           ? `<rect class="docdiagram-resize-handle" x="${x + nodeWidth - 7}" y="${y + nodeHeight - 7}" width="14" height="14" rx="3"/>`
           : "",
+        isSelected && editMode && !isEditing
+          ? edgeAnchors.map((anchor) => {
+            const point = geometry.anchors[anchor];
+            return `<circle class="docdiagram-connection-port" data-anchor="${anchor}" cx="${point.x}" cy="${point.y}" r="7" aria-label="${anchor} connection port"/>`;
+          }).join("")
+          : "",
         `</g>`
       ].join("");
     }).join("");
@@ -680,7 +819,11 @@
       `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Architecture diagram" data-diagram-index="${diagramIndex}">`,
       `<defs>${edgeMarkerDefs.join("")}</defs>`,
       edgeMarkup,
+      connectionDrag?.diagramIndex === diagramIndex
+        ? `<path class="docdiagram-connection-preview${connectionDrag.invalid ? " docdiagram-connection-invalid" : ""}" d="${buildEdgePath(connectionDrag.start, connectionDrag.current, connectionDrag.sourceAnchor, connectionDrag.targetAnchor || connectionDrag.sourceAnchor, "straight").path}"/>`
+        : "",
       nodeMarkup,
+      edgeEndpointMarkup.join(""),
       `</svg>`,
       `</figure>`
     ].join("");
@@ -1036,6 +1179,8 @@
       `<option value="dark"${documentTheme === "dark" ? " selected" : ""}>Dark</option>`,
       `</select></label>`,
       `<button type="button" class="docdiagram-save"${editMode ? "" : " hidden"}>Save a copy</button>`,
+      `<button type="button" class="docdiagram-create-node"${editMode ? "" : " hidden"}>Add node</button>`,
+      `<button type="button" class="docdiagram-delete-selection"${editMode && (node || edge) ? "" : " hidden"}>Delete selected</button>`,
       node
         ? `<div class="docdiagram-inspector" data-kind="node">${buildNodeInspectorFields(inspectorDiagram, node)}</div>`
         : edge
@@ -1045,6 +1190,8 @@
 
     const editButton = toolbar.querySelector(".docdiagram-edit-toggle");
     const saveButton = toolbar.querySelector(".docdiagram-save");
+    const createNodeButton = toolbar.querySelector(".docdiagram-create-node");
+    const deleteButton = toolbar.querySelector(".docdiagram-delete-selection");
     const themeSelect = toolbar.querySelector(".docdiagram-theme-select");
 
     editButton.addEventListener("click", () => {
@@ -1057,6 +1204,19 @@
     });
 
     saveButton.addEventListener("click", downloadDocument);
+    createNodeButton.addEventListener("click", () => {
+      const diagramIndex = selectedNode?.diagramIndex ?? selectedEdge?.diagramIndex ?? 0;
+      const diagram = diagramModels[diagramIndex];
+      if (!diagram) {
+        return;
+      }
+      const node = createNode(diagram);
+      selectedNode = { diagramIndex, nodeId: node.id };
+      selectedEdge = null;
+      persistDiagramModels();
+      renderDocument();
+    });
+    deleteButton.addEventListener("click", deleteSelected);
 
     themeSelect.addEventListener("change", () => {
       setSource(setFrontmatterTheme(getSource(), themeSelect.value));
@@ -1257,6 +1417,28 @@
     renderDocument();
   }
 
+  function deleteSelected() {
+    if (selectedNode) {
+      const { diagramIndex, nodeId } = selectedNode;
+      const diagram = diagramModels[diagramIndex];
+      const attachedEdges = diagram?.edges.filter((edge) => edge.source === nodeId || edge.target === nodeId) || [];
+      if (attachedEdges.length && !globalThis.confirm(`Delete this node and its ${attachedEdges.length} attached connector${attachedEdges.length === 1 ? "" : "s"}?`)) {
+        return;
+      }
+      deleteNode(diagram, nodeId);
+    } else if (selectedEdge) {
+      deleteConnector(diagramModels[selectedEdge.diagramIndex], selectedEdge.edgeIndex);
+    } else {
+      return;
+    }
+    selectedNode = null;
+    selectedEdge = null;
+    editingNode = null;
+    editingEdge = null;
+    persistDiagramModels();
+    renderDocument();
+  }
+
   function saveInlineLabel(input) {
     const node = getSelectedNode();
     if (node) {
@@ -1379,6 +1561,116 @@
     svg.addEventListener("pointercancel", finish);
   }
 
+  function getNodePortPoint(node, anchor) {
+    const bounds = getNodeBounds(node);
+    return getNodeGeometry(node, bounds.x, bounds.y, bounds.width, bounds.height).anchors[anchor];
+  }
+
+  function addConnectionTargetPorts(svg, diagramIndex) {
+    const diagram = diagramModels[diagramIndex];
+    for (const node of diagram.nodes) {
+      for (const anchor of edgeAnchors) {
+        const point = getNodePortPoint(node, anchor);
+        const port = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        port.setAttribute("class", "docdiagram-connection-port docdiagram-connection-target-port");
+        port.dataset.nodeId = node.id;
+        port.dataset.anchor = anchor;
+        port.setAttribute("cx", point.x);
+        port.setAttribute("cy", point.y);
+        port.setAttribute("r", "7");
+        svg.append(port);
+      }
+    }
+  }
+
+  function beginConnectionDrag(svg, event, drag) {
+    event.preventDefault();
+    event.stopPropagation();
+    connectionDrag = { ...drag, current: svgPoint(svg, event), invalid: false };
+    addConnectionTargetPorts(svg, drag.diagramIndex);
+    const preview = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    preview.setAttribute("class", "docdiagram-connection-preview");
+    svg.append(preview);
+
+    if (event.isTrusted) {
+      svg.setPointerCapture(event.pointerId);
+    }
+
+    function getDropPort(pointerEvent) {
+      const hitPort = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY)
+        ?.closest(".docdiagram-connection-port");
+      if (hitPort) {
+        return hitPort;
+      }
+      return [...svg.querySelectorAll(".docdiagram-connection-port")].find((port) => {
+        const bounds = port.getBoundingClientRect();
+        return pointerEvent.clientX >= bounds.left && pointerEvent.clientX <= bounds.right &&
+          pointerEvent.clientY >= bounds.top && pointerEvent.clientY <= bounds.bottom;
+      }) || null;
+    }
+
+    function move(moveEvent) {
+      const point = svgPoint(svg, moveEvent);
+      const candidate = getDropPort(moveEvent);
+      connectionDrag.current = point;
+      connectionDrag.invalid = !candidate;
+      const targetAnchor = candidate?.dataset.anchor || connectionDrag.sourceAnchor;
+      preview.setAttribute("d", buildEdgePath(
+        connectionDrag.start,
+        point,
+        connectionDrag.sourceAnchor,
+        targetAnchor,
+        "straight"
+      ).path);
+      preview.classList.toggle("docdiagram-connection-invalid", connectionDrag.invalid);
+    }
+
+    function finish(finishEvent) {
+      if (finishEvent.isTrusted && svg.hasPointerCapture(finishEvent.pointerId)) {
+        svg.releasePointerCapture(finishEvent.pointerId);
+      }
+      svg.removeEventListener("pointermove", move);
+      svg.removeEventListener("pointerup", finish);
+      svg.removeEventListener("pointercancel", finish);
+
+      const target = getDropPort(finishEvent);
+      const dragState = connectionDrag;
+      connectionDrag = null;
+      if (target && dragState) {
+        const diagram = diagramModels[dragState.diagramIndex];
+        if (dragState.reconnect) {
+          reconnectConnector(
+            diagram.edges[dragState.edgeIndex],
+            dragState.endpoint,
+            target.dataset.nodeId || target.closest(".docdiagram-node")?.dataset.nodeId,
+            target.dataset.anchor
+          );
+          selectedEdge = { diagramIndex: dragState.diagramIndex, edgeIndex: dragState.edgeIndex };
+          selectedNode = null;
+        } else {
+          const targetNodeId = target.dataset.nodeId || target.closest(".docdiagram-node")?.dataset.nodeId;
+          if (targetNodeId) {
+            const edge = createConnector(
+              diagram,
+              dragState.sourceNodeId,
+              dragState.sourceAnchor,
+              targetNodeId,
+              target.dataset.anchor
+            );
+            selectedEdge = { diagramIndex: dragState.diagramIndex, edgeIndex: diagram.edges.indexOf(edge) };
+            selectedNode = null;
+          }
+        }
+        persistDiagramModels();
+      }
+      renderDocument();
+    }
+
+    svg.addEventListener("pointermove", move);
+    svg.addEventListener("pointerup", finish);
+    svg.addEventListener("pointercancel", finish);
+  }
+
   function isEdgeEditor(element) {
     return element.classList.contains("docdiagram-inline-editor-edge");
   }
@@ -1435,6 +1727,41 @@
       });
 
       svg.addEventListener("pointerdown", (event) => {
+        const port = event.target.closest(".docdiagram-connection-port");
+        if (port) {
+          const group = port.closest(".docdiagram-node");
+          const diagramIndex = Number(group?.dataset.diagramIndex ?? svg.dataset.diagramIndex);
+          const nodeId = port.dataset.nodeId || group?.dataset.nodeId;
+          const node = diagramModels[diagramIndex].nodes.find((candidate) => candidate.id === nodeId);
+          if (node) {
+            beginConnectionDrag(svg, event, {
+              diagramIndex,
+              sourceNodeId: nodeId,
+              sourceAnchor: port.dataset.anchor,
+              start: getNodePortPoint(node, port.dataset.anchor)
+            });
+          }
+          return;
+        }
+
+        const endpoint = event.target.closest(".docdiagram-edge-endpoint");
+        if (endpoint) {
+          const diagramIndex = Number(endpoint.dataset.diagramIndex);
+          const edgeIndex = Number(endpoint.dataset.edgeIndex);
+          const edge = diagramModels[diagramIndex].edges[edgeIndex];
+          const endpointName = endpoint.dataset.endpoint;
+          const node = diagramModels[diagramIndex].nodes.find((candidate) => candidate.id === edge[endpointName]);
+          beginConnectionDrag(svg, event, {
+            diagramIndex,
+            edgeIndex,
+            endpoint: endpointName,
+            reconnect: true,
+            sourceAnchor: edge[`${endpointName}Anchor`],
+            start: getNodePortPoint(node, edge[`${endpointName}Anchor`])
+          });
+          return;
+        }
+
         const resizeHandle = event.target.closest(".docdiagram-resize-handle");
         if (resizeHandle) {
           resizeNode(svg, event, resizeHandle.closest(".docdiagram-node"));
@@ -1538,6 +1865,22 @@
       editor.addEventListener("blur", commit, { once: true });
       editor.focus();
       editor.select();
+    }
+
+    if (!outputElement.dataset.deleteShortcutBound) {
+      outputElement.dataset.deleteShortcutBound = "true";
+      document.addEventListener("keydown", (event) => {
+        if (!editMode || (event.key !== "Delete" && event.key !== "Backspace")) {
+          return;
+        }
+        if (event.target.matches("input, textarea, select, [contenteditable]")) {
+          return;
+        }
+        if (selectedNode || selectedEdge) {
+          event.preventDefault();
+          deleteSelected();
+        }
+      });
     }
   }
 
@@ -1776,6 +2119,26 @@
         stroke: #3574c7;
         stroke-width: 2;
       }
+      .docdiagram-connection-port,
+      .docdiagram-edge-endpoint {
+        cursor: crosshair;
+        fill: #ffffff;
+        stroke: #3574c7;
+        stroke-width: 2;
+      }
+      .docdiagram-connection-target-port {
+        fill: #eaf2ff;
+      }
+      .docdiagram-connection-preview {
+        fill: none;
+        pointer-events: none;
+        stroke: #3574c7;
+        stroke-dasharray: 6 4;
+        stroke-width: 2;
+      }
+      .docdiagram-connection-preview.docdiagram-connection-invalid {
+        stroke: #d53f3f;
+      }
       .docdiagram-node {
         cursor: default;
       }
@@ -1831,6 +2194,13 @@
     edgeMarkerStyles,
     getTheme,
     getGridSize,
+    createUniqueNodeId,
+    getDefaultNodePosition,
+    createNode,
+    createConnector,
+    reconnectConnector,
+    deleteConnector,
+    deleteNode,
     getNodeEffectiveStyle,
     getEdgeEffectiveStyle,
     getEdgeMarkerStyle,
