@@ -11,6 +11,10 @@
   let editingEdge = null;
   let connectionDrag = null;
   let documentTheme = "light";
+  let documentFormat = "centered";
+  let savedSource = "";
+  let editSessionSource = null;
+  const diagramZooms = new Map();
   const minimumNodeSize = { width: 120, height: 60 };
   const defaultNode = {
     type: "application",
@@ -35,24 +39,66 @@
   const edgeRoutes = ["orthogonal", "straight", "curved"];
   const edgeMarkerStyles = ["none", "arrow", "circle"];
   const edgeMarkerDefaults = { start: "none", end: "arrow" };
+  const nodeColorPalettes = {
+    pink: {
+      label: "Pink",
+      light: { fill: "#F6C5D8", stroke: "#9D174D", text: "#9D174D" },
+      dark: { fill: "#9D174D", stroke: "#FBCFE8", text: "#FBCFE8" }
+    },
+    red: {
+      label: "Red",
+      light: { fill: "#FECACA", stroke: "#B91C1C", text: "#B91C1C" },
+      dark: { fill: "#B91C1C", stroke: "#FEE2E2", text: "#FEE2E2" }
+    },
+    orange: {
+      label: "Orange",
+      light: { fill: "#FED7AA", stroke: "#C2410C", text: "#9A3412" },
+      dark: { fill: "#C2410C", stroke: "#FFEDD5", text: "#FFEDD5" }
+    },
+    yellow: {
+      label: "Yellow",
+      light: { fill: "#FEF08A", stroke: "#A16207", text: "#854D0E" },
+      dark: { fill: "#A16207", stroke: "#FEF9C3", text: "#FEF9C3" }
+    },
+    green: {
+      label: "Green",
+      light: { fill: "#BBF7D0", stroke: "#15803D", text: "#166534" },
+      dark: { fill: "#15803D", stroke: "#DCFCE7", text: "#DCFCE7" }
+    },
+    cyan: {
+      label: "Cyan",
+      light: { fill: "#A5F3FC", stroke: "#0E7490", text: "#155E75" },
+      dark: { fill: "#0E7490", stroke: "#CFFAFE", text: "#CFFAFE" }
+    },
+    blue: {
+      label: "Blue",
+      light: { fill: "#BFDBFE", stroke: "#1D4ED8", text: "#1E3A8A" },
+      dark: { fill: "#1D4ED8", stroke: "#DBEAFE", text: "#DBEAFE" }
+    },
+    purple: {
+      label: "Purple",
+      light: { fill: "#DDD6FE", stroke: "#6D28D9", text: "#5B21B6" },
+      dark: { fill: "#6D28D9", stroke: "#EDE9FE", text: "#EDE9FE" }
+    }
+  };
 
   const diagramThemes = {
     light: {
       edge: { stroke: "#52616B", strokeWidth: 2, text: "#3E4A54" },
       node: {
-        application: { fill: "#EAF2FF", stroke: "#3574C7", strokeWidth: 2, text: "#17202A", subtitleText: "#52616B" },
-        service: { fill: "#E9F8F0", stroke: "#24824A", strokeWidth: 2, text: "#17202A", subtitleText: "#52616B" },
-        datastore: { fill: "#F7F1FF", stroke: "#7A4CC2", strokeWidth: 2, text: "#17202A", subtitleText: "#52616B" },
-        note: { fill: "#FFF8DF", stroke: "#9B7B00", strokeWidth: 2, text: "#17202A", subtitleText: "#52616B" }
+        application: { fill: "#EAF2FF", stroke: "#3574C7", strokeWidth: 2, text: "#17202A" },
+        service: { fill: "#E9F8F0", stroke: "#24824A", strokeWidth: 2, text: "#17202A" },
+        datastore: { fill: "#F7F1FF", stroke: "#7A4CC2", strokeWidth: 2, text: "#17202A" },
+        note: { fill: "#FFF8DF", stroke: "#9B7B00", strokeWidth: 2, text: "#17202A" }
       }
     },
     dark: {
       edge: { stroke: "#B8C7D5", strokeWidth: 2, text: "#D9E4ED" },
       node: {
-        application: { fill: "#193A61", stroke: "#71AEF7", strokeWidth: 2, text: "#F3F8FC", subtitleText: "#C5D5E5" },
-        service: { fill: "#164A38", stroke: "#66D39A", strokeWidth: 2, text: "#F3F8FC", subtitleText: "#C5D5E5" },
-        datastore: { fill: "#3D285D", stroke: "#B796FF", strokeWidth: 2, text: "#F3F8FC", subtitleText: "#C5D5E5" },
-        note: { fill: "#594819", stroke: "#F1CC58", strokeWidth: 2, text: "#F3F8FC", subtitleText: "#DDE7EF" }
+        application: { fill: "#193A61", stroke: "#71AEF7", strokeWidth: 2, text: "#F3F8FC" },
+        service: { fill: "#164A38", stroke: "#66D39A", strokeWidth: 2, text: "#F3F8FC" },
+        datastore: { fill: "#3D285D", stroke: "#B796FF", strokeWidth: 2, text: "#F3F8FC" },
+        note: { fill: "#594819", stroke: "#F1CC58", strokeWidth: 2, text: "#F3F8FC" }
       }
     }
   };
@@ -280,6 +326,35 @@
       width: Number(node.size?.width) || defaultNode.width,
       height: Number(node.size?.height) || defaultNode.height
     };
+  }
+
+  function expandCanvasForNode(diagram, node, padding = 40) {
+    const width = Number(diagram.canvas?.width) || 1000;
+    const height = Number(diagram.canvas?.height) || 560;
+    const nodes = diagram.nodes.includes(node) ? diagram.nodes : [...diagram.nodes, node];
+    const bounds = nodes.map(getNodeBounds);
+    const minimumX = Math.min(0, ...bounds.map((candidate) => candidate.x));
+    const minimumY = Math.min(0, ...bounds.map((candidate) => candidate.y));
+    const shiftX = minimumX < 0 ? padding - minimumX : 0;
+    const shiftY = minimumY < 0 ? padding - minimumY : 0;
+
+    if (shiftX || shiftY) {
+      for (const candidate of diagram.nodes) {
+        candidate.position = {
+          ...candidate.position,
+          x: (Number(candidate.position?.x) || 0) + shiftX,
+          y: (Number(candidate.position?.y) || 0) + shiftY
+        };
+      }
+    }
+
+    const expandedBounds = nodes.map(getNodeBounds);
+    diagram.canvas = {
+      ...diagram.canvas,
+      width: Math.max(width + shiftX, ...expandedBounds.map((candidate) => candidate.x + candidate.width + padding)),
+      height: Math.max(height + shiftY, ...expandedBounds.map((candidate) => candidate.y + candidate.height + padding))
+    };
+    return diagram;
   }
 
   function rectanglesOverlap(first, second) {
@@ -799,7 +874,7 @@
           ? `<foreignObject class="docdiagram-inline-editor-host" x="${geometry.textBounds.x}" y="${geometry.textBounds.y}" width="${geometry.textBounds.width}" height="${geometry.textBounds.height}"><textarea class="docdiagram-inline-editor docdiagram-inline-editor-node" aria-label="Edit node label. Press Enter for a new line. Press Control or Command plus Enter to save. Press Escape to cancel.">${escapeHtml(node.label)}</textarea></foreignObject>`
           : renderTextBlock(layout.centerX, layout.labelStartY, layout.labelLines, layout.labelLineHeight, "docdiagram-node-label", style.text),
         !isEditing && layout.subtitleLines.length
-          ? renderTextBlock(layout.centerX, layout.subtitleStartY, layout.subtitleLines, layout.subtitleLineHeight, "docdiagram-node-subtitle", style.subtitleText)
+          ? renderTextBlock(layout.centerX, layout.subtitleStartY, layout.subtitleLines, layout.subtitleLineHeight, "docdiagram-node-subtitle", style.text)
           : "",
         isSelected && editMode && !isEditing
           ? `<rect class="docdiagram-resize-handle" x="${x + nodeWidth - 7}" y="${y + nodeHeight - 7}" width="14" height="14" rx="3"/>`
@@ -816,7 +891,15 @@
 
     return [
       `<figure class="docdiagram" data-diagram-index="${diagramIndex}">`,
-      `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Architecture diagram" data-diagram-index="${diagramIndex}">`,
+      `<div class="docdiagram-diagram-toolbar" role="toolbar" aria-label="Diagram controls">`,
+      `<button type="button" class="docdiagram-icon-button docdiagram-zoom-in" data-diagram-index="${diagramIndex}" aria-label="Zoom in" title="Zoom in">+</button>`,
+      `<button type="button" class="docdiagram-icon-button docdiagram-zoom-out" data-diagram-index="${diagramIndex}" aria-label="Zoom out" title="Zoom out">−</button>`,
+      `<button type="button" class="docdiagram-icon-button docdiagram-fit" data-diagram-index="${diagramIndex}" aria-label="Zoom to fit" title="Zoom to fit">⊡</button>`,
+      editMode
+        ? `<button type="button" class="docdiagram-icon-button docdiagram-done-editing" aria-label="Done editing" title="Done editing">✓</button><button type="button" class="docdiagram-icon-button docdiagram-cancel-editing" aria-label="Cancel editing and discard changes" title="Cancel editing and discard changes">×</button><button type="button" class="docdiagram-icon-button docdiagram-create-node" data-diagram-index="${diagramIndex}" aria-label="New node" title="New node">+</button>`
+        : `<button type="button" class="docdiagram-icon-button docdiagram-start-editing" aria-label="Edit diagram" title="Edit diagram">✎</button>`,
+      `</div>`,
+      `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Architecture diagram" data-diagram-index="${diagramIndex}" style="width: ${diagramZooms.get(diagramIndex) || 100}%">`,
       `<defs>${edgeMarkerDefs.join("")}</defs>`,
       edgeMarkup,
       connectionDrag?.diagramIndex === diagramIndex
@@ -1107,6 +1190,20 @@
     return node;
   }
 
+  function setNodeColorPalette(node, tone, hue) {
+    const preset = nodeColorPalettes[hue]?.[tone];
+    if (!preset) {
+      return node;
+    }
+    node.style = {
+      ...node.style,
+      fill: preset.fill,
+      stroke: preset.stroke,
+      text: preset.text
+    };
+    return node;
+  }
+
   function setNodeSize(diagram, node, dimension, rawValue) {
     const grid = getGridSize(diagram);
     const minimum = dimension === "width" ? minimumNodeSize.width : minimumNodeSize.height;
@@ -1162,6 +1259,7 @@
     toolbar.className = "docdiagram-toolbar";
     toolbar.dataset.editing = String(editMode);
     toolbar.dataset.theme = documentTheme;
+    toolbar.dataset.format = documentFormat;
 
     const node = editMode ? getSelectedNode() : null;
     const edge = editMode && !node ? getSelectedEdge() : null;
@@ -1172,15 +1270,19 @@
         : null;
 
     toolbar.innerHTML = [
-      `<button type="button" class="docdiagram-edit-toggle">${editMode ? "Finish editing" : "Edit diagram"}</button>`,
-      `<label class="docdiagram-theme-control">Theme`,
-      `<select class="docdiagram-theme-select">`,
+      `<button type="button" class="docdiagram-menu-toggle" aria-label="Document menu" aria-expanded="false" title="Document menu">☰</button>`,
+      `<div class="docdiagram-menu" hidden>`,
+      `<label class="docdiagram-theme-control">Theme<select class="docdiagram-theme-select">`,
       `<option value="light"${documentTheme === "light" ? " selected" : ""}>Light</option>`,
       `<option value="dark"${documentTheme === "dark" ? " selected" : ""}>Dark</option>`,
       `</select></label>`,
-      `<button type="button" class="docdiagram-save"${editMode ? "" : " hidden"}>Save a copy</button>`,
-      `<button type="button" class="docdiagram-create-node"${editMode ? "" : " hidden"}>Add node</button>`,
-      `<button type="button" class="docdiagram-delete-selection"${editMode && (node || edge) ? "" : " hidden"}>Delete selected</button>`,
+      `<label class="docdiagram-theme-control">Format<select class="docdiagram-format-select">`,
+      `<option value="centered"${documentFormat === "centered" ? " selected" : ""}>Centered</option>`,
+      `<option value="full-width"${documentFormat === "full-width" ? " selected" : ""}>Full width</option>`,
+      `</select></label>`,
+      `<button type="button" class="docdiagram-save">Save As</button>`,
+      `<button type="button" class="docdiagram-offline-save" disabled>Save for Offline (coming soon)</button>`,
+      `</div>`,
       node
         ? `<div class="docdiagram-inspector" data-kind="node">${buildNodeInspectorFields(inspectorDiagram, node)}</div>`
         : edge
@@ -1188,48 +1290,123 @@
           : ""
     ].join("");
 
-    const editButton = toolbar.querySelector(".docdiagram-edit-toggle");
+    const menuToggle = toolbar.querySelector(".docdiagram-menu-toggle");
+    const menu = toolbar.querySelector(".docdiagram-menu");
     const saveButton = toolbar.querySelector(".docdiagram-save");
-    const createNodeButton = toolbar.querySelector(".docdiagram-create-node");
-    const deleteButton = toolbar.querySelector(".docdiagram-delete-selection");
     const themeSelect = toolbar.querySelector(".docdiagram-theme-select");
+    const formatSelect = toolbar.querySelector(".docdiagram-format-select");
 
-    editButton.addEventListener("click", () => {
-      editMode = !editMode;
-      selectedNode = null;
-      selectedEdge = null;
-      editingNode = null;
-      editingEdge = null;
-      renderDocument();
+    menuToggle.addEventListener("click", () => {
+      const open = menu.hidden;
+      menu.hidden = !open;
+      menuToggle.setAttribute("aria-expanded", String(open));
     });
 
     saveButton.addEventListener("click", downloadDocument);
-    createNodeButton.addEventListener("click", () => {
-      const diagramIndex = selectedNode?.diagramIndex ?? selectedEdge?.diagramIndex ?? 0;
-      const diagram = diagramModels[diagramIndex];
-      if (!diagram) {
-        return;
-      }
-      const node = createNode(diagram);
-      selectedNode = { diagramIndex, nodeId: node.id };
-      selectedEdge = null;
-      persistDiagramModels();
-      renderDocument();
-    });
-    deleteButton.addEventListener("click", deleteSelected);
-
     themeSelect.addEventListener("change", () => {
       setSource(setFrontmatterTheme(getSource(), themeSelect.value));
       renderDocument();
     });
+    formatSelect.addEventListener("change", () => {
+      documentFormat = formatSelect.value;
+      renderDocument();
+    });
+
+    outputElement.before(toolbar);
 
     if (node) {
       wireNodeInspector(toolbar, selectedNode.diagramIndex, selectedNode.nodeId);
+      positionInspector(selectedNode.diagramIndex);
     } else if (edge) {
       wireEdgeInspector(toolbar, selectedEdge.diagramIndex, selectedEdge.edgeIndex);
+      positionInspector(selectedEdge.diagramIndex);
     }
 
-    outputElement.before(toolbar);
+    function positionInspector(diagramIndex) {
+      const inspector = document.querySelector(".docdiagram-inspector");
+      const diagram = outputElement.querySelector(`.docdiagram[data-diagram-index="${diagramIndex}"]`);
+      if (!inspector || !diagram) {
+        return;
+      }
+      inspector.style.top = `${Math.max(16, diagram.getBoundingClientRect().top)}px`;
+    }
+
+    wireChromeControls(toolbar);
+  }
+
+  function isDirty() {
+    return getSource() !== savedSource;
+  }
+
+  function clampZoom(value) {
+    return Math.min(200, Math.max(25, Number(value) || 100));
+  }
+
+  function clearEditorState() {
+    selectedNode = null;
+    selectedEdge = null;
+    editingNode = null;
+    editingEdge = null;
+  }
+
+  function exitEditing(discard) {
+    if (discard && editSessionSource !== null) {
+      setSource(editSessionSource);
+    } else if (!discard && isDirty()) {
+      globalThis.confirm("Save changes before leaving edit mode?") && downloadDocument();
+    }
+    editMode = false;
+    editSessionSource = null;
+    clearEditorState();
+    renderDocument();
+  }
+
+  function createNewNode(diagramIndex) {
+    const diagram = diagramModels[diagramIndex];
+    if (!diagram) {
+      return;
+    }
+    const node = createNode(diagram);
+    selectedNode = { diagramIndex, nodeId: node.id };
+    selectedEdge = null;
+    persistDiagramModels();
+    renderDocument();
+  }
+
+  function wireChromeControls(toolbar) {
+    for (const button of outputElement.querySelectorAll(".docdiagram-zoom-in, .docdiagram-zoom-out")) {
+      button.addEventListener("click", () => {
+        const diagramIndex = Number(button.dataset.diagramIndex);
+        const current = diagramZooms.get(diagramIndex) || 100;
+        const direction = button.classList.contains("docdiagram-zoom-in") ? 25 : -25;
+        diagramZooms.set(diagramIndex, clampZoom(current + direction));
+        renderDocument();
+      });
+    }
+    for (const button of outputElement.querySelectorAll(".docdiagram-fit")) {
+      button.addEventListener("click", () => {
+        diagramZooms.set(Number(button.dataset.diagramIndex), 100);
+        renderDocument();
+      });
+    }
+
+    for (const button of outputElement.querySelectorAll(".docdiagram-start-editing")) {
+      button.addEventListener("click", () => {
+        editSessionSource = getSource();
+        editMode = true;
+        clearEditorState();
+        renderDocument();
+      });
+    }
+    for (const button of outputElement.querySelectorAll(".docdiagram-done-editing")) {
+      button.addEventListener("click", () => exitEditing(false));
+    }
+    for (const button of outputElement.querySelectorAll(".docdiagram-cancel-editing")) {
+      button.addEventListener("click", () => exitEditing(true));
+    }
+    for (const button of outputElement.querySelectorAll(".docdiagram-create-node")) {
+      button.addEventListener("click", () => createNewNode(Number(button.dataset.diagramIndex)));
+    }
   }
 
   function buildNodeInspectorFields(diagram, node) {
@@ -1240,12 +1417,24 @@
     const widthMinimum = grid ? Math.ceil(minimumNodeSize.width / grid) * grid : minimumNodeSize.width;
     const heightMinimum = grid ? Math.ceil(minimumNodeSize.height / grid) * grid : minimumNodeSize.height;
     const step = grid || 1;
+    const matchingPalette = Object.entries(nodeColorPalettes).find(([, palette]) =>
+      [palette.light, palette.dark].some((preset) =>
+        preset.fill.toLowerCase() === style.fill.toLowerCase() &&
+        preset.stroke.toLowerCase() === style.stroke.toLowerCase() &&
+        preset.text.toLowerCase() === style.text.toLowerCase()
+      )
+    );
+    const matchingHue = matchingPalette?.[0] || "blue";
+    const matchingTone = matchingPalette && matchingPalette[1].light.fill.toLowerCase() === style.fill.toLowerCase()
+      ? "light"
+      : "dark";
 
     return [
       `<label class="docdiagram-field docdiagram-field-wide">Label<textarea class="docdiagram-inspector-label docdiagram-inspector-textarea" rows="2">${escapeHtml(node.label)}</textarea></label>`,
       `<label class="docdiagram-field docdiagram-field-wide">Subtitle<textarea class="docdiagram-inspector-subtitle docdiagram-inspector-textarea" rows="2">${escapeHtml(node.subtitle || "")}</textarea></label>`,
-      `<label class="docdiagram-field">Type<select class="docdiagram-inspector-type">${nodeTypes.map(
-        (type) => `<option value="${type}"${type === node.type ? " selected" : ""}>${type}</option>`
+      `<label class="docdiagram-field">Tone<select class="docdiagram-inspector-tone"><option value="light"${matchingTone === "light" ? " selected" : ""}>Light</option><option value="dark"${matchingTone === "dark" ? " selected" : ""}>Dark</option></select></label>`,
+      `<label class="docdiagram-field">Colour<select class="docdiagram-inspector-colour">${Object.entries(nodeColorPalettes).map(
+        ([name, palette]) => `<option value="${name}"${name === matchingHue ? " selected" : ""}>${palette.label}</option>`
       ).join("")}</select></label>`,
       `<label class="docdiagram-field">Shape<select class="docdiagram-inspector-shape">${nodeShapes.map(
         (shape) => `<option value="${shape}"${shape === node.shape ? " selected" : ""}>${shape}</option>`
@@ -1310,9 +1499,13 @@
       withNode((diagram, node) => setNodeSubtitle(node, event.target.value));
     });
 
-    container.querySelector(".docdiagram-inspector-type").addEventListener("change", (event) => {
-      withNode((diagram, node) => setNodeType(node, event.target.value));
-    });
+    const toneSelect = container.querySelector(".docdiagram-inspector-tone");
+    const colourSelect = container.querySelector(".docdiagram-inspector-colour");
+    const applyColourPalette = () => {
+      withNode((diagram, node) => setNodeColorPalette(node, toneSelect.value, colourSelect.value));
+    };
+    toneSelect.addEventListener("change", applyColourPalette);
+    colourSelect.addEventListener("change", applyColourPalette);
 
     container.querySelector(".docdiagram-inspector-shape").addEventListener("change", (event) => {
       withNode((diagram, node) => setNodeShape(node, event.target.value));
@@ -1547,6 +1740,7 @@
       svg.removeEventListener("pointercancel", finish);
 
       if (resized) {
+        expandCanvasForNode(diagram, node);
         selectedNode = { diagramIndex, nodeId };
         selectedEdge = null;
         editingNode = null;
@@ -1692,6 +1886,55 @@
     renderDocument();
   }
 
+  function beginCanvasPan(svg, event) {
+    const frame = svg.closest(".docdiagram");
+    if (!frame) {
+      return;
+    }
+
+    event.preventDefault();
+    const start = {
+      clientX: event.clientX,
+      clientY: event.clientY,
+      scrollLeft: frame.scrollLeft,
+      scrollTop: frame.scrollTop
+    };
+    frame.classList.add("docdiagram-panning");
+
+    if (event.isTrusted) {
+      svg.setPointerCapture(event.pointerId);
+    }
+
+    function move(moveEvent) {
+      frame.scrollLeft = start.scrollLeft - (moveEvent.clientX - start.clientX);
+      frame.scrollTop = start.scrollTop - (moveEvent.clientY - start.clientY);
+    }
+
+    function finish(finishEvent) {
+      if (finishEvent.isTrusted && svg.hasPointerCapture(finishEvent.pointerId)) {
+        svg.releasePointerCapture(finishEvent.pointerId);
+      }
+      frame.classList.remove("docdiagram-panning");
+      svg.removeEventListener("pointermove", move);
+      svg.removeEventListener("pointerup", finish);
+      svg.removeEventListener("pointercancel", finish);
+    }
+
+    svg.addEventListener("pointermove", move);
+    svg.addEventListener("pointerup", finish);
+    svg.addEventListener("pointercancel", finish);
+  }
+
+  function enableCanvasPanning() {
+    for (const svg of outputElement.querySelectorAll(".docdiagram svg")) {
+      svg.addEventListener("pointerdown", (event) => {
+        if (event.target === svg) {
+          beginCanvasPan(svg, event);
+        }
+      });
+    }
+  }
+
   function enableEditing() {
     for (const svg of outputElement.querySelectorAll(".docdiagram svg")) {
       svg.addEventListener("click", (event) => {
@@ -1812,6 +2055,7 @@
           svg.removeEventListener("pointercancel", finish);
 
           if (moved) {
+            expandCanvasForNode(diagramModels[diagramIndex], node);
             selectedNode = { diagramIndex, nodeId };
             selectedEdge = null;
             editingNode = null;
@@ -1904,6 +2148,7 @@
     link.download = `${title || "document"}-edited.html`;
     link.click();
     URL.revokeObjectURL(link.href);
+    savedSource = getSource();
   }
 
   function applyPageTheme(theme) {
@@ -1919,7 +2164,23 @@
     }
   }
 
+  function closeDocumentMenu() {
+    const menu = document.querySelector(".docdiagram-menu");
+    const toggle = document.querySelector(".docdiagram-menu-toggle");
+    if (!menu || !toggle) {
+      return;
+    }
+    menu.hidden = true;
+    toggle.setAttribute("aria-expanded", "false");
+  }
+
   function renderDocument() {
+    const scrollPositions = new Map(
+      [...outputElement.querySelectorAll(".docdiagram")].map((diagram) => [
+        Number(diagram.dataset.diagramIndex),
+        { left: diagram.scrollLeft, top: diagram.scrollTop }
+      ])
+    );
     diagramModels.length = 0;
     let parsedDocument;
     try {
@@ -1933,13 +2194,23 @@
     }
 
     outputElement.dataset.theme = documentTheme;
+    outputElement.dataset.format = documentFormat;
     applyPageTheme(documentTheme);
     outputElement.innerHTML = renderMarkdown(parsedDocument.content);
     removeToolbarChrome();
     createToolbar();
+    enableCanvasPanning();
 
     if (editMode) {
       enableEditing();
+    }
+
+    for (const diagram of outputElement.querySelectorAll(".docdiagram")) {
+      const position = scrollPositions.get(Number(diagram.dataset.diagramIndex));
+      if (position) {
+        diagram.scrollLeft = position.left;
+        diagram.scrollTop = position.top;
+      }
     }
   }
 
@@ -1970,6 +2241,10 @@
         margin: 0 auto;
         max-width: 1100px;
         padding: 2rem;
+      }
+      #rendered-document[data-format="full-width"] {
+        margin: 0;
+        max-width: none;
       }
       #rendered-document pre {
         background: var(--docdiagram-code-background);
@@ -2003,11 +2278,19 @@
         background: var(--docdiagram-background);
         color: var(--docdiagram-text);
         display: flex;
-        flex-wrap: wrap;
-        gap: .75rem;
-        margin: 1.5rem auto 0;
+        justify-content: flex-end;
+        margin: 0;
         max-width: 1100px;
-        padding: .75rem 2rem;
+        padding: .5rem 2rem;
+        position: fixed;
+        right: 0;
+        top: 0;
+        z-index: 40;
+      }
+      .docdiagram-toolbar[data-format="full-width"] {
+        margin-left: 0;
+        margin-right: 0;
+        max-width: none;
       }
       .docdiagram-toolbar button,
       .docdiagram-toolbar input,
@@ -2025,39 +2308,82 @@
       .docdiagram-toolbar button:hover {
         background: var(--docdiagram-control-hover);
       }
-      .docdiagram-theme-control {
-        align-items: flex-start;
-        color: var(--docdiagram-muted);
+      .docdiagram-toolbar button:disabled {
+        cursor: not-allowed;
+        opacity: .6;
+      }
+      .docdiagram-menu {
+        background: var(--docdiagram-background);
+        border: 1px solid var(--docdiagram-border);
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgb(21 41 62 / 18%);
         display: flex;
         flex-direction: column;
-        font-size: .72rem;
-        gap: .15rem;
+        gap: .6rem;
+        padding: .75rem;
+        position: absolute;
+        right: 2rem;
+        top: calc(100% + .25rem);
+        z-index: 20;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 1rem;
+      }
+      .docdiagram-menu[hidden] {
+        display: none;
+      }
+      .docdiagram-theme-control {
+        align-items: center;
+        color: var(--docdiagram-muted);
+        display: flex;
+        font-size: .9rem;
+        gap: .75rem;
+        justify-content: space-between;
       }
       .docdiagram-inspector {
-        align-items: center;
-        border-left: 1px solid var(--docdiagram-border);
-        display: flex;
-        flex-wrap: wrap;
-        gap: .6rem;
-        margin-left: .25rem;
-        padding-left: .85rem;
-      }
-      .docdiagram-field {
-        align-items: flex-start;
-        color: var(--docdiagram-muted);
+        background: var(--docdiagram-background);
+        border: 1px solid var(--docdiagram-border);
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgb(21 41 62 / 18%);
         display: flex;
         flex-direction: column;
-        font-size: .72rem;
-        gap: .15rem;
+        gap: .6rem;
+        max-height: calc(100vh - 5.5rem);
+        overflow-y: auto;
+        padding: 1rem;
+        position: fixed;
+        right: 1rem;
+        top: 1rem;
+        width: min(19rem, calc(100vw - 2rem));
+        z-index: 30;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 1rem;
+      }
+      .docdiagram-field {
+        align-items: center;
+        color: var(--docdiagram-muted);
+        display: flex;
+        flex-direction: row;
+        font-size: .9rem;
+        gap: .75rem;
+        justify-content: space-between;
+        width: 100%;
       }
       .docdiagram-field-wide {
-        flex-basis: 100%;
+        width: 100%;
       }
       .docdiagram-field input,
       .docdiagram-field select,
       .docdiagram-field textarea {
+        background: var(--docdiagram-control-background);
+        border: 1px solid var(--docdiagram-border);
+        border-radius: 6px;
+        color: var(--docdiagram-text);
         font-size: .85rem;
         padding: .3rem .4rem;
+      }
+      .docdiagram-field select,
+      .docdiagram-field input:not([type="color"]) {
+        min-width: 9rem;
       }
       .docdiagram-field input[type="color"] {
         height: 1.9rem;
@@ -2080,13 +2406,43 @@
         border-radius: 12px;
         box-shadow: 0 2px 8px rgb(21 41 62 / 8%);
         margin: 1.5rem 0;
+        height: min(70vh, 42rem);
         overflow: auto;
         padding: 1rem;
+        position: relative;
+      }
+      .docdiagram-panning svg {
+        cursor: grabbing;
+      }
+      .docdiagram-diagram-toolbar {
+        display: flex;
+        gap: .35rem;
+        justify-content: flex-end;
+        margin-bottom: .5rem;
+        box-sizing: border-box;
+        left: 0;
+        position: sticky;
+        right: 0;
+        top: 0;
+        width: 100%;
+        z-index: 10;
+      }
+      .docdiagram-icon-button {
+        background: var(--docdiagram-control-background);
+        border: 1px solid var(--docdiagram-border);
+        border-radius: 6px;
+        color: var(--docdiagram-text);
+        cursor: pointer;
+        font: inherit;
+        height: 2rem;
+        padding: 0;
+        width: 2rem;
+      }
+      .docdiagram-icon-button:hover {
+        background: var(--docdiagram-control-hover);
       }
       .docdiagram svg {
         display: block;
-        min-width: 720px;
-        width: 100%;
       }
       .docdiagram-edge {
         fill: none;
@@ -2145,6 +2501,9 @@
       .docdiagram-toolbar[data-editing="true"] + #rendered-document .docdiagram-node {
         cursor: grab;
       }
+      #rendered-document .docdiagram svg {
+        cursor: grab;
+      }
       .docdiagram-toolbar[data-editing="true"] + #rendered-document .docdiagram-node:has(.docdiagram-inline-editor) {
         cursor: text;
       }
@@ -2188,12 +2547,14 @@
   globalThis.DocDiagramCore = {
     diagramThemes,
     nodeTypes,
+    nodeColorPalettes,
     nodeShapes,
     edgeAnchors,
     edgeRoutes,
     edgeMarkerStyles,
     getTheme,
     getGridSize,
+    expandCanvasForNode,
     createUniqueNodeId,
     getDefaultNodePosition,
     createNode,
@@ -2218,6 +2579,7 @@
     setNodeShape,
     setNodeSubtitle,
     setNodeStyleOverride,
+    setNodeColorPalette,
     setNodeSize,
     setEdgeLabel,
     setEdgeRoute,
@@ -2232,11 +2594,31 @@
     getNodeGeometry,
     renderNodeBody,
     buildEdgePath,
-    buildEdgeInspectorFields
+    buildEdgeInspectorFields,
+    clampZoom
   };
 
   if (sourceElement && outputElement) {
     injectStyles();
+    savedSource = getSource();
+    globalThis.addEventListener("beforeunload", (event) => {
+      if (!isDirty()) {
+        return;
+      }
+      event.preventDefault();
+      event.returnValue = "";
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeDocumentMenu();
+      }
+    });
+    document.addEventListener("pointerdown", (event) => {
+      const toolbar = document.querySelector(".docdiagram-toolbar");
+      if (toolbar && !toolbar.contains(event.target)) {
+        closeDocumentMenu();
+      }
+    });
     renderDocument();
   }
 }());

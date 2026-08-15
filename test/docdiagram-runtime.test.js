@@ -17,12 +17,14 @@ vm.runInContext(runtime, context, { filename: "docdiagram-runtime.js" });
 
 const {
   nodeTypes,
+  nodeColorPalettes,
   nodeShapes,
   edgeAnchors,
   edgeRoutes,
   edgeMarkerStyles,
   getTheme,
   getGridSize,
+  expandCanvasForNode,
   createUniqueNodeId,
   getDefaultNodePosition,
   createNode,
@@ -47,6 +49,7 @@ const {
   setNodeShape,
   setNodeSubtitle,
   setNodeStyleOverride,
+  setNodeColorPalette,
   setNodeSize,
   setEdgeLabel,
   setEdgeRoute,
@@ -61,7 +64,8 @@ const {
   getNodeGeometry,
   renderNodeBody,
   buildEdgePath,
-  buildEdgeInspectorFields
+  buildEdgeInspectorFields,
+  clampZoom
 } = context.globalThis.DocDiagramCore;
 
 function readTemplateSource(filePath) {
@@ -77,6 +81,72 @@ test("extracts document frontmatter without treating it as Markdown content", ()
 
   assert.equal(document.frontmatter.theme, "dark");
   assert.equal(document.content, "\n# Payments");
+});
+
+test("diagram markup provides compact view-mode zoom and edit controls", () => {
+  const markup = renderDiagram([
+    "canvas:",
+    "  width: 800",
+    "  height: 500",
+    "nodes:",
+    "  - id: api",
+    "    type: application",
+    "    shape: rounded-rectangle",
+    "    label: API",
+    "    position: { x: 100, y: 100 }",
+    "    size: { width: 190, height: 80 }",
+    "edges:"
+  ].join("\n"), 0);
+
+  assert.match(markup, /class="docdiagram-diagram-toolbar"/);
+  assert.match(markup, /class="docdiagram-icon-button docdiagram-zoom-in"/);
+  assert.match(markup, /class="docdiagram-icon-button docdiagram-zoom-out"/);
+  assert.match(markup, /class="docdiagram-icon-button docdiagram-fit"/);
+  assert.match(markup, /class="docdiagram-icon-button docdiagram-start-editing"/);
+  assert.match(markup, /aria-label="Zoom in"/);
+  assert.match(markup, /aria-label="Zoom to fit"/);
+  assert.match(markup, /aria-label="Edit diagram"/);
+});
+
+test("clampZoom limits diagram zoom to supported discrete bounds", () => {
+  assert.equal(clampZoom(10), 25);
+  assert.equal(clampZoom(125), 125);
+  assert.equal(clampZoom(250), 200);
+});
+
+test("expanding a canvas keeps a moved node and padding inside its bounds", () => {
+  const diagram = {
+    canvas: { width: 800, height: 500 },
+    nodes: [],
+    edges: []
+  };
+  const node = {
+    position: { x: 760, y: 470 },
+    size: { width: 190, height: 80 }
+  };
+
+  expandCanvasForNode(diagram, node);
+
+  assert.equal(diagram.canvas.width, 990);
+  assert.equal(diagram.canvas.height, 590);
+});
+
+test("expanding a canvas left or up shifts every node into positive coordinates", () => {
+  const diagram = {
+    canvas: { width: 800, height: 500 },
+    nodes: [
+      { id: "moved", position: { x: -100, y: -60 }, size: { width: 190, height: 80 } },
+      { id: "existing", position: { x: 300, y: 200 }, size: { width: 190, height: 80 } }
+    ],
+    edges: []
+  };
+
+  expandCanvasForNode(diagram, diagram.nodes[0]);
+
+  assert.equal(JSON.stringify(diagram.nodes[0].position), JSON.stringify({ x: 40, y: 40 }));
+  assert.equal(JSON.stringify(diagram.nodes[1].position), JSON.stringify({ x: 440, y: 300 }));
+  assert.equal(diagram.canvas.width, 940);
+  assert.equal(diagram.canvas.height, 600);
 });
 
 test("resolves the actual example document's dark theme", () => {
@@ -298,6 +368,19 @@ test("nodeTypes, nodeShapes, edgeAnchors, edgeRoutes, and edgeMarkerStyles expos
   assert.equal(JSON.stringify([...edgeAnchors]), JSON.stringify(["top", "right", "bottom", "left"]));
   assert.equal(JSON.stringify([...edgeRoutes]), JSON.stringify(["orthogonal", "straight", "curved"]));
   assert.equal(JSON.stringify([...edgeMarkerStyles]), JSON.stringify(["none", "arrow", "circle"]));
+});
+
+test("node color palettes replace manual fill, stroke, and text overrides together", () => {
+  const node = {
+    type: "application",
+    style: { fill: "#ffffff", stroke: "#000000", text: "#222222" }
+  };
+
+  setNodeColorPalette(node, "dark", "pink");
+
+  assert.equal(node.style.fill, nodeColorPalettes.pink.dark.fill);
+  assert.equal(node.style.stroke, nodeColorPalettes.pink.dark.stroke);
+  assert.equal(node.style.text, nodeColorPalettes.pink.dark.text);
 });
 
 test("requires supported node shapes and explicit edge anchors without retaining style.width aliases", () => {

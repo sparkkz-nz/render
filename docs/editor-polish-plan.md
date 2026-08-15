@@ -105,16 +105,30 @@ when real imported diagrams require them, are `double-circle`, `subroutine`,
 
 ### Editor presentation
 
-The wide always-visible toolbar is replaced by a compact header:
+The wide always-visible toolbar is replaced by two compact, separate control
+surfaces:
 
-- an **Edit diagram** toggle and a hamburger button remain visible;
-- the hamburger menu holds document actions (theme, save a copy, zoom/reset,
-  and node/connector creation);
-- selecting a node opens a shape-properties popover next to the selection;
-- selecting a connector opens a connector-properties popover next to its
-  label/path;
+- a hamburger button at the top right of the complete document opens document
+  actions: **Theme** (dark and light only for now), **Format** (centered or
+  full width), **Save As**, and disabled **Save for Offline (coming soon)**;
+- every diagram has a toolbar at its top right with icon-only **Zoom in**,
+  **Zoom out**, and **Edit** buttons;
+- entering edit mode replaces the Edit button with icon-only **Done** (check
+  mark), **Cancel** (discard all edits made in that editing session), and
+  **New node** buttons; Done and Cancel leave edit mode, while New node keeps
+  it active;
+- selecting a node or connector opens the corresponding properties popover
+  against the right side of the browser window, with its controls arranged in
+  a clear vertical sequence. On narrow windows it may overlay the diagram
+  workspace rather than forcing the diagram to shrink;
+- document-menu and inspector labels align with their controls in larger,
+  readable rows; native delayed tooltips explain every icon button;
 - selection popovers contain the existing appropriate properties plus the new
   shape/anchor/route controls;
+- track document dirty state against the last saved source. If an author exits
+  editing with retained changes or attempts to leave/reload a dirty document,
+  prompt them to save; Cancel intentionally discards the current edit session
+  and does not prompt to save those discarded changes;
 - all menus and popovers support Escape, close when focus moves outside, and
   expose accessible labels and focus order.
 
@@ -271,8 +285,42 @@ does not scale as the properties and creation actions grow.
 
 **Task details**
 
-- Replace the current toolbar layout with the compact header, hamburger menu,
-  and contextual node/connector popovers defined above.
+- Replace the current toolbar layout with the document-level hamburger menu,
+  per-diagram icon toolbar, and right-window properties popovers defined
+  above.
+- Implement the hamburger menu's dark/light Theme control, Save As action, and
+  centered/full-width Format control, and visibly unavailable Save for Offline
+  item labelled "coming soon". Centered preserves the current readable
+  max-width layout; full width uses available horizontal space while retaining
+  the existing narrow-window behavior. Keep diagram-local controls out of this
+  menu.
+- Make the per-diagram toolbar show Zoom in, Zoom out, and Edit while viewing;
+  in edit mode replace Edit with Done, Cancel (discarding every unsaved edit
+  from that session), and New node. Use accessible names even though the
+  buttons are icon-only.
+- Anchor node and connector properties popovers to the browser window's right
+  edge and arrange controls vertically. Allow the popover to overlap the
+  diagram workspace on narrow browser windows rather than reducing the
+  workspace, but align its top with the selected diagram frame and keep it
+  above diagram controls.
+- Keep the diagram toolbar fixed at the viewport's top-right within its
+  scrollable diagram frame on both axes. Preserve its scroll position through
+  selection and property rerenders. Constrain diagram frames to the browser
+  viewport and use both scrollbars when a zoomed canvas exceeds the frame.
+- Grow the canonical canvas dimensions when a moved or resized node reaches
+  any boundary. When a node moves left or above the origin, shift all diagram
+  coordinates together and extend the canvas in that direction, preserving
+  padding so no node is clipped.
+- Support background drag-panning whenever a diagram frame overflows. Replace
+  the semantic Type selector with Light/Dark and hue controls (Pink, Red,
+  Orange, Yellow, Green, Cyan, Blue, and Purple). Selecting either control
+  deliberately writes fill, border, and text-colour overrides; it does not
+  persist a separate style property. Subtitle text uses the same colour as the
+  node's main text.
+- Track whether canonical document source differs from its last saved version.
+  Prompt to save retained changes on Done and before leaving or reloading a
+  dirty document; Cancel restores the edit-session baseline without prompting
+  to save discarded changes.
 - Keep common actions discoverable through accessible labels, keyboard focus,
   and visible selected-state affordances.
 - Add zoom in, zoom out, fit all, reset-to-100%, and percentage display. Start
@@ -288,13 +336,27 @@ does not scale as the properties and creation actions grow.
 **Test requirements**
 
 - Unit coverage for zoom clamping and coordinate conversion.
-- DOM markup tests for menu/popover state and accessible controls.
-- Browser tests for menu focus management, popover dismissal, zoom/scroll,
-  drag/resize/connection coordinates under non-100% zoom, and save/reopen.
+- DOM markup tests for document-menu and per-diagram-toolbar states,
+  accessible icon controls, document-format states, vertically ordered
+  right-window popovers, and the unavailable offline-save item.
+- Browser tests for menu focus management, popover dismissal, dark/light theme
+  selection, centered/full-width format selection, narrow-window popover
+  overlap, edit Done/Cancel/New node states (including discarding a complete
+  edit session), dirty-state save prompts, zoom/scroll, drag/resize/connection
+  coordinates under non-100% zoom, and save/reopen.
 
 **Acceptance criteria**
 
 - [ ] The editor is usable without a full-width persistent inspector.
+- [ ] The document menu contains Theme, Format, Save As, and clearly
+  unavailable Save for Offline actions; centered and full-width formats render
+  as expected while every diagram exposes its own zoom and edit controls.
+- [ ] Edit mode presents Done, Cancel, and New node; Cancel restores the
+  diagram to its state when that edit session began.
+- [ ] Node and connector properties stay at the right browser edge in a
+  vertically arranged popover and may overlap the workspace on narrow windows.
+- [ ] Retained edits mark the document dirty and prompt the author to save
+  before they leave or reload it.
 - [ ] Zoom and scrollbars work on diagrams larger than the viewport.
 - [ ] Editing actions remain coordinate-accurate at every supported zoom.
 - [ ] View-only mode remains uncluttered.
@@ -342,3 +404,11 @@ so the final menu and popover structure exposes the full action set.
 | --- | --- |
 | 2026-08-15 | Created the editor-polish plan from the requested shapes, curved connectors, side-specific ports, lifecycle actions, and UI refinement. |
 | 2026-08-15 | Resolved shape geometry, port visibility, deletion, and zoom decisions; added both double-ended and right-facing chevrons. |
+| 2026-08-15 | Refined EPOL-T05: moved Theme, Save As, and offline-save status into the document menu; specified per-diagram view/edit toolbar states and right-aligned vertical properties popovers. |
+| 2026-08-15 | Clarified that right-edge properties may overlay narrow diagrams and added dirty-state save prompting. |
+| 2026-08-15 | Added centered and full-width document format options to the hamburger menu. |
+| 2026-08-15 | Refined menu, inspector, tooltip, and scrolling behavior; canvas grows to retain moved or resized nodes. |
+| 2026-08-15 | Preserved diagram scroll position through rerenders, locked the toolbar on both scroll axes, aligned the inspector to its diagram, and expanded canvases in every direction. |
+| 2026-08-15 | Added overflow-frame background panning, document-menu overlay positioning, and visual node style presets. |
+| 2026-08-15 | Made background panning available in view mode and updated style presets with stronger fills and matching text colours. |
+| 2026-08-15 | Replaced named presets with Light/Dark hue controls and made subtitle text follow the primary node text colour. |
