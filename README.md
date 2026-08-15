@@ -16,11 +16,20 @@ The runtime is published to GitHub Pages:
   src="https://sparkkz-nz.github.io/render/releases/v1.2.0/render-runtime.js"
   defer>
 </script>
+
+<!-- Current branch build for pre-merge integration testing -->
+<script
+  src="https://sparkkz-nz.github.io/render/dev/render-runtime.js"
+  defer>
+</script>
 ```
 
 Every push to `main` tests and publishes the latest runtime. Every Git tag
 beginning with `v` creates a versioned snapshot. Tags are retained in the Pages
 site, so consumers who pin a release URL do not receive later runtime changes.
+Every branch push also tests that branch and updates the shared development URL.
+Use the development URL only for short-lived pre-merge testing: the next branch
+push replaces it.
 
 The first deployment requires GitHub Pages to use **GitHub Actions** as its
 build and deployment source in the repository's Pages settings.

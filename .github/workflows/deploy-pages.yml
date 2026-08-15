@@ -3,7 +3,7 @@ name: Deploy runtime to GitHub Pages
 on:
   push:
     branches:
-      - main
+      - "**"
     tags:
       - "v*"
   workflow_dispatch:
@@ -24,10 +24,9 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Check out main and release tags
+      - name: Check out pushed revision and release tags
         uses: actions/checkout@v4
         with:
-          ref: main
           fetch-depth: 0
 
       - name: Set up Node.js
@@ -44,10 +43,19 @@ jobs:
           set -euo pipefail
 
           site_dir="$RUNNER_TEMP/pages-site"
-          mkdir -p "$site_dir/releases"
-          cp render-runtime.js "$site_dir/render-runtime.js"
-          cp hello.html hello-runtime.js "$site_dir/"
-          cp pages/index.html "$site_dir/index.html"
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          mkdir -p "$site_dir/dev" "$site_dir/releases"
+          git show "origin/main:render-runtime.js" > "$site_dir/render-runtime.js"
+          git show "origin/main:hello.html" > "$site_dir/hello.html"
+          git show "origin/main:hello-runtime.js" > "$site_dir/hello-runtime.js"
+          git show "origin/main:pages/index.html" > "$site_dir/index.html"
+
+          if [ "$GITHUB_REF_TYPE" = "branch" ]; then
+            dev_revision="$GITHUB_SHA"
+          else
+            dev_revision="origin/main"
+          fi
+          git show "$dev_revision:render-runtime.js" > "$site_dir/dev/render-runtime.js"
 
           while IFS= read -r tag; do
             [ -n "$tag" ] || continue
