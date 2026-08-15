@@ -395,6 +395,21 @@ test("node color palettes replace manual fill, stroke, and text overrides togeth
   assert.equal(style.stroke, nodeColorPalettes.pink.dark.stroke);
   assert.equal(style.text, nodeColorPalettes.pink.dark.text);
   assert.equal(style.strokeWidth, 3);
+
+  setNodeStyleOverride(node, "fill", "#ffffff");
+  setNodeStyleOverride(node, "stroke", "#000000");
+  setNodeStyleOverride(node, "text", "#222222");
+  const overridden = getNodeEffectiveStyle({ theme: "light" }, node);
+  assert.equal(overridden.fill, "#ffffff");
+  assert.equal(overridden.stroke, "#000000");
+  assert.equal(overridden.text, "#222222");
+
+  setNodeColorPalette(node, "light", "blue");
+  assert.equal(JSON.stringify(node.style), JSON.stringify({ strokeWidth: 3 }));
+  const reselected = getNodeEffectiveStyle({ theme: "light" }, node);
+  assert.equal(reselected.fill, nodeColorPalettes.blue.light.fill);
+  assert.equal(reselected.stroke, nodeColorPalettes.blue.light.stroke);
+  assert.equal(reselected.text, nodeColorPalettes.blue.light.text);
 });
 
 test("node color palettes include neutral grey and black-and-white tones", () => {

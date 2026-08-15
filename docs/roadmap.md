@@ -172,7 +172,9 @@ presentation elements.
    light/dark theme colours. The document selects the actual shade mapping once
    with frontmatter such as `colourScheme: classic`; future schemes such as
    `pastel` must retain the same tone and colour names. Do not attach domain
-   meaning to a colour.
+   meaning to a colour. Explicit fill, stroke, and text overrides take
+   precedence for an individual component; selecting a tone and colour again
+   clears those overrides and restores the current scheme's standard shades.
 4. Define nesting, malformed-input, accessibility, and source-serialization
    behavior before adding more component types.
 
