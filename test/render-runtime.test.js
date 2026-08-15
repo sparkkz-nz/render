@@ -383,6 +383,33 @@ test("node color palettes replace manual fill, stroke, and text overrides togeth
   assert.equal(node.style.text, nodeColorPalettes.pink.dark.text);
 });
 
+test("node color palettes include neutral grey and black-and-white tones", () => {
+  assert.deepEqual(Object.keys(nodeColorPalettes), [
+    "pink",
+    "red",
+    "orange",
+    "yellow",
+    "green",
+    "cyan",
+    "blue",
+    "purple",
+    "grey",
+    "bw"
+  ]);
+  assert.equal(nodeColorPalettes.grey.light.fill, "#E5E7EB");
+  assert.equal(nodeColorPalettes.grey.light.stroke, "#4B5563");
+  assert.equal(nodeColorPalettes.grey.light.text, "#374151");
+  assert.equal(nodeColorPalettes.grey.dark.fill, "#4B5563");
+  assert.equal(nodeColorPalettes.grey.dark.stroke, "#E5E7EB");
+  assert.equal(nodeColorPalettes.grey.dark.text, "#F9FAFB");
+  assert.equal(nodeColorPalettes.bw.light.fill, "#FFFFFF");
+  assert.equal(nodeColorPalettes.bw.light.stroke, "#111827");
+  assert.equal(nodeColorPalettes.bw.light.text, "#111827");
+  assert.equal(nodeColorPalettes.bw.dark.fill, "#111827");
+  assert.equal(nodeColorPalettes.bw.dark.stroke, "#FFFFFF");
+  assert.equal(nodeColorPalettes.bw.dark.text, "#FFFFFF");
+});
+
 test("requires supported node shapes and explicit edge anchors without retaining style.width aliases", () => {
   const valid = twoNodeEdgeSource(["    route: curved", "    style: { strokeWidth: 3 }"]);
   const diagram = parseDiagram(valid);

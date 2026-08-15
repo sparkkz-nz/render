@@ -80,6 +80,16 @@
       label: "Purple",
       light: { fill: "#DDD6FE", stroke: "#6D28D9", text: "#5B21B6" },
       dark: { fill: "#6D28D9", stroke: "#EDE9FE", text: "#EDE9FE" }
+    },
+    grey: {
+      label: "Grey",
+      light: { fill: "#E5E7EB", stroke: "#4B5563", text: "#374151" },
+      dark: { fill: "#4B5563", stroke: "#E5E7EB", text: "#F9FAFB" }
+    },
+    bw: {
+      label: "Black and white",
+      light: { fill: "#FFFFFF", stroke: "#111827", text: "#111827" },
+      dark: { fill: "#111827", stroke: "#FFFFFF", text: "#FFFFFF" }
     }
   };
 
