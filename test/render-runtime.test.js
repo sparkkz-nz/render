@@ -440,6 +440,18 @@ test("node color palettes include neutral grey and black-and-white tones", () =>
   assert.equal(nodeColorPalettes.bw.dark.text, "#FFFFFF");
 });
 
+test("palette selection serializes without an empty style mapping", () => {
+  const diagram = parseDiagram(twoNodeEdgeSource([]));
+
+  setNodeColorPalette(diagram.nodes[0], "light", "grey");
+
+  assert.equal(diagram.nodes[0].style, undefined);
+  assert.equal(
+    JSON.stringify(parseDiagram(serializeDiagram(diagram))),
+    JSON.stringify(diagram)
+  );
+});
+
 test("requires supported node shapes and explicit edge anchors without retaining style.width aliases", () => {
   const valid = twoNodeEdgeSource(["    route: curved", "    style: { strokeWidth: 3 }"]);
   const diagram = parseDiagram(valid);

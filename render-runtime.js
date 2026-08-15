@@ -151,7 +151,12 @@
     }
 
     if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
-      const entries = trimmed.slice(1, -1).split(",");
+      const entriesSource = trimmed.slice(1, -1).trim();
+      if (!entriesSource) {
+        return {};
+      }
+
+      const entries = entriesSource.split(",");
       const object = {};
 
       for (const entry of entries) {
@@ -1111,6 +1116,9 @@
     }
 
     if (value && typeof value === "object") {
+      if (!Object.keys(value).length) {
+        return "{}";
+      }
       return `{ ${Object.entries(value).map(([key, entry]) => `${key}: ${formatScalar(entry)}`).join(", ")} }`;
     }
 
@@ -1231,9 +1239,11 @@
     }
 
     const { fill, stroke, text, ...style } = node.style || {};
-    node.style = {
-      ...style
-    };
+    if (Object.keys(style).length) {
+      node.style = style;
+    } else {
+      delete node.style;
+    }
     node.palette = { tone, colour };
     return node;
   }
