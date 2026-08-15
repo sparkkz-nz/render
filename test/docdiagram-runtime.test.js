@@ -43,6 +43,7 @@ const {
   setNodeSize,
   setEdgeLabel,
   setEdgeRoute,
+  setEdgeAnchor,
   setEdgeStyleOverride,
   setStyleStrokeWidth,
   setEdgeMarkerStart,
@@ -51,7 +52,9 @@ const {
   renderTextBlock,
   computeNodeTextLayout,
   getNodeGeometry,
-  renderNodeBody
+  renderNodeBody,
+  buildEdgePath,
+  buildEdgeInspectorFields
 } = context.globalThis.DocDiagramCore;
 
 function readTemplateSource(filePath) {
@@ -373,12 +376,16 @@ test("edge inspector helpers mutate the canonical model and round-trip through Y
 
   setEdgeLabel(edge, "  Create payment intent  ");
   setEdgeRoute(edge, "straight");
+  setEdgeAnchor(edge, "source", "bottom");
+  setEdgeAnchor(edge, "target", "top");
   setEdgeStyleOverride(edge, "stroke", "#ff0000");
   setEdgeStyleOverride(edge, "text", "#00ff00");
   setStyleStrokeWidth(edge, "4.7");
 
   assert.equal(edge.label, "Create payment intent");
   assert.equal(edge.route, "straight");
+  assert.equal(edge.sourceAnchor, "bottom");
+  assert.equal(edge.targetAnchor, "top");
   assert.equal(edge.style.stroke, "#ff0000");
   assert.equal(edge.style.text, "#00ff00");
   assert.equal(edge.style.strokeWidth, 5);
@@ -386,8 +393,61 @@ test("edge inspector helpers mutate the canonical model and round-trip through Y
   const reparsed = parseDiagram(serializeDiagram(diagram));
   assert.equal(reparsed.edges[0].label, "Create payment intent");
   assert.equal(reparsed.edges[0].route, "straight");
+  assert.equal(reparsed.edges[0].sourceAnchor, "bottom");
+  assert.equal(reparsed.edges[0].targetAnchor, "top");
   assert.equal(reparsed.edges[0].style.stroke, "#ff0000");
   assert.equal(reparsed.edges[0].style.strokeWidth, 5);
+});
+
+test("buildEdgePath produces deterministic geometry for every route and anchor pair", () => {
+  const source = { x: 100, y: 100 };
+  const target = { x: 300, y: 220 };
+
+  for (const route of edgeRoutes) {
+    for (const sourceAnchor of edgeAnchors) {
+      for (const targetAnchor of edgeAnchors) {
+        const edgePath = buildEdgePath(source, target, sourceAnchor, targetAnchor, route);
+        assert.match(edgePath.path, /^M 100 100 /, `${route} ${sourceAnchor} -> ${targetAnchor}`);
+        assert.match(edgePath.path, /300 220$/, `${route} ${sourceAnchor} -> ${targetAnchor}`);
+        assert.equal(edgePath.hitPath, edgePath.path);
+        assert.ok(Number.isFinite(edgePath.midpoint.x) && Number.isFinite(edgePath.midpoint.y));
+        assert.ok(Number.isFinite(edgePath.startTangent.x) && Number.isFinite(edgePath.startTangent.y));
+        assert.ok(Number.isFinite(edgePath.endTangent.x) && Number.isFinite(edgePath.endTangent.y));
+      }
+    }
+  }
+
+  assert.equal(
+    JSON.stringify(buildEdgePath(source, target, "right", "left", "curved")),
+    JSON.stringify({
+      path: "M 100 100 C 200 100 200 220 300 220",
+      midpoint: { x: 200, y: 160 },
+      startTangent: { x: 100, y: 0 },
+      endTangent: { x: 100, y: 0 },
+      hitPath: "M 100 100 C 200 100 200 220 300 220"
+    })
+  );
+
+  const overlapping = buildEdgePath(source, source, "right", "right", "orthogonal");
+  assert.equal(overlapping.path, "M 100 100 L 140 100 L 100 100");
+  assert.deepEqual(JSON.parse(JSON.stringify(overlapping.midpoint)), { x: 140, y: 100 });
+
+  const sameSide = buildEdgePath({ x: 300, y: 100 }, { x: 100, y: 100 }, "right", "right", "orthogonal");
+  assert.equal(sameSide.path, "M 300 100 L 340 100 L 140 100 L 100 100");
+});
+
+test("edge inspector exposes route and both endpoint-side controls", () => {
+  const markup = buildEdgeInspectorFields(
+    { theme: "light" },
+    { source: "api", target: "db", sourceAnchor: "bottom", targetAnchor: "top", route: "curved" }
+  );
+
+  assert.match(markup, /class="docdiagram-inspector-route"/);
+  assert.match(markup, /class="docdiagram-inspector-source-anchor"/);
+  assert.match(markup, /class="docdiagram-inspector-target-anchor"/);
+  assert.match(markup, /value="curved" selected/);
+  assert.match(markup, /value="bottom" selected/);
+  assert.match(markup, /value="top" selected/);
 });
 
 test("setStyleStrokeWidth never produces a stroke width below one", () => {
@@ -641,13 +701,19 @@ test("renders multiline edge labels as stacked tspans while preserving stroke/wi
     "    target: db",
     "    sourceAnchor: right",
     "    targetAnchor: left",
+    "    route: curved",
     "    label: \"Retry\\nwith backoff\"",
+    "    start: circle",
+    "    end: arrow",
     "    style: { stroke: #ABCDEF, strokeWidth: 3 }"
   ].join("\n");
 
   const markup = renderDiagram(source, 0);
   const edgeLabelGroup = markup.match(/<text[^>]*class="docdiagram-edge-label"[^>]*>[\s\S]*?<\/text>/);
 
+  assert.match(markup, /<path class="docdiagram-edge-hit" d="M 200 80 C 250 80 250 80 300 80"/);
+  assert.match(markup, /<path class="docdiagram-edge" d="M 200 80 C 250 80 250 80 300 80"[^>]*marker-start=/);
+  assert.match(markup, /marker-end="url\(#docdiagram-marker-0-0-end\)"/);
   assert.ok(edgeLabelGroup, "Expected an edge label text block");
   assert.equal((edgeLabelGroup[0].match(/<tspan/g) || []).length, 2);
   assert.match(edgeLabelGroup[0], />Retry<\/tspan>/);

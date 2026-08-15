@@ -394,6 +394,121 @@
     );
   }
 
+  function getAnchorDirection(anchor) {
+    return {
+      top: { x: 0, y: -1 },
+      right: { x: 1, y: 0 },
+      bottom: { x: 0, y: 1 },
+      left: { x: -1, y: 0 }
+    }[anchor];
+  }
+
+  function formatPathPoint(point) {
+    return `${point.x} ${point.y}`;
+  }
+
+  function getPolylineMidpoint(points) {
+    const segments = points.slice(1).map((point, index) => {
+      const previous = points[index];
+      return {
+        start: previous,
+        end: point,
+        length: Math.hypot(point.x - previous.x, point.y - previous.y)
+      };
+    });
+    const totalLength = segments.reduce((total, segment) => total + segment.length, 0);
+    let remaining = totalLength / 2;
+
+    for (const segment of segments) {
+      if (remaining <= segment.length || segment === segments.at(-1)) {
+        const ratio = segment.length ? remaining / segment.length : 0;
+        return {
+          x: segment.start.x + (segment.end.x - segment.start.x) * ratio,
+          y: segment.start.y + (segment.end.y - segment.start.y) * ratio
+        };
+      }
+      remaining -= segment.length;
+    }
+
+    return points[0];
+  }
+
+  function buildEdgePath(source, target, sourceAnchor, targetAnchor, route = "orthogonal") {
+    const sourceDirection = getAnchorDirection(sourceAnchor);
+    const targetDirection = getAnchorDirection(targetAnchor);
+    const sourceIsHorizontal = sourceDirection.x !== 0;
+    let path;
+    let midpoint;
+    let startTangent;
+    let endTangent;
+
+    if (route === "straight") {
+      path = `M ${formatPathPoint(source)} L ${formatPathPoint(target)}`;
+      midpoint = { x: (source.x + target.x) / 2, y: (source.y + target.y) / 2 };
+      startTangent = { x: target.x - source.x, y: target.y - source.y };
+      endTangent = startTangent;
+    } else if (route === "curved") {
+      const distance = Math.max(Math.abs(target.x - source.x), Math.abs(target.y - source.y), 80);
+      const controlDistance = Math.min(distance / 2, 140);
+      const sourceControl = {
+        x: source.x + sourceDirection.x * controlDistance,
+        y: source.y + sourceDirection.y * controlDistance
+      };
+      const targetControl = {
+        x: target.x + targetDirection.x * controlDistance,
+        y: target.y + targetDirection.y * controlDistance
+      };
+      path = `M ${formatPathPoint(source)} C ${formatPathPoint(sourceControl)} ${formatPathPoint(targetControl)} ${formatPathPoint(target)}`;
+      midpoint = {
+        x: (source.x + 3 * sourceControl.x + 3 * targetControl.x + target.x) / 8,
+        y: (source.y + 3 * sourceControl.y + 3 * targetControl.y + target.y) / 8
+      };
+      startTangent = { x: sourceControl.x - source.x, y: sourceControl.y - source.y };
+      endTangent = { x: target.x - targetControl.x, y: target.y - targetControl.y };
+    } else {
+      const lead = 40;
+      const sourceLead = {
+        x: source.x + sourceDirection.x * lead,
+        y: source.y + sourceDirection.y * lead
+      };
+      const targetLead = {
+        x: target.x + targetDirection.x * lead,
+        y: target.y + targetDirection.y * lead
+      };
+      const corner = sourceIsHorizontal
+        ? { x: targetLead.x, y: sourceLead.y }
+        : { x: sourceLead.x, y: targetLead.y };
+      let points = [source, sourceLead, corner, targetLead, target];
+
+      let distinctPoints = points.filter((point, index) =>
+        index === 0 || point.x !== points[index - 1].x || point.y !== points[index - 1].y
+      );
+      if (distinctPoints.length === 1) {
+        distinctPoints = [
+          source,
+          {
+            x: source.x + sourceDirection.x * 40,
+            y: source.y + sourceDirection.y * 40
+          },
+          target
+        ];
+      }
+      path = `M ${formatPathPoint(distinctPoints[0])}${distinctPoints.slice(1).map((point) => ` L ${formatPathPoint(point)}`).join("")}`;
+      midpoint = getPolylineMidpoint(distinctPoints);
+      startTangent = {
+        x: distinctPoints[1].x - distinctPoints[0].x,
+        y: distinctPoints[1].y - distinctPoints[0].y
+      };
+      const finalSegment = distinctPoints.slice(-2);
+      endTangent = {
+        x: finalSegment[1].x - finalSegment[0].x,
+        y: finalSegment[1].y - finalSegment[0].y
+      };
+    }
+
+    return { path, midpoint, startTangent, endTangent, hitPath: path };
+  }
+
   function getEdgeMarkerDimensions(strokeWidth) {
     const width = Math.max(1, Number(strokeWidth) || 2);
     const size = 6 + width * 2.5;
@@ -481,16 +596,10 @@
       );
       const sourceAnchor = sourceGeometry.anchors[edge.sourceAnchor];
       const targetAnchor = targetGeometry.anchors[edge.targetAnchor];
-      const sourceX = sourceAnchor.x;
-      const sourceY = sourceAnchor.y;
-      const targetX = targetAnchor.x;
-      const targetY = targetAnchor.y;
       const route = edge.route || "orthogonal";
-      const path = route === "straight"
-        ? `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`
-        : `M ${sourceX} ${sourceY} H ${(sourceX + targetX) / 2} V ${targetY} H ${targetX}`;
-      const labelX = (sourceX + targetX) / 2;
-      const labelY = (sourceY + targetY) / 2 - 10;
+      const edgePath = buildEdgePath(sourceAnchor, targetAnchor, edge.sourceAnchor, edge.targetAnchor, route);
+      const labelX = edgePath.midpoint.x;
+      const labelY = edgePath.midpoint.y - 10;
 
       const style = getEdgeEffectiveStyle(diagram, edge);
       const isSelected = selectedEdge?.diagramIndex === diagramIndex && selectedEdge.edgeIndex === edgeIndex;
@@ -525,8 +634,8 @@
 
       return [
         `<g class="docdiagram-edge-group${isSelected ? " docdiagram-edge-selected" : ""}" data-diagram-index="${diagramIndex}" data-edge-index="${edgeIndex}">`,
-        `<path class="docdiagram-edge-hit" d="${path}" fill="none" stroke="transparent" stroke-width="16"/>`,
-        `<path class="docdiagram-edge" d="${path}"${markerAttributes} stroke="${escapeHtml(style.stroke)}" stroke-width="${strokeWidth}"/>`,
+        `<path class="docdiagram-edge-hit" d="${edgePath.hitPath}" fill="none" stroke="transparent" stroke-width="16"/>`,
+        `<path class="docdiagram-edge" d="${edgePath.path}"${markerAttributes} stroke="${escapeHtml(style.stroke)}" stroke-width="${strokeWidth}"/>`,
         isEditing
           ? `<foreignObject class="docdiagram-inline-editor-host" x="${labelX - editorWidth / 2}" y="${labelY - editorHeight / 2}" width="${editorWidth}" height="${editorHeight}"><textarea class="docdiagram-inline-editor docdiagram-inline-editor-edge" aria-label="Edit edge label. Press Enter for a new line. Press Control or Command plus Enter to save. Press Escape to cancel.">${escapeHtml(edge.label || "")}</textarea></foreignObject>`
           : edgeLabelLines.length
@@ -875,6 +984,15 @@
     return edge;
   }
 
+  function setEdgeAnchor(edge, endpoint, anchor) {
+    if (endpoint === "source") {
+      edge.sourceAnchor = anchor;
+    } else {
+      edge.targetAnchor = anchor;
+    }
+    return edge;
+  }
+
   function setEdgeStyleOverride(edge, key, value) {
     edge.style = { ...edge.style, [key]: value };
     return edge;
@@ -993,6 +1111,12 @@
       `<label class="docdiagram-field">Route<select class="docdiagram-inspector-route">${edgeRoutes.map(
         (candidate) => `<option value="${candidate}"${candidate === route ? " selected" : ""}>${candidate}</option>`
       ).join("")}</select></label>`,
+      `<label class="docdiagram-field">Source side<select class="docdiagram-inspector-source-anchor">${edgeAnchors.map(
+        (candidate) => `<option value="${candidate}"${candidate === edge.sourceAnchor ? " selected" : ""}>${candidate}</option>`
+      ).join("")}</select></label>`,
+      `<label class="docdiagram-field">Target side<select class="docdiagram-inspector-target-anchor">${edgeAnchors.map(
+        (candidate) => `<option value="${candidate}"${candidate === edge.targetAnchor ? " selected" : ""}>${candidate}</option>`
+      ).join("")}</select></label>`,
       `<label class="docdiagram-field">Start<select class="docdiagram-inspector-marker-start">${edgeMarkerStyles.map(
         (candidate) => `<option value="${candidate}"${candidate === startMarkerStyle ? " selected" : ""}>${candidate}</option>`
       ).join("")}</select></label>`,
@@ -1078,6 +1202,14 @@
 
     container.querySelector(".docdiagram-inspector-route").addEventListener("change", (event) => {
       withEdge((diagram, edge) => setEdgeRoute(edge, event.target.value));
+    });
+
+    container.querySelector(".docdiagram-inspector-source-anchor").addEventListener("change", (event) => {
+      withEdge((diagram, edge) => setEdgeAnchor(edge, "source", event.target.value));
+    });
+
+    container.querySelector(".docdiagram-inspector-target-anchor").addEventListener("change", (event) => {
+      withEdge((diagram, edge) => setEdgeAnchor(edge, "target", event.target.value));
     });
 
     container.querySelector(".docdiagram-inspector-marker-start").addEventListener("change", (event) => {
@@ -1719,6 +1851,7 @@
     setNodeSize,
     setEdgeLabel,
     setEdgeRoute,
+    setEdgeAnchor,
     setEdgeStyleOverride,
     setStyleStrokeWidth,
     setEdgeMarkerStart,
@@ -1727,7 +1860,9 @@
     renderTextBlock,
     computeNodeTextLayout,
     getNodeGeometry,
-    renderNodeBody
+    renderNodeBody,
+    buildEdgePath,
+    buildEdgeInspectorFields
   };
 
   if (sourceElement && outputElement) {
