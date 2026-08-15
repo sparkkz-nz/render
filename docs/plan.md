@@ -133,9 +133,14 @@ Support:
 - rounded-rectangle nodes;
 - a small semantic node-type style set, initially `application`, `service`,
   `datastore`, and `note`;
+- built-in `light` and `dark` themes selected by a document-level `theme` YAML
+  frontmatter field, consistently styling Markdown prose, controls, and
+  diagrams; a diagram-level `theme` may override it for a single diagram;
+  optional per-node and per-edge style overrides;
 - directed, labelled straight or orthogonal edges;
 - explicit node positions and dimensions;
-- an explicit canvas width, height, and optional grid;
+- an explicit canvas width, height, and optional `grid` increment; when present,
+  move and resize edits snap to its nearest multiple;
 - SVG output.
 
 Do not add arbitrary shapes, custom SVG, freehand drawing, containers, or
@@ -147,7 +152,14 @@ proven.
 View mode is the default. Edit mode exposes:
 
 - direct editing of a node label;
-- drag-and-drop node positioning;
+- drag-and-drop node positioning and resizing, with optional grid snapping;
+- edge selection alongside node selection, each with a clear selected state;
+- a compact toolbar properties inspector that follows the selected node or
+  edge (node: label, type, fill/border/text colours, width/height; edge:
+  label, route, start/end endpoint markers, stroke, label colour, width) and
+  persists every change to the canonical YAML;
+- a document theme selector that updates the YAML frontmatter `theme` field
+  and rerenders, styling the surrounding page as well as the document;
 - a visible **Save a copy** action;
 - a way to leave edit mode without saving.
 
@@ -345,8 +357,10 @@ labels, positions, sizes, and edges.
 
 - Add semantic styles and the MVP node types.
 - Add readable edge labels and basic orthogonal routing.
-- Add selected-node affordances and edit-mode usability.
-- Add a small theme/style configuration.
+- Add selected-node and selected-edge affordances and edit-mode usability.
+- Add a small theme/style configuration, including a page-wide theme and a
+  document theme selector.
+- Add a toolbar properties inspector for node and edge style overrides.
 
 **Exit criteria:** an architecture diagram is visually suitable for normal
 technical documentation without manual SVG changes.
