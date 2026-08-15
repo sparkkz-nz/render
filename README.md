@@ -1,62 +1,86 @@
 # render
 
-## GitHub Pages runtime
+render turns a portable HTML document containing Markdown, frontmatter, and
+diagram source into readable documentation with interactive SVG flowcharts.
+The Markdown source remains embedded in the HTML file, so a document can be
+opened locally, edited, saved as a new copy, and reopened without a server or
+build tool.
 
-The runtime is published to GitHub Pages:
+render is a viewer for agent-generated documentation with targeted editing for
+human corrections. It is not a general-purpose document authoring application.
 
-```html
-<!-- Latest version from main -->
-<script
-  src="https://sparkkz-nz.github.io/render/render-runtime.js"
-  defer>
-</script>
+## Start here
 
-<!-- Immutable release snapshot -->
-<script
-  src="https://sparkkz-nz.github.io/render/releases/v1.2.0/render-runtime.js"
-  defer>
-</script>
-
-<!-- Current branch build for pre-merge integration testing -->
-<script
-  src="https://sparkkz-nz.github.io/render/dev/render-runtime.js"
-  defer>
-</script>
-```
-
-Every push to `main` tests and publishes the latest runtime. Every Git tag
-beginning with `v` creates a versioned snapshot. Tags are retained in the Pages
-site, so consumers who pin a release URL do not receive later runtime changes.
-Every branch push also tests that branch and updates the shared development URL.
-Use the development URL only for short-lived pre-merge testing: the next branch
-push replaces it.
-
-The first deployment requires GitHub Pages to use **GitHub Actions** as its
-build and deployment source in the repository's Pages settings.
-
-## External script proof of concept
-
-[hello.html](hello.html) is a minimal browser-openable document. Its only
-runtime dependency is a script hosted by this repository's GitHub Pages site:
+Create an HTML file containing a `template#source`, a
+`main#rendered-document`, and the hosted runtime:
 
 ```html
-<script
-  src="https://sparkkz-nz.github.io/render/hello-runtime.js"
-  defer>
-</script>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hello render</title>
+  <script
+    src="https://sparkkz-nz.github.io/render/render-runtime.js"
+    defer>
+  </script>
+</head>
+<body>
+  <template id="source" type="text/markdown">
+# Hello render
+
+This document can be opened directly from your file system.
+  </template>
+  <main id="rendered-document"></main>
+</body>
+</html>
 ```
 
-Open the published document at:
+Save it as `hello-render.html` and open it in a browser. See the
+[getting-started guide](docs/getting-started.md) for a diagram and editing
+walkthrough, or the [syntax reference](docs/reference.md) for the complete
+current document contract.
 
-<https://sparkkz-nz.github.io/render/hello.html>
+## Runtime URLs
 
-It should show:
+```html
+<!-- Latest runtime from main: suitable for normal use and local experiments. -->
+<script src="https://sparkkz-nz.github.io/render/render-runtime.js" defer></script>
 
-> Success: hello-runtime.js loaded and ran.
+<!-- Immutable release snapshot: use for documents you publish or distribute. -->
+<script src="https://sparkkz-nz.github.io/render/releases/v1.2.0/render-runtime.js" defer></script>
 
-To verify that a distributed document can load the centrally hosted runtime,
-download [hello.html](hello.html) and open the downloaded file in a browser.
-It will still retrieve `hello-runtime.js` from GitHub Pages.
+<!-- Shared branch build: use only for short-lived pre-merge testing. -->
+<script src="https://sparkkz-nz.github.io/render/dev/render-runtime.js" defer></script>
+```
 
-`hello-runtime.js` is deliberately tiny. The production diagram runtime is
-published as `render-runtime.js`.
+Each push to `main` tests and publishes the latest runtime. A Git tag beginning
+with `v` produces a retained, versioned snapshot. Each branch push updates the
+shared development runtime, so documents must not rely on that URL after
+testing.
+
+For a document that must work without network access, keep a local copy of the
+runtime beside it and use a relative script URL. A future offline-export action
+will embed a pinned runtime in the saved document.
+
+## Documentation
+
+- [Getting started](docs/getting-started.md): create, open, edit, and save a
+  portable document.
+- [Syntax reference](docs/reference.md): supported HTML, frontmatter, Markdown,
+  flowchart YAML, and editing behaviour.
+- [Agent authoring skill](.github/skills/render-document/SKILL.md): instructions
+  and checked examples for agents creating valid render documents.
+- [Roadmap](docs/roadmap.md): planned compatibility, editing, and diagram work.
+- [Development notes](docs/dev/): implementation plans and handoff material.
+
+## Development
+
+[example.html](example.html) is the comprehensive local fixture. It uses a
+machine-specific development runtime URL, so replace that URL before sharing a
+copy. Run the runtime tests with:
+
+```sh
+node --test test/render-runtime.test.js
+```

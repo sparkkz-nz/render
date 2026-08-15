@@ -1,0 +1,113 @@
+---
+name: render-document
+description: Create valid, portable render HTML documents with canonical Markdown and editable flowcharts.
+---
+
+# Author render documents
+
+Use this skill when creating or updating a render document. A render document is
+a portable HTML file that embeds canonical Markdown in `template#source` and
+renders it through the hosted `render-runtime.js` browser runtime.
+
+The complete, versioned authoring contract is the repository's
+[syntax reference](../../../docs/reference.md). Treat it as the source of truth:
+do not invent frontmatter, Markdown, YAML fields, enum values, extension fences,
+or diagram types that the reference does not document.
+
+## Authoring workflow
+
+1. Start from the required HTML shell below.
+2. Put all canonical document content in `template#source`; never author
+   content directly in `main#rendered-document`.
+3. Use only the Markdown and diagram YAML described in the syntax reference.
+4. Choose a runtime channel appropriate to the document's lifetime.
+5. Write accessible headings, concise prose, meaningful node labels, and prose
+   that lets a reader understand a diagram without relying only on its visuals.
+6. Validate the HTML shell, frontmatter, Markdown subset, and every diagram
+   field before returning the document.
+
+```html
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Document title</title>
+  <script
+    src="https://sparkkz-nz.github.io/render/render-runtime.js"
+    defer>
+  </script>
+</head>
+<body>
+  <template id="source" type="text/markdown">
+# Document title
+
+Readable fallback prose describes the document and any diagram's purpose.
+  </template>
+  <main id="rendered-document"></main>
+</body>
+</html>
+```
+
+## Runtime channel selection
+
+Use one of these script sources:
+
+| Document purpose | Script source |
+| --- | --- |
+| Normal local or shared use | `https://sparkkz-nz.github.io/render/render-runtime.js` |
+| Short-lived pre-merge testing only | `https://sparkkz-nz.github.io/render/dev/render-runtime.js` |
+| Published or distributed document | `https://sparkkz-nz.github.io/render/releases/<tag>/render-runtime.js` |
+
+Use a real released tag, such as `v1.2.0`, in a pinned URL. Never use the shared
+development channel in an enduring document. A local relative runtime is valid
+only when the document and runtime are deliberately distributed together. Never
+put a machine-specific `file:///...` URL in a shareable document.
+
+## Flowchart rules
+
+Flowcharts use fenced `diagram` YAML. Every node must have a supported `shape`.
+Every edge must include both `sourceAnchor` and `targetAnchor`. Use only the
+values in the syntax reference, including:
+
+- node shapes: `rounded-rectangle`, `circle`, `oval`, `database`, `diamond`,
+  `rhombus`, `flattened-hexagon`, `chevron`, and `right-chevron`;
+- node types: `application`, `service`, `datastore`, and `note`;
+- anchors: `top`, `right`, `bottom`, and `left`;
+- routes: `orthogonal`, `straight`, and `curved`;
+- endpoint markers: `none`, `arrow`, and `circle`.
+
+Use explicit, stable node IDs and labels that describe a reader-visible
+responsibility. Keep the diagram compact and include adjacent prose that
+explains the flow. Do not use Mermaid fences, sequence diagrams, panels,
+callouts, tables, raw HTML, or other roadmap features that are not currently
+supported.
+
+## Validation checklist
+
+Before returning a document, verify:
+
+- It has `<!doctype html>`, `lang`, UTF-8, viewport, a descriptive `title`,
+  `template#source`, and `main#rendered-document`.
+- The template contains canonical Markdown and the rendered container is empty.
+- The script URL matches the document's intended lifetime.
+- Frontmatter, if present, is at the start and uses only supported values.
+- The Markdown uses only headings, paragraphs, unordered lists, ordinary code
+  fences, and `diagram` fences.
+- Every diagram parses with its explicit shape and edge anchors, and uses only
+  supported palette, route, marker, and style values.
+- A reader can understand each diagram from its heading, labels, and nearby
+  prose.
+- The finished file can be opened in a browser directly from the local file
+  system.
+
+## Worked examples
+
+The checked fixtures demonstrate valid documents:
+
+- [Simple document](../../../test/fixtures/render-document/simple-document.html)
+- [Flowchart document](../../../test/fixtures/render-document/flowchart-document.html)
+- [Themed document](../../../test/fixtures/render-document/themed-document.html)
+
+Do not create examples for future Markdown extensions until their syntax and
+serialization behavior are implemented and added to the syntax reference.

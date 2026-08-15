@@ -66,8 +66,8 @@ The proof of concept now supports:
   so line breaks always survive a parse → serialize → parse cycle;
 - **Save a copy**, which downloads an updated HTML document.
 
-The main sample is [example.html](../example.html), driven by
-[render-runtime.js](../render-runtime.js). It demonstrates required
+The main sample is [example.html](../../example.html), driven by
+[render-runtime.js](../../render-runtime.js). It demonstrates required
 node shapes, explicit non-default connector anchors, the `curved` route, a
 node subtitle, multiline labels, an edge `style.strokeWidth` override, and
 non-default edge endpoint markers.
@@ -87,7 +87,7 @@ recolors/rethickens the selected edge, and the change survives a rerender.
 
 ## Development runtime
 
-[example.html](../example.html) currently references the runtime through this
+[example.html](../../example.html) currently references the runtime through this
 machine-specific absolute file URL:
 
 ```text
@@ -102,7 +102,7 @@ replace it with an immutable public runtime URL as described in
 ## Validation completed
 
 - `node --check render-runtime.js`
-- `node --test test/render-runtime.test.js` — 42 tests covering helpers,
+- `node --test test/render-runtime.test.js` — 59 tests covering helpers,
   frontmatter persistence, node/edge YAML round-trip, the new `subtitle`
   field (including multiline round-trip), multiline node label/subtitle/edge
   label rendering as stacked `<tspan>`s, absence of `node.type` as SVG text,

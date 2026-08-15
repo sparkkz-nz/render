@@ -21,7 +21,7 @@ runtime is released.
 `node.type` continues to select the theme's semantic colours (`application`,
 `service`, `datastore`, and `note`). Introduce an independent `node.shape`
 field to select SVG geometry. This is an intentional source-schema break:
-update [example.html](../example.html) and do not retain deprecated aliases
+update [example.html](../../example.html) and do not retain deprecated aliases
 because it is the only existing document.
 
 Initial shape values:

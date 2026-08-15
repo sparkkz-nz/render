@@ -77,6 +77,39 @@ function readTemplateSource(filePath) {
   return template[1];
 }
 
+function readDiagramSources(source) {
+  return [...source.matchAll(/^```diagram\s*\n([\s\S]*?)^```$/gm)].map((match) => match[1]);
+}
+
+test("render authoring skill fixtures use the required shell and valid source", () => {
+  const fixtureDirectory = path.resolve(__dirname, "fixtures", "render-document");
+  const fixtures = [
+    "simple-document.html",
+    "flowchart-document.html",
+    "themed-document.html"
+  ];
+
+  for (const fixture of fixtures) {
+    const filePath = path.join(fixtureDirectory, fixture);
+    const html = fs.readFileSync(filePath, "utf8");
+    const source = readTemplateSource(filePath);
+
+    assert.match(html, /^<!doctype html>/i, `${fixture} has a document doctype`);
+    assert.match(html, /<html lang="en">/, `${fixture} declares its language`);
+    assert.match(html, /<meta charset="utf-8">/, `${fixture} declares UTF-8`);
+    assert.match(html, /<meta name="viewport"/, `${fixture} has a viewport`);
+    assert.match(html, /<script src="https:\/\/sparkkz-nz\.github\.io\/render(?:\/releases\/v1\.2\.0)?\/render-runtime\.js" defer><\/script>/, `${fixture} uses a hosted runtime`);
+    assert.match(html, /<main id="rendered-document"><\/main>/, `${fixture} has an empty render target`);
+
+    const document = resolveDocument(source);
+    assert.ok(document.content.includes("# "), `${fixture} has a document heading`);
+
+    for (const diagramSource of readDiagramSources(document.content)) {
+      assert.doesNotThrow(() => parseDiagram(diagramSource), `${fixture} has a valid diagram`);
+    }
+  }
+});
+
 test("extracts document frontmatter without treating it as Markdown content", () => {
   const document = parseDocumentFrontmatter("\n---\ntheme: dark\n---\n\n# Payments");
 

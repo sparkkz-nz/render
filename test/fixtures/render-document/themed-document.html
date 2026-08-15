@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Operations overview</title>
+  <script src="https://sparkkz-nz.github.io/render/render-runtime.js" defer></script>
+</head>
+<body>
+  <template id="source" type="text/markdown">
+---
+theme: dark
+colourScheme: classic
+---
+
+# Operations overview
+
+This dark-themed document uses the classic colour scheme.
+
+```diagram
+version: 1
+id: operations-overview
+canvas:
+  width: 720
+  height: 300
+  grid: 5
+nodes:
+  - id: monitor
+    label: Monitoring
+    type: application
+    shape: diamond
+    position: { x: 60, y: 100 }
+    size: { width: 160, height: 100 }
+    palette: { tone: dark, colour: cyan }
+  - id: on-call
+    label: On-call engineer
+    type: note
+    shape: chevron
+    position: { x: 460, y: 100 }
+    size: { width: 180, height: 100 }
+    palette: { tone: dark, colour: orange }
+edges:
+  - source: monitor
+    target: on-call
+    sourceAnchor: right
+    targetAnchor: left
+    label: Page
+    route: curved
+    start: circle
+    end: arrow
+```
+  </template>
+  <main id="rendered-document"></main>
+</body>
+</html>
