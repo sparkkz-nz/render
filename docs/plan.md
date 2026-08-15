@@ -419,5 +419,6 @@ Browser-level tests should cover:
 
 ## Next step
 
-Review and resolve the open questions that affect the first delivery slice,
-then implement Slice 1 with a sample document and local runtime.
+Slices 1 through 3 are complete. The next planned work is the editor-polish
+roadmap in [editor-polish-plan.md](editor-polish-plan.md), followed by Slice 4
+(package and publish the runtime) once the diagram source schema is stable.

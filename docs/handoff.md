@@ -136,23 +136,16 @@ offline-menu work remains explicitly deferred (see below).
 
 ## Next recommended work
 
-Continue visual refinement:
+Implement the dependency-ordered editor-polish slices in
+[editor-polish-plan.md](editor-polish-plan.md):
 
-1. add multi-select and bulk style editing for nodes/edges;
-2. support creating and deleting nodes/edges from the toolbar;
-3. expand focused automated coverage as new Markdown and diagram features are
-   added.
-
-Defer **Save offline version** until there is a deterministic packaging step
-that can embed a pinned runtime release. The requirement and design constraint
-are recorded in [plan.md](plan.md).
-
-Continue visual refinement:
-
-1. add multi-select and bulk style editing for nodes/edges;
-2. support creating and deleting nodes/edges from the toolbar;
-3. expand focused automated coverage as new Markdown and diagram features are
-   added.
+1. establish the backwards-compatible shape, connector-port, and curved-route
+   schema;
+2. render and edit the requested shape palette;
+3. render side-aware straight, orthogonal, and curved connectors;
+4. create, reconnect, and delete nodes and connectors;
+5. replace the permanent inspector with compact menu/popover editor chrome and
+   add zoom/scroll refinement.
 
 Defer **Save offline version** until there is a deterministic packaging step
 that can embed a pinned runtime release. The requirement and design constraint
