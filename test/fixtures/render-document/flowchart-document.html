@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Order processing flow</title>
+  <script src="https://sparkkz-nz.github.io/render/releases/v1.2.0/render-runtime.js" defer></script>
+</head>
+<body>
+  <template id="source" type="text/markdown">
+---
+theme: light
+---
+
+# Order processing flow
+
+The storefront submits a new order to the order service, which records it in
+the order database.
+
+```diagram
+version: 1
+id: order-processing
+canvas:
+  width: 900
+  height: 320
+nodes:
+  - id: storefront
+    label: Storefront
+    type: application
+    shape: rounded-rectangle
+    position: { x: 50, y: 110 }
+    size: { width: 180, height: 80 }
+  - id: orders-api
+    label: Order service
+    type: service
+    shape: oval
+    position: { x: 360, y: 110 }
+    size: { width: 180, height: 80 }
+  - id: orders-db
+    label: Orders database
+    type: datastore
+    shape: database
+    position: { x: 670, y: 110 }
+    size: { width: 180, height: 80 }
+edges:
+  - source: storefront
+    target: orders-api
+    sourceAnchor: right
+    targetAnchor: left
+    label: Create order
+    route: straight
+    end: arrow
+  - source: orders-api
+    target: orders-db
+    sourceAnchor: right
+    targetAnchor: left
+    label: Store order
+    route: straight
+    end: arrow
+```
+  </template>
+  <main id="rendered-document"></main>
+</body>
+</html>
