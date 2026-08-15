@@ -37,6 +37,7 @@ const {
   serializeDiagram,
   setNodeLabel,
   setNodeType,
+  setNodeShape,
   setNodeSubtitle,
   setNodeStyleOverride,
   setNodeSize,
@@ -48,7 +49,9 @@ const {
   setEdgeMarkerEnd,
   splitTextLines,
   renderTextBlock,
-  computeNodeTextLayout
+  computeNodeTextLayout,
+  getNodeGeometry,
+  renderNodeBody
 } = context.globalThis.DocDiagramCore;
 
 function readTemplateSource(filePath) {
@@ -418,6 +421,60 @@ test("computeNodeTextLayout stacks label and subtitle lines and keeps the block 
   assert.equal(withSubtitle.subtitleLines.length, 1);
   // The label block should start above the subtitle block so the stack reads top-to-bottom.
   assert.ok(withSubtitle.labelStartY < withSubtitle.subtitleStartY);
+});
+
+test("shape geometry renders every supported shape with usable text bounds and perimeter anchors", () => {
+  const expectedMarkup = {
+    "rounded-rectangle": "<rect", circle: "<circle", oval: "<ellipse", database: "<path",
+    diamond: "<polygon", rhombus: "<polygon", "flattened-hexagon": "<polygon",
+    chevron: "<polygon", "right-chevron": "<polygon"
+  };
+
+  for (const shape of nodeShapes) {
+    const geometry = getNodeGeometry({ shape }, 20, 40, 200, 100);
+    assert.match(geometry.bodyMarkup, new RegExp(expectedMarkup[shape]));
+    assert.match(renderNodeBody(geometry, { fill: "#123456", stroke: "#abcdef" }, 4), /fill="#123456" stroke="#abcdef" stroke-width="4"/);
+    assert.ok(geometry.textBounds.width > 0 && geometry.textBounds.height > 0, `${shape} has usable text bounds`);
+    assert.equal(JSON.stringify(Object.keys(geometry.anchors).sort()), JSON.stringify(["bottom", "left", "right", "top"]));
+
+    for (const anchor of Object.values(geometry.anchors)) {
+      assert.ok(Number.isFinite(anchor.x) && Number.isFinite(anchor.y), `${shape} anchor is finite`);
+    }
+  }
+});
+
+test("shape-specific anchors resolve to their rendered perimeters", () => {
+  const rhombus = getNodeGeometry({ shape: "rhombus" }, 20, 40, 200, 100);
+  assert.equal(rhombus.anchors.left.x, 40);
+  assert.equal(rhombus.anchors.right.x, 200);
+  assert.equal(rhombus.anchors.left.y, 90);
+  assert.equal(rhombus.anchors.right.y, 90);
+
+  const chevron = getNodeGeometry({ shape: "chevron" }, 20, 40, 200, 100);
+  assert.match(chevron.bodyMarkup, /points="20,40 188,40 220,90 188,140 20,140 52,90"/);
+  assert.equal(chevron.anchors.left.x, 52);
+  assert.equal(chevron.anchors.left.y, 90);
+  assert.equal(chevron.textBounds.x + chevron.textBounds.width / 2, 136);
+
+  const rightChevron = getNodeGeometry({ shape: "right-chevron" }, 20, 40, 200, 100);
+  assert.match(rightChevron.bodyMarkup, /points="20,40 188,40 220,90 188,140 20,140"/);
+  assert.equal(rightChevron.anchors.left.x, 20);
+  assert.equal(rightChevron.anchors.left.y, 90);
+
+  const database = getNodeGeometry({ shape: "database" }, 20, 40, 200, 100);
+  assert.equal(database.anchors.top.y, 40);
+  assert.equal(database.anchors.bottom.y, 140);
+});
+
+test("circle node size changes preserve a square bounding box", () => {
+  const diagram = { canvas: { grid: 5 } };
+  const circle = { shape: "circle", size: { width: 150, height: 150 } };
+
+  setNodeSize(diagram, circle, "width", 183);
+  assert.equal(JSON.stringify(circle.size), JSON.stringify({ width: 185, height: 185 }));
+  setNodeShape(circle, "oval");
+  setNodeSize(diagram, circle, "height", 92);
+  assert.equal(JSON.stringify(circle.size), JSON.stringify({ width: 185, height: 90 }));
 });
 
 test("parses and serializes a node subtitle, including multiline values, with a safe roundtrip", () => {

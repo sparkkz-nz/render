@@ -282,7 +282,88 @@
     return `<text x="${centerX}" y="${startY}" text-anchor="middle" class="${className}" fill="${escapeHtml(fill)}">${tspans}</text>`;
   }
 
-  function computeNodeTextLayout(x, y, nodeWidth, nodeHeight, node) {
+  function getNodeGeometry(node, x, y, nodeWidth, nodeHeight) {
+    const shape = node.shape;
+    const centerX = x + nodeWidth / 2;
+    const centerY = y + nodeHeight / 2;
+    const inset = Math.min(nodeWidth, nodeHeight) * 0.2;
+    const textBounds = { x: x + 12, y: y + 12, width: nodeWidth - 24, height: nodeHeight - 24 };
+    const anchors = {
+      top: { x: centerX, y },
+      right: { x: x + nodeWidth, y: centerY },
+      bottom: { x: centerX, y: y + nodeHeight },
+      left: { x, y: centerY }
+    };
+    let bodyMarkup;
+
+    if (shape === "circle") {
+      const diameter = Math.min(nodeWidth, nodeHeight);
+      const circleX = centerX - diameter / 2;
+      const circleY = centerY - diameter / 2;
+      const radius = diameter / 2;
+      textBounds.x = circleX + radius * 0.3;
+      textBounds.y = circleY + radius * 0.3;
+      textBounds.width = radius * 1.4;
+      textBounds.height = radius * 1.4;
+      anchors.top.y = circleY;
+      anchors.right.x = circleX + diameter;
+      anchors.bottom.y = circleY + diameter;
+      anchors.left.x = circleX;
+      bodyMarkup = `<circle class="docdiagram-node-body" cx="${centerX}" cy="${centerY}" r="${radius}"/>`;
+    } else if (shape === "oval") {
+      textBounds.x += nodeWidth * 0.1;
+      textBounds.width -= nodeWidth * 0.2;
+      bodyMarkup = `<ellipse class="docdiagram-node-body" cx="${centerX}" cy="${centerY}" rx="${nodeWidth / 2}" ry="${nodeHeight / 2}"/>`;
+    } else if (shape === "database") {
+      const cap = Math.min(nodeHeight * 0.22, 18);
+      textBounds.y += cap / 2;
+      textBounds.height -= cap;
+      bodyMarkup = `<path class="docdiagram-node-body" d="M ${x} ${y + cap} C ${x} ${y - cap / 3} ${x + nodeWidth} ${y - cap / 3} ${x + nodeWidth} ${y + cap} V ${y + nodeHeight - cap} C ${x + nodeWidth} ${y + nodeHeight + cap / 3} ${x} ${y + nodeHeight + cap / 3} ${x} ${y + nodeHeight - cap} Z M ${x} ${y + cap} C ${x} ${y + cap * 2.3} ${x + nodeWidth} ${y + cap * 2.3} ${x + nodeWidth} ${y + cap}"/>`;
+    } else if (shape === "diamond") {
+      textBounds.x += nodeWidth * 0.25;
+      textBounds.y += nodeHeight * 0.25;
+      textBounds.width -= nodeWidth * 0.5;
+      textBounds.height -= nodeHeight * 0.5;
+      anchors.top = { x: centerX, y };
+      anchors.right = { x: x + nodeWidth, y: centerY };
+      anchors.bottom = { x: centerX, y: y + nodeHeight };
+      anchors.left = { x, y: centerY };
+      bodyMarkup = `<polygon class="docdiagram-node-body" points="${centerX},${y} ${x + nodeWidth},${centerY} ${centerX},${y + nodeHeight} ${x},${centerY}"/>`;
+    } else if (shape === "rhombus") {
+      const slant = Math.min(nodeWidth * 0.2, nodeHeight * 0.6);
+      textBounds.x += slant;
+      textBounds.width -= slant * 2;
+      anchors.left.x = x + slant / 2;
+      anchors.right.x = x + nodeWidth - slant / 2;
+      bodyMarkup = `<polygon class="docdiagram-node-body" points="${x + slant},${y} ${x + nodeWidth},${y} ${x + nodeWidth - slant},${y + nodeHeight} ${x},${y + nodeHeight}"/>`;
+    } else if (shape === "flattened-hexagon") {
+      const clip = Math.min(nodeWidth * 0.18, nodeHeight * 0.7);
+      textBounds.x += clip;
+      textBounds.width -= clip * 2;
+      bodyMarkup = `<polygon class="docdiagram-node-body" points="${x + clip},${y} ${x + nodeWidth - clip},${y} ${x + nodeWidth},${centerY} ${x + nodeWidth - clip},${y + nodeHeight} ${x + clip},${y + nodeHeight} ${x},${centerY}"/>`;
+    } else if (shape === "chevron") {
+      const point = Math.min(nodeWidth * 0.16, nodeHeight * 0.45);
+      textBounds.x += point * 1.175;
+      textBounds.width -= point * 1.35;
+      anchors.left.x = x + point;
+      bodyMarkup = `<polygon class="docdiagram-node-body" points="${x},${y} ${x + nodeWidth - point},${y} ${x + nodeWidth},${centerY} ${x + nodeWidth - point},${y + nodeHeight} ${x},${y + nodeHeight} ${x + point},${centerY}"/>`;
+    } else if (shape === "right-chevron") {
+      const point = Math.min(nodeWidth * 0.16, nodeHeight * 0.45);
+      textBounds.width -= point;
+      bodyMarkup = `<polygon class="docdiagram-node-body" points="${x},${y} ${x + nodeWidth - point},${y} ${x + nodeWidth},${centerY} ${x + nodeWidth - point},${y + nodeHeight} ${x},${y + nodeHeight}"/>`;
+    } else {
+      bodyMarkup = `<rect class="docdiagram-node-body" x="${x}" y="${y}" width="${nodeWidth}" height="${nodeHeight}" rx="12"/>`;
+    }
+
+    return { bodyMarkup, textBounds, anchors };
+  }
+
+  function computeNodeTextLayout(textBounds, node, legacyWidth, legacyHeight, legacyNode) {
+    if (typeof textBounds === "number") {
+      textBounds = { x: textBounds, y: node, width: legacyWidth, height: legacyHeight };
+      node = legacyNode;
+    }
+
     const labelLineHeight = 20;
     const subtitleLineHeight = 15;
     const labelLines = splitTextLines(node.label);
@@ -291,8 +372,8 @@
     const labelBlockHeight = labelLines.length * labelLineHeight;
     const subtitleBlockHeight = subtitleLines.length * subtitleLineHeight;
     const totalBlockHeight = labelBlockHeight + subtitleGap + subtitleBlockHeight;
-    const centerX = x + nodeWidth / 2;
-    const centerY = y + nodeHeight / 2;
+    const centerX = textBounds.x + textBounds.width / 2;
+    const centerY = textBounds.y + textBounds.height / 2;
     const blockTop = centerY - totalBlockHeight / 2;
 
     return {
@@ -304,6 +385,13 @@
       labelStartY: blockTop + labelLineHeight * 0.72,
       subtitleStartY: blockTop + labelBlockHeight + subtitleGap + subtitleLineHeight * 0.72
     };
+  }
+
+  function renderNodeBody(geometry, style, strokeWidth) {
+    return geometry.bodyMarkup.replace(
+      "/>",
+      ` fill="${escapeHtml(style.fill)}" stroke="${escapeHtml(style.stroke)}" stroke-width="${strokeWidth}"/>`
+    );
   }
 
   function getEdgeMarkerDimensions(strokeWidth) {
@@ -377,10 +465,26 @@
         return "";
       }
 
-      const sourceX = Number(sourceNode.position.x) + (Number(sourceNode.size.width) || 190);
-      const sourceY = Number(sourceNode.position.y) + (Number(sourceNode.size.height) || 80) / 2;
-      const targetX = Number(targetNode.position.x);
-      const targetY = Number(targetNode.position.y) + (Number(targetNode.size.height) || 80) / 2;
+      const sourceGeometry = getNodeGeometry(
+        sourceNode,
+        Number(sourceNode.position.x) || 0,
+        Number(sourceNode.position.y) || 0,
+        Number(sourceNode.size.width) || 190,
+        Number(sourceNode.size.height) || 80
+      );
+      const targetGeometry = getNodeGeometry(
+        targetNode,
+        Number(targetNode.position.x) || 0,
+        Number(targetNode.position.y) || 0,
+        Number(targetNode.size.width) || 190,
+        Number(targetNode.size.height) || 80
+      );
+      const sourceAnchor = sourceGeometry.anchors[edge.sourceAnchor];
+      const targetAnchor = targetGeometry.anchors[edge.targetAnchor];
+      const sourceX = sourceAnchor.x;
+      const sourceY = sourceAnchor.y;
+      const targetX = targetAnchor.x;
+      const targetY = targetAnchor.y;
       const route = edge.route || "orthogonal";
       const path = route === "straight"
         ? `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`
@@ -443,13 +547,14 @@
       const isSelected = selectedNode?.diagramIndex === diagramIndex && selectedNode.nodeId === node.id;
       const isEditing = isSelected && editingNode?.diagramIndex === diagramIndex && editingNode.nodeId === node.id;
       const strokeWidth = (Number(style.strokeWidth) || 2) + (isSelected ? 2 : 0);
-      const layout = computeNodeTextLayout(x, y, nodeWidth, nodeHeight, node);
+      const geometry = getNodeGeometry(node, x, y, nodeWidth, nodeHeight);
+      const layout = computeNodeTextLayout(geometry.textBounds, node);
 
       return [
         `<g class="docdiagram-node${isSelected ? " docdiagram-node-selected" : ""}" data-diagram-index="${diagramIndex}" data-node-id="${escapeHtml(node.id)}">`,
-        `<rect class="docdiagram-node-body" x="${x}" y="${y}" width="${nodeWidth}" height="${nodeHeight}" rx="12" fill="${escapeHtml(style.fill)}" stroke="${escapeHtml(style.stroke)}" stroke-width="${strokeWidth}"/>`,
+        renderNodeBody(geometry, style, strokeWidth),
         isEditing
-          ? `<foreignObject class="docdiagram-inline-editor-host" x="${x + 10}" y="${y + 10}" width="${nodeWidth - 20}" height="${nodeHeight - 20}"><textarea class="docdiagram-inline-editor docdiagram-inline-editor-node" aria-label="Edit node label. Press Enter for a new line. Press Control or Command plus Enter to save. Press Escape to cancel.">${escapeHtml(node.label)}</textarea></foreignObject>`
+          ? `<foreignObject class="docdiagram-inline-editor-host" x="${geometry.textBounds.x}" y="${geometry.textBounds.y}" width="${geometry.textBounds.width}" height="${geometry.textBounds.height}"><textarea class="docdiagram-inline-editor docdiagram-inline-editor-node" aria-label="Edit node label. Press Enter for a new line. Press Control or Command plus Enter to save. Press Escape to cancel.">${escapeHtml(node.label)}</textarea></foreignObject>`
           : renderTextBlock(layout.centerX, layout.labelStartY, layout.labelLines, layout.labelLineHeight, "docdiagram-node-label", style.text),
         !isEditing && layout.subtitleLines.length
           ? renderTextBlock(layout.centerX, layout.subtitleStartY, layout.subtitleLines, layout.subtitleLineHeight, "docdiagram-node-subtitle", style.subtitleText)
@@ -735,6 +840,11 @@
     return node;
   }
 
+  function setNodeShape(node, shape) {
+    node.shape = shape;
+    return node;
+  }
+
   function setNodeSubtitle(node, subtitle) {
     node.subtitle = String(subtitle ?? "").trim();
     return node;
@@ -749,7 +859,9 @@
     const grid = getGridSize(diagram);
     const minimum = dimension === "width" ? minimumNodeSize.width : minimumNodeSize.height;
     const size = clampNodeSize(Number(rawValue) || minimum, minimum, grid);
-    node.size = { ...node.size, [dimension]: size };
+    node.size = node.shape === "circle"
+      ? { ...node.size, width: size, height: size }
+      : { ...node.size, [dimension]: size };
     return node;
   }
 
@@ -857,6 +969,9 @@
       `<label class="docdiagram-field">Type<select class="docdiagram-inspector-type">${nodeTypes.map(
         (type) => `<option value="${type}"${type === node.type ? " selected" : ""}>${type}</option>`
       ).join("")}</select></label>`,
+      `<label class="docdiagram-field">Shape<select class="docdiagram-inspector-shape">${nodeShapes.map(
+        (shape) => `<option value="${shape}"${shape === node.shape ? " selected" : ""}>${shape}</option>`
+      ).join("")}</select></label>`,
       `<label class="docdiagram-field">Fill<input type="color" class="docdiagram-inspector-fill" value="${escapeHtml(style.fill)}"></label>`,
       `<label class="docdiagram-field">Border<input type="color" class="docdiagram-inspector-stroke" value="${escapeHtml(style.stroke)}"></label>`,
       `<label class="docdiagram-field">Border width<input type="number" class="docdiagram-inspector-stroke-width" value="${Number(style.strokeWidth) || 2}" min="1" step="1"></label>`,
@@ -913,6 +1028,10 @@
 
     container.querySelector(".docdiagram-inspector-type").addEventListener("change", (event) => {
       withNode((diagram, node) => setNodeType(node, event.target.value));
+    });
+
+    container.querySelector(".docdiagram-inspector-shape").addEventListener("change", (event) => {
+      withNode((diagram, node) => setNodeShape(node, event.target.value));
     });
 
     container.querySelector(".docdiagram-inspector-fill").addEventListener("change", (event) => {
@@ -1041,14 +1160,15 @@
   function updateNodeSizeMarkup(group, node, width, height) {
     const x = Number(node.position?.x) || 0;
     const y = Number(node.position?.y) || 0;
-    const nodeRect = group.querySelector(".docdiagram-node-body");
+    const nodeBody = group.querySelector(".docdiagram-node-body");
     const label = group.querySelector(".docdiagram-node-label");
     const subtitle = group.querySelector(".docdiagram-node-subtitle");
     const handle = group.querySelector(".docdiagram-resize-handle");
-    const layout = computeNodeTextLayout(x, y, width, height, node);
+    const style = getNodeEffectiveStyle(diagramModels[Number(group.dataset.diagramIndex)], node);
+    const geometry = getNodeGeometry(node, x, y, width, height);
+    const layout = computeNodeTextLayout(geometry.textBounds, node);
 
-    nodeRect.setAttribute("width", width);
-    nodeRect.setAttribute("height", height);
+    nodeBody.outerHTML = renderNodeBody(geometry, style, Number(style.strokeWidth) || 2);
 
     if (label) {
       label.setAttribute("x", layout.centerX);
@@ -1090,8 +1210,14 @@
 
     function move(moveEvent) {
       const point = svgPoint(svg, moveEvent);
-      const width = clampNodeSize(origin.width + point.x - start.x, minimumNodeSize.width, grid);
-      const height = clampNodeSize(origin.height + point.y - start.y, minimumNodeSize.height, grid);
+      let width = clampNodeSize(origin.width + point.x - start.x, minimumNodeSize.width, grid);
+      let height = clampNodeSize(origin.height + point.y - start.y, minimumNodeSize.height, grid);
+
+      if (node.shape === "circle") {
+        const diameter = Math.max(width, height);
+        width = diameter;
+        height = diameter;
+      }
 
       resized = resized || width !== origin.width || height !== origin.height;
       node.size = { ...node.size, width, height };
@@ -1587,6 +1713,7 @@
     serializeDiagram,
     setNodeLabel,
     setNodeType,
+    setNodeShape,
     setNodeSubtitle,
     setNodeStyleOverride,
     setNodeSize,
@@ -1598,7 +1725,9 @@
     setEdgeMarkerEnd,
     splitTextLines,
     renderTextBlock,
-    computeNodeTextLayout
+    computeNodeTextLayout,
+    getNodeGeometry,
+    renderNodeBody
   };
 
   if (sourceElement && outputElement) {
