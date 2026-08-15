@@ -9,7 +9,8 @@ The proof of concept now supports:
 - a small custom Markdown renderer for headings, paragraphs, lists, ordinary
   code blocks, and `diagram` code blocks;
 - a restricted YAML diagram syntax with explicit canvas, nodes, edges,
-  positions, and dimensions;
+  positions, dimensions, required node shapes, and required connector
+  source/target anchors;
 - polished SVG flow diagrams with semantic application, service, datastore,
   and note styles;
 - an internal-only node `type`: it still drives theme colours and is editable
@@ -49,14 +50,14 @@ The proof of concept now supports:
 - built-in `light` and `dark` themes selected in Markdown YAML frontmatter,
   consistently styling the surrounding page (`html`/`body`), prose, controls,
   and diagrams; a diagram may override the document theme, with optional
-  per-node and per-edge style overrides — including edge `stroke` and
-  `width`, which now render and persist correctly (see bug fix below);
+  per-node and per-edge style overrides — including the shared `stroke` and
+  `strokeWidth` properties, which render and persist correctly;
 - a toolbar theme selector that rewrites the `theme` YAML frontmatter field
   directly (preserving any other frontmatter keys/comments) and rerenders;
 - a compact toolbar properties inspector that follows the selected node or
-  edge: node label/subtitle/type/fill/border/text colour/width/height
+  edge: node label/subtitle/type/fill/border/border width/text colour/width/height
   (clamped to the minimum size and grid), and edge
-  label/route/start/end/stroke/label colour/width — `Start` and `End`
+  label/route/start/end/stroke/label colour/stroke width — `Start` and `End`
   selects expose the three marker styles; every inspector edit persists to
   the canonical YAML through the existing serializer;
 - source serialization after edits, including safe multiline round-tripping:
@@ -66,14 +67,14 @@ The proof of concept now supports:
 - **Save a copy**, which downloads an updated HTML document.
 
 The main sample is [example.html](../example.html), driven by
-[docdiagram-runtime.js](../docdiagram-runtime.js). It now demonstrates a node
-subtitle, a multiline node label, and a multiline edge label alongside an
-edge `style` override, plus non-default edge endpoint markers (`start:
-circle`/`end: arrow` on one edge, `end: circle` on the other).
+[docdiagram-runtime.js](../docdiagram-runtime.js). It demonstrates required
+node shapes, explicit non-default connector anchors, the `curved` route, a
+node subtitle, multiline labels, an edge `style.strokeWidth` override, and
+non-default edge endpoint markers.
 
-## Bug fix: edge stroke/width not visibly updating
+## Bug fix: edge stroke width not visibly updating
 
-Inspector changes to an edge's `style.stroke` and `style.width` were always
+Inspector changes to an edge's `style.stroke` and `style.strokeWidth` were always
 computed and serialized correctly, but never rendered: the injected
 stylesheet's `.docdiagram-edge` rule hard-coded `stroke` and `stroke-width`,
 and CSS declarations always beat SVG presentation attributes in the cascade,
@@ -101,11 +102,13 @@ replace it with an immutable public runtime URL as described in
 ## Validation completed
 
 - `node --check docdiagram-runtime.js`
-- `node --test test/docdiagram-runtime.test.js` — 39 tests covering helpers,
+- `node --test test/docdiagram-runtime.test.js` — 42 tests covering helpers,
   frontmatter persistence, node/edge YAML round-trip, the new `subtitle`
   field (including multiline round-trip), multiline node label/subtitle/edge
   label rendering as stacked `<tspan>`s, absence of `node.type` as SVG text,
-  edge `stroke`/`width` overrides reflected in rendered markup, a regression
+  node and edge `stroke`/`strokeWidth` overrides reflected in rendered markup,
+  required node-shape and edge-anchor schema validation, supported curved
+  routes, a regression
   guard asserting the `.docdiagram-edge` CSS rule no longer hard-codes
   `stroke`/`stroke-width`, and edge endpoint markers: `start`/`end` defaults,
   markup for each of `none`/`arrow`/`circle`, unique per-edge marker ids
@@ -122,7 +125,7 @@ replace it with an immutable public runtime URL as described in
   `example.html`): confirmed node subtitle displays below the label with no
   visible `type` text; edited a node's multiline label and subtitle via the
   inspector textareas and saw both stack correctly; edited an edge's stroke
-  colour and width via the inspector and saw the rendered edge visibly
+  colour and stroke width via the inspector and saw the rendered edge visibly
   recolor/thicken (confirming the CSS fix); selected an edge, clicked it
   again to open the in-place multiline editor, confirmed Enter inserts a
   newline, Ctrl+Enter commits, and Escape discards an in-progress edit
@@ -136,23 +139,14 @@ offline-menu work remains explicitly deferred (see below).
 
 ## Next recommended work
 
-Continue visual refinement:
+Implement the dependency-ordered editor-polish slices in
+[editor-polish-plan.md](editor-polish-plan.md):
 
-1. add multi-select and bulk style editing for nodes/edges;
-2. support creating and deleting nodes/edges from the toolbar;
-3. expand focused automated coverage as new Markdown and diagram features are
-   added.
-
-Defer **Save offline version** until there is a deterministic packaging step
-that can embed a pinned runtime release. The requirement and design constraint
-are recorded in [plan.md](plan.md).
-
-Continue visual refinement:
-
-1. add multi-select and bulk style editing for nodes/edges;
-2. support creating and deleting nodes/edges from the toolbar;
-3. expand focused automated coverage as new Markdown and diagram features are
-   added.
+1. render and edit the requested shape palette;
+2. render side-aware straight, orthogonal, and curved connectors;
+3. create, reconnect, and delete nodes and connectors;
+4. replace the permanent inspector with compact menu/popover editor chrome and
+   add zoom/scroll refinement.
 
 Defer **Save offline version** until there is a deterministic packaging step
 that can embed a pinned runtime release. The requirement and design constraint

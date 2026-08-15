@@ -31,32 +31,39 @@ nodes:
   - id: web-app
     label: Customer web app
     type: application
+    shape: rounded-rectangle
     position: { x: 60, y: 225 }
     size: { width: 190, height: 90 }
   - id: payments-api
     label: Payments API
     type: service
+    shape: oval
     subtitle: "Owns the payment-intent\nlifecycle"
     position: { x: 420, y: 210 }
     size: { width: 220, height: 100 }
   - id: payments-db
     label: "Payments\nDB"
     type: datastore
+    shape: database
     subtitle: "Postgres, encrypted\nat rest"
     position: { x: 810, y: 210 }
     size: { width: 200, height: 100 }
 edges:
   - source: web-app
     target: payments-api
+    sourceAnchor: right
+    targetAnchor: left
     label: "POST /payments\n(idempotent)"
     route: orthogonal
     start: circle
     end: arrow
-    style: { stroke: "#F1CC58", width: 3 }
+    style: { stroke: "#F1CC58", strokeWidth: 3 }
   - source: payments-api
     target: payments-db
+    sourceAnchor: bottom
+    targetAnchor: top
     label: Create payment intent
-    route: orthogonal
+    route: curved
     end: circle
 ```
   </template>

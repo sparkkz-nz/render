@@ -17,6 +17,8 @@ vm.runInContext(runtime, context, { filename: "docdiagram-runtime.js" });
 
 const {
   nodeTypes,
+  nodeShapes,
+  edgeAnchors,
   edgeRoutes,
   edgeMarkerStyles,
   getTheme,
@@ -35,18 +37,24 @@ const {
   serializeDiagram,
   setNodeLabel,
   setNodeType,
+  setNodeShape,
   setNodeSubtitle,
   setNodeStyleOverride,
   setNodeSize,
   setEdgeLabel,
   setEdgeRoute,
+  setEdgeAnchor,
   setEdgeStyleOverride,
-  setEdgeWidth,
+  setStyleStrokeWidth,
   setEdgeMarkerStart,
   setEdgeMarkerEnd,
   splitTextLines,
   renderTextBlock,
-  computeNodeTextLayout
+  computeNodeTextLayout,
+  getNodeGeometry,
+  renderNodeBody,
+  buildEdgePath,
+  buildEdgeInspectorFields
 } = context.globalThis.DocDiagramCore;
 
 function readTemplateSource(filePath) {
@@ -105,20 +113,23 @@ test("parses and serializes diagram themes and style overrides", () => {
     "  - id: api",
     "    label: Payments API",
     "    type: service",
+    "    shape: rounded-rectangle",
     "    position: { x: 20, y: 40 }",
     "    size: { width: 180, height: 80 }",
     "    style: { fill: #123456, text: #FFFFFF }",
     "edges:",
     "  - source: api",
     "    target: api",
-    "    style: { stroke: #ABCDEF, width: 3 }"
+    "    sourceAnchor: right",
+    "    targetAnchor: left",
+    "    style: { stroke: #ABCDEF, strokeWidth: 3 }"
   ].join("\n");
   const diagram = parseDiagram(source);
 
   assert.equal(diagram.theme, "dark");
   assert.equal(diagram.canvas.grid, 5);
   assert.equal(JSON.stringify(diagram.nodes[0].style), JSON.stringify({ fill: "#123456", text: "#FFFFFF" }));
-  assert.equal(JSON.stringify(diagram.edges[0].style), JSON.stringify({ stroke: "#ABCDEF", width: 3 }));
+  assert.equal(JSON.stringify(diagram.edges[0].style), JSON.stringify({ stroke: "#ABCDEF", strokeWidth: 3 }));
   assert.equal(
     JSON.stringify(parseDiagram(serializeDiagram(diagram))),
     JSON.stringify(diagram)
@@ -139,23 +150,28 @@ test("renders themed defaults and explicit style overrides", () => {
     "  - id: api",
     "    label: Payments API",
     "    type: service",
+    "    shape: rounded-rectangle",
     "    position: { x: 20, y: 40 }",
     "    size: { width: 180, height: 80 }",
-    "    style: { fill: #123456 }",
+    "    style: { fill: #123456, strokeWidth: 4 }",
     "  - id: db",
     "    label: Payments DB",
     "    type: datastore",
+    "    shape: rounded-rectangle",
     "    position: { x: 300, y: 40 }",
     "    size: { width: 180, height: 80 }",
     "edges:",
     "  - source: api",
     "    target: db",
-    "    style: { stroke: #ABCDEF, width: 3 }"
+    "    sourceAnchor: right",
+    "    targetAnchor: left",
+    "    style: { stroke: #ABCDEF, strokeWidth: 3 }"
   ].join("\n");
 
   const markup = renderDiagram(source, 0);
 
   assert.match(markup, /fill="#123456"/);
+  assert.match(markup, /stroke="#66D39A" stroke-width="4"/);
   assert.match(markup, /stroke="#ABCDEF" stroke-width="3"/);
   assert.match(markup, /fill="#F3F8FC"/);
 });
@@ -169,17 +185,21 @@ test("renders edges as selectable groups with a wide hit target", () => {
     "nodes:",
     "  - id: api",
     "    label: Payments API",
+    "    shape: rounded-rectangle",
     "    type: service",
     "    position: { x: 20, y: 40 }",
     "    size: { width: 180, height: 80 }",
     "  - id: db",
     "    label: Payments DB",
+    "    shape: rounded-rectangle",
     "    type: datastore",
     "    position: { x: 300, y: 40 }",
     "    size: { width: 180, height: 80 }",
     "edges:",
     "  - source: api",
     "    target: db",
+    "    sourceAnchor: right",
+    "    targetAnchor: left",
     "    label: Reads and writes"
   ].join("\n");
 
@@ -190,10 +210,53 @@ test("renders edges as selectable groups with a wide hit target", () => {
   assert.match(markup, /Reads and writes/);
 });
 
-test("nodeTypes, edgeRoutes, and edgeMarkerStyles expose the supported inspector option sets", () => {
+test("nodeTypes, nodeShapes, edgeAnchors, edgeRoutes, and edgeMarkerStyles expose the supported inspector option sets", () => {
   assert.equal(JSON.stringify([...nodeTypes]), JSON.stringify(["application", "service", "datastore", "note"]));
-  assert.equal(JSON.stringify([...edgeRoutes]), JSON.stringify(["orthogonal", "straight"]));
+  assert.equal(JSON.stringify([...nodeShapes]), JSON.stringify(["rounded-rectangle", "circle", "oval", "database", "diamond", "rhombus", "flattened-hexagon", "chevron", "right-chevron"]));
+  assert.equal(JSON.stringify([...edgeAnchors]), JSON.stringify(["top", "right", "bottom", "left"]));
+  assert.equal(JSON.stringify([...edgeRoutes]), JSON.stringify(["orthogonal", "straight", "curved"]));
   assert.equal(JSON.stringify([...edgeMarkerStyles]), JSON.stringify(["none", "arrow", "circle"]));
+});
+
+test("requires supported node shapes and explicit edge anchors without retaining style.width aliases", () => {
+  const valid = twoNodeEdgeSource(["    route: curved", "    style: { strokeWidth: 3 }"]);
+  const diagram = parseDiagram(valid);
+
+  assert.equal(diagram.nodes[0].shape, "rounded-rectangle");
+  assert.equal(diagram.edges[0].sourceAnchor, "right");
+  assert.equal(diagram.edges[0].targetAnchor, "left");
+  assert.equal(diagram.edges[0].route, "curved");
+  assert.equal(diagram.edges[0].style.strokeWidth, 3);
+  assert.equal(JSON.stringify(parseDiagram(serializeDiagram(diagram))), JSON.stringify(diagram));
+
+  assert.throws(
+    () => parseDiagram(valid.replace("    shape: rounded-rectangle\n", "")),
+    /Node "api" requires a shape/
+  );
+  assert.throws(
+    () => parseDiagram(valid.replace("    sourceAnchor: right\n", "")),
+    /Edge "api" -> "db" requires a sourceAnchor/
+  );
+  assert.throws(
+    () => parseDiagram(valid.replace("    targetAnchor: left\n", "")),
+    /Edge "api" -> "db" requires a targetAnchor/
+  );
+  assert.throws(
+    () => parseDiagram(valid.replace("rounded-rectangle", "star")),
+    /Unsupported node shape: star/
+  );
+  assert.throws(
+    () => parseDiagram(valid.replace("sourceAnchor: right", "sourceAnchor: centre")),
+    /Unsupported edge sourceAnchor: centre/
+  );
+  assert.throws(
+    () => parseDiagram(valid.replace("route: curved", "route: loop")),
+    /Unsupported edge route: loop/
+  );
+  assert.throws(
+    () => parseDiagram(valid.replace("strokeWidth: 3", "width: 3")),
+    /Edge style\.width is not supported; use style\.strokeWidth/
+  );
 });
 
 test("resolves effective node and edge styles from theme defaults and overrides", () => {
@@ -249,11 +312,14 @@ test("node inspector helpers mutate the canonical model and round-trip through Y
     "  - id: api",
     "    label: Payments API",
     "    type: service",
+    "    shape: rounded-rectangle",
     "    position: { x: 20, y: 40 }",
     "    size: { width: 180, height: 80 }",
     "edges:",
     "  - source: api",
-    "    target: api"
+    "    target: api",
+    "    sourceAnchor: right",
+    "    targetAnchor: left"
   ].join("\n");
   const diagram = parseDiagram(source);
   const node = diagram.nodes[0];
@@ -261,12 +327,14 @@ test("node inspector helpers mutate the canonical model and round-trip through Y
   setNodeLabel(node, "  Payment Gateway  ");
   setNodeType(node, "application");
   setNodeStyleOverride(node, "fill", "#0000ff");
+  setStyleStrokeWidth(node, "3.6");
   setNodeSize(diagram, node, "width", 123);
   setNodeSize(diagram, node, "height", 58);
 
   assert.equal(node.label, "Payment Gateway");
   assert.equal(node.type, "application");
   assert.equal(node.style.fill, "#0000ff");
+  assert.equal(node.style.strokeWidth, 4);
   assert.equal(node.size.width, 120);
   assert.equal(node.size.height, 60);
 
@@ -274,6 +342,7 @@ test("node inspector helpers mutate the canonical model and round-trip through Y
   assert.equal(reparsed.nodes[0].label, "Payment Gateway");
   assert.equal(reparsed.nodes[0].type, "application");
   assert.equal(reparsed.nodes[0].style.fill, "#0000ff");
+  assert.equal(reparsed.nodes[0].style.strokeWidth, 4);
   assert.equal(reparsed.nodes[0].size.width, 120);
   assert.equal(reparsed.nodes[0].size.height, 60);
 });
@@ -292,11 +361,14 @@ test("edge inspector helpers mutate the canonical model and round-trip through Y
     "nodes:",
     "  - id: api",
     "    label: Payments API",
+    "    shape: rounded-rectangle",
     "    position: { x: 20, y: 40 }",
     "    size: { width: 180, height: 80 }",
     "edges:",
     "  - source: api",
     "    target: api",
+    "    sourceAnchor: right",
+    "    targetAnchor: left",
     "    label: Retry"
   ].join("\n");
   const diagram = parseDiagram(source);
@@ -304,29 +376,86 @@ test("edge inspector helpers mutate the canonical model and round-trip through Y
 
   setEdgeLabel(edge, "  Create payment intent  ");
   setEdgeRoute(edge, "straight");
+  setEdgeAnchor(edge, "source", "bottom");
+  setEdgeAnchor(edge, "target", "top");
   setEdgeStyleOverride(edge, "stroke", "#ff0000");
   setEdgeStyleOverride(edge, "text", "#00ff00");
-  setEdgeWidth(edge, "4.7");
+  setStyleStrokeWidth(edge, "4.7");
 
   assert.equal(edge.label, "Create payment intent");
   assert.equal(edge.route, "straight");
+  assert.equal(edge.sourceAnchor, "bottom");
+  assert.equal(edge.targetAnchor, "top");
   assert.equal(edge.style.stroke, "#ff0000");
   assert.equal(edge.style.text, "#00ff00");
-  assert.equal(edge.style.width, 5);
+  assert.equal(edge.style.strokeWidth, 5);
 
   const reparsed = parseDiagram(serializeDiagram(diagram));
   assert.equal(reparsed.edges[0].label, "Create payment intent");
   assert.equal(reparsed.edges[0].route, "straight");
+  assert.equal(reparsed.edges[0].sourceAnchor, "bottom");
+  assert.equal(reparsed.edges[0].targetAnchor, "top");
   assert.equal(reparsed.edges[0].style.stroke, "#ff0000");
-  assert.equal(reparsed.edges[0].style.width, 5);
+  assert.equal(reparsed.edges[0].style.strokeWidth, 5);
 });
 
-test("setEdgeWidth never produces a width below one", () => {
+test("buildEdgePath produces deterministic geometry for every route and anchor pair", () => {
+  const source = { x: 100, y: 100 };
+  const target = { x: 300, y: 220 };
+
+  for (const route of edgeRoutes) {
+    for (const sourceAnchor of edgeAnchors) {
+      for (const targetAnchor of edgeAnchors) {
+        const edgePath = buildEdgePath(source, target, sourceAnchor, targetAnchor, route);
+        assert.match(edgePath.path, /^M 100 100 /, `${route} ${sourceAnchor} -> ${targetAnchor}`);
+        assert.match(edgePath.path, /300 220$/, `${route} ${sourceAnchor} -> ${targetAnchor}`);
+        assert.equal(edgePath.hitPath, edgePath.path);
+        assert.ok(Number.isFinite(edgePath.midpoint.x) && Number.isFinite(edgePath.midpoint.y));
+        assert.ok(Number.isFinite(edgePath.startTangent.x) && Number.isFinite(edgePath.startTangent.y));
+        assert.ok(Number.isFinite(edgePath.endTangent.x) && Number.isFinite(edgePath.endTangent.y));
+      }
+    }
+  }
+
+  assert.equal(
+    JSON.stringify(buildEdgePath(source, target, "right", "left", "curved")),
+    JSON.stringify({
+      path: "M 100 100 C 200 100 200 220 300 220",
+      midpoint: { x: 200, y: 160 },
+      startTangent: { x: 100, y: 0 },
+      endTangent: { x: 100, y: 0 },
+      hitPath: "M 100 100 C 200 100 200 220 300 220"
+    })
+  );
+
+  const overlapping = buildEdgePath(source, source, "right", "right", "orthogonal");
+  assert.equal(overlapping.path, "M 100 100 L 140 100 L 100 100");
+  assert.deepEqual(JSON.parse(JSON.stringify(overlapping.midpoint)), { x: 140, y: 100 });
+
+  const sameSide = buildEdgePath({ x: 300, y: 100 }, { x: 100, y: 100 }, "right", "right", "orthogonal");
+  assert.equal(sameSide.path, "M 300 100 L 340 100 L 140 100 L 100 100");
+});
+
+test("edge inspector exposes route and both endpoint-side controls", () => {
+  const markup = buildEdgeInspectorFields(
+    { theme: "light" },
+    { source: "api", target: "db", sourceAnchor: "bottom", targetAnchor: "top", route: "curved" }
+  );
+
+  assert.match(markup, /class="docdiagram-inspector-route"/);
+  assert.match(markup, /class="docdiagram-inspector-source-anchor"/);
+  assert.match(markup, /class="docdiagram-inspector-target-anchor"/);
+  assert.match(markup, /value="curved" selected/);
+  assert.match(markup, /value="bottom" selected/);
+  assert.match(markup, /value="top" selected/);
+});
+
+test("setStyleStrokeWidth never produces a stroke width below one", () => {
   const edge = { source: "a", target: "b" };
-  setEdgeWidth(edge, "-5");
-  assert.equal(edge.style.width, 1);
-  setEdgeWidth(edge, "not-a-number");
-  assert.equal(edge.style.width, 1);
+  setStyleStrokeWidth(edge, "-5");
+  assert.equal(edge.style.strokeWidth, 1);
+  setStyleStrokeWidth(edge, "not-a-number");
+  assert.equal(edge.style.strokeWidth, 1);
 });
 
 test("splitTextLines normalizes CRLF and splits on newlines", () => {
@@ -354,6 +483,60 @@ test("computeNodeTextLayout stacks label and subtitle lines and keeps the block 
   assert.ok(withSubtitle.labelStartY < withSubtitle.subtitleStartY);
 });
 
+test("shape geometry renders every supported shape with usable text bounds and perimeter anchors", () => {
+  const expectedMarkup = {
+    "rounded-rectangle": "<rect", circle: "<circle", oval: "<ellipse", database: "<path",
+    diamond: "<polygon", rhombus: "<polygon", "flattened-hexagon": "<polygon",
+    chevron: "<polygon", "right-chevron": "<polygon"
+  };
+
+  for (const shape of nodeShapes) {
+    const geometry = getNodeGeometry({ shape }, 20, 40, 200, 100);
+    assert.match(geometry.bodyMarkup, new RegExp(expectedMarkup[shape]));
+    assert.match(renderNodeBody(geometry, { fill: "#123456", stroke: "#abcdef" }, 4), /fill="#123456" stroke="#abcdef" stroke-width="4"/);
+    assert.ok(geometry.textBounds.width > 0 && geometry.textBounds.height > 0, `${shape} has usable text bounds`);
+    assert.equal(JSON.stringify(Object.keys(geometry.anchors).sort()), JSON.stringify(["bottom", "left", "right", "top"]));
+
+    for (const anchor of Object.values(geometry.anchors)) {
+      assert.ok(Number.isFinite(anchor.x) && Number.isFinite(anchor.y), `${shape} anchor is finite`);
+    }
+  }
+});
+
+test("shape-specific anchors resolve to their rendered perimeters", () => {
+  const rhombus = getNodeGeometry({ shape: "rhombus" }, 20, 40, 200, 100);
+  assert.equal(rhombus.anchors.left.x, 40);
+  assert.equal(rhombus.anchors.right.x, 200);
+  assert.equal(rhombus.anchors.left.y, 90);
+  assert.equal(rhombus.anchors.right.y, 90);
+
+  const chevron = getNodeGeometry({ shape: "chevron" }, 20, 40, 200, 100);
+  assert.match(chevron.bodyMarkup, /points="20,40 188,40 220,90 188,140 20,140 52,90"/);
+  assert.equal(chevron.anchors.left.x, 52);
+  assert.equal(chevron.anchors.left.y, 90);
+  assert.equal(chevron.textBounds.x + chevron.textBounds.width / 2, 136);
+
+  const rightChevron = getNodeGeometry({ shape: "right-chevron" }, 20, 40, 200, 100);
+  assert.match(rightChevron.bodyMarkup, /points="20,40 188,40 220,90 188,140 20,140"/);
+  assert.equal(rightChevron.anchors.left.x, 20);
+  assert.equal(rightChevron.anchors.left.y, 90);
+
+  const database = getNodeGeometry({ shape: "database" }, 20, 40, 200, 100);
+  assert.equal(database.anchors.top.y, 40);
+  assert.equal(database.anchors.bottom.y, 140);
+});
+
+test("circle node size changes preserve a square bounding box", () => {
+  const diagram = { canvas: { grid: 5 } };
+  const circle = { shape: "circle", size: { width: 150, height: 150 } };
+
+  setNodeSize(diagram, circle, "width", 183);
+  assert.equal(JSON.stringify(circle.size), JSON.stringify({ width: 185, height: 185 }));
+  setNodeShape(circle, "oval");
+  setNodeSize(diagram, circle, "height", 92);
+  assert.equal(JSON.stringify(circle.size), JSON.stringify({ width: 185, height: 90 }));
+});
+
 test("parses and serializes a node subtitle, including multiline values, with a safe roundtrip", () => {
   const source = [
     "canvas:",
@@ -363,12 +546,15 @@ test("parses and serializes a node subtitle, including multiline values, with a 
     "  - id: api",
     "    label: Payments API",
     "    type: service",
+    "    shape: rounded-rectangle",
     "    subtitle: Handles card capture",
     "    position: { x: 20, y: 40 }",
     "    size: { width: 180, height: 80 }",
     "edges:",
     "  - source: api",
-    "    target: api"
+    "    target: api",
+    "    sourceAnchor: right",
+    "    targetAnchor: left"
   ].join("\n");
   const diagram = parseDiagram(source);
 
@@ -406,11 +592,14 @@ test("multiline edge labels round-trip through serialization safely", () => {
     "nodes:",
     "  - id: api",
     "    label: Payments API",
+    "    shape: rounded-rectangle",
     "    position: { x: 20, y: 40 }",
     "    size: { width: 180, height: 80 }",
     "edges:",
     "  - source: api",
-    "    target: api"
+    "    target: api",
+    "    sourceAnchor: right",
+    "    targetAnchor: left"
   ].join("\n");
   const diagram = parseDiagram(source);
   const edge = diagram.edges[0];
@@ -435,12 +624,15 @@ test("renders a node subtitle below the label and never renders the internal typ
     "  - id: api",
     "    label: Payments API",
     "    type: service",
+    "    shape: rounded-rectangle",
     "    subtitle: Card capture and auth",
     "    position: { x: 20, y: 40 }",
     "    size: { width: 180, height: 80 }",
     "edges:",
     "  - source: api",
-    "    target: api"
+    "    target: api",
+    "    sourceAnchor: right",
+    "    targetAnchor: left"
   ].join("\n");
 
   const markup = renderDiagram(source, 0);
@@ -462,12 +654,15 @@ test("renders multiline node labels and subtitles as stacked tspans", () => {
     "  - id: api",
     "    label: \"Payments\\nAPI\"",
     "    type: service",
+    "    shape: rounded-rectangle",
     "    subtitle: \"Card capture\\nand auth\"",
     "    position: { x: 20, y: 40 }",
     "    size: { width: 180, height: 100 }",
     "edges:",
     "  - source: api",
-    "    target: api"
+    "    target: api",
+    "    sourceAnchor: right",
+    "    targetAnchor: left"
   ].join("\n");
 
   const markup = renderDiagram(source, 0);
@@ -493,22 +688,32 @@ test("renders multiline edge labels as stacked tspans while preserving stroke/wi
     "nodes:",
     "  - id: api",
     "    label: Payments API",
+    "    shape: rounded-rectangle",
     "    position: { x: 20, y: 40 }",
     "    size: { width: 180, height: 80 }",
     "  - id: db",
     "    label: Payments DB",
+    "    shape: rounded-rectangle",
     "    position: { x: 300, y: 40 }",
     "    size: { width: 180, height: 80 }",
     "edges:",
     "  - source: api",
     "    target: db",
+    "    sourceAnchor: right",
+    "    targetAnchor: left",
+    "    route: curved",
     "    label: \"Retry\\nwith backoff\"",
-    "    style: { stroke: #ABCDEF, width: 3 }"
+    "    start: circle",
+    "    end: arrow",
+    "    style: { stroke: #ABCDEF, strokeWidth: 3 }"
   ].join("\n");
 
   const markup = renderDiagram(source, 0);
   const edgeLabelGroup = markup.match(/<text[^>]*class="docdiagram-edge-label"[^>]*>[\s\S]*?<\/text>/);
 
+  assert.match(markup, /<path class="docdiagram-edge-hit" d="M 200 80 C 250 80 250 80 300 80"/);
+  assert.match(markup, /<path class="docdiagram-edge" d="M 200 80 C 250 80 250 80 300 80"[^>]*marker-start=/);
+  assert.match(markup, /marker-end="url\(#docdiagram-marker-0-0-end\)"/);
   assert.ok(edgeLabelGroup, "Expected an edge label text block");
   assert.equal((edgeLabelGroup[0].match(/<tspan/g) || []).length, 2);
   assert.match(edgeLabelGroup[0], />Retry<\/tspan>/);
@@ -525,22 +730,26 @@ test("inspector edge style overrides for stroke and width are reflected in the r
     "nodes:",
     "  - id: api",
     "    label: Payments API",
+    "    shape: rounded-rectangle",
     "    position: { x: 20, y: 40 }",
     "    size: { width: 180, height: 80 }",
     "  - id: db",
     "    label: Payments DB",
+    "    shape: rounded-rectangle",
     "    position: { x: 300, y: 40 }",
     "    size: { width: 180, height: 80 }",
     "edges:",
     "  - source: api",
-    "    target: db"
+    "    target: db",
+    "    sourceAnchor: right",
+    "    targetAnchor: left"
   ].join("\n");
   const diagram = parseDiagram(source);
   const edge = diagram.edges[0];
 
   // Simulate the inspector mutating the selected edge, then re-rendering from the mutated model.
   setEdgeStyleOverride(edge, "stroke", "#ff00ff");
-  setEdgeWidth(edge, "6");
+  setStyleStrokeWidth(edge, "6");
 
   const markup = renderDiagram(serializeDiagram(diagram), 0);
 
@@ -578,15 +787,19 @@ function twoNodeEdgeSource(edgeLines) {
     "nodes:",
     "  - id: api",
     "    label: Payments API",
+    "    shape: rounded-rectangle",
     "    position: { x: 20, y: 40 }",
     "    size: { width: 180, height: 80 }",
     "  - id: db",
     "    label: Payments DB",
+    "    shape: rounded-rectangle",
     "    position: { x: 300, y: 40 }",
     "    size: { width: 180, height: 80 }",
     "edges:",
     "  - source: api",
     "    target: db",
+    "    sourceAnchor: right",
+    "    targetAnchor: left",
     ...edgeLines
   ].join("\n");
 }
@@ -651,24 +864,31 @@ test("each edge gets unique marker ids so overrides on one edge cannot leak into
     "nodes:",
     "  - id: a",
     "    label: A",
+    "    shape: rounded-rectangle",
     "    position: { x: 0, y: 0 }",
     "    size: { width: 100, height: 60 }",
     "  - id: b",
     "    label: B",
+    "    shape: rounded-rectangle",
     "    position: { x: 200, y: 0 }",
     "    size: { width: 100, height: 60 }",
     "  - id: c",
     "    label: C",
+    "    shape: rounded-rectangle",
     "    position: { x: 400, y: 0 }",
     "    size: { width: 100, height: 60 }",
     "edges:",
     "  - source: a",
     "    target: b",
+    "    sourceAnchor: right",
+    "    targetAnchor: left",
     "    start: circle",
     "    end: circle",
     "    style: { stroke: \"#ff0000\" }",
     "  - source: b",
     "    target: c",
+    "    sourceAnchor: right",
+    "    targetAnchor: left",
     "    start: circle",
     "    end: circle",
     "    style: { stroke: \"#00ff00\" }"
@@ -694,7 +914,7 @@ test("marker defs use user-space units and scale gently with edge stroke width",
   const markup = renderDiagram(twoNodeEdgeSource([
     "    start: circle",
     "    end: arrow",
-    "    style: { width: 12 }"
+    "    style: { strokeWidth: 12 }"
   ]), 0);
 
   const markerDefs = [...markup.matchAll(/<marker [^>]*>/g)];

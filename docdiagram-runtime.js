@@ -12,27 +12,39 @@
   let documentTheme = "light";
   const minimumNodeSize = { width: 120, height: 60 };
   const nodeTypes = ["application", "service", "datastore", "note"];
-  const edgeRoutes = ["orthogonal", "straight"];
+  const nodeShapes = [
+    "rounded-rectangle",
+    "circle",
+    "oval",
+    "database",
+    "diamond",
+    "rhombus",
+    "flattened-hexagon",
+    "chevron",
+    "right-chevron"
+  ];
+  const edgeAnchors = ["top", "right", "bottom", "left"];
+  const edgeRoutes = ["orthogonal", "straight", "curved"];
   const edgeMarkerStyles = ["none", "arrow", "circle"];
   const edgeMarkerDefaults = { start: "none", end: "arrow" };
 
   const diagramThemes = {
     light: {
-      edge: { stroke: "#52616B", text: "#3E4A54" },
+      edge: { stroke: "#52616B", strokeWidth: 2, text: "#3E4A54" },
       node: {
-        application: { fill: "#EAF2FF", stroke: "#3574C7", text: "#17202A", subtitleText: "#52616B" },
-        service: { fill: "#E9F8F0", stroke: "#24824A", text: "#17202A", subtitleText: "#52616B" },
-        datastore: { fill: "#F7F1FF", stroke: "#7A4CC2", text: "#17202A", subtitleText: "#52616B" },
-        note: { fill: "#FFF8DF", stroke: "#9B7B00", text: "#17202A", subtitleText: "#52616B" }
+        application: { fill: "#EAF2FF", stroke: "#3574C7", strokeWidth: 2, text: "#17202A", subtitleText: "#52616B" },
+        service: { fill: "#E9F8F0", stroke: "#24824A", strokeWidth: 2, text: "#17202A", subtitleText: "#52616B" },
+        datastore: { fill: "#F7F1FF", stroke: "#7A4CC2", strokeWidth: 2, text: "#17202A", subtitleText: "#52616B" },
+        note: { fill: "#FFF8DF", stroke: "#9B7B00", strokeWidth: 2, text: "#17202A", subtitleText: "#52616B" }
       }
     },
     dark: {
-      edge: { stroke: "#B8C7D5", text: "#D9E4ED" },
+      edge: { stroke: "#B8C7D5", strokeWidth: 2, text: "#D9E4ED" },
       node: {
-        application: { fill: "#193A61", stroke: "#71AEF7", text: "#F3F8FC", subtitleText: "#C5D5E5" },
-        service: { fill: "#164A38", stroke: "#66D39A", text: "#F3F8FC", subtitleText: "#C5D5E5" },
-        datastore: { fill: "#3D285D", stroke: "#B796FF", text: "#F3F8FC", subtitleText: "#C5D5E5" },
-        note: { fill: "#594819", stroke: "#F1CC58", text: "#F3F8FC", subtitleText: "#DDE7EF" }
+        application: { fill: "#193A61", stroke: "#71AEF7", strokeWidth: 2, text: "#F3F8FC", subtitleText: "#C5D5E5" },
+        service: { fill: "#164A38", stroke: "#66D39A", strokeWidth: 2, text: "#F3F8FC", subtitleText: "#C5D5E5" },
+        datastore: { fill: "#3D285D", stroke: "#B796FF", strokeWidth: 2, text: "#F3F8FC", subtitleText: "#C5D5E5" },
+        note: { fill: "#594819", stroke: "#F1CC58", strokeWidth: 2, text: "#F3F8FC", subtitleText: "#DDE7EF" }
       }
     }
   };
@@ -161,7 +173,50 @@
       throw new Error(`Cannot parse diagram line: ${rawLine}`);
     }
 
+    validateDiagram(diagram);
     return diagram;
+  }
+
+  function validateDiagram(diagram) {
+    for (const node of diagram.nodes) {
+      if (!node.shape) {
+        throw new Error(`Node "${node.id || node.label || "unknown"}" requires a shape.`);
+      }
+
+      if (!nodeShapes.includes(node.shape)) {
+        throw new Error(`Unsupported node shape: ${node.shape}`);
+      }
+
+      if (node.style?.width !== undefined) {
+        throw new Error("Node style.width is not supported; use style.strokeWidth.");
+      }
+    }
+
+    for (const edge of diagram.edges) {
+      if (!edge.sourceAnchor) {
+        throw new Error(`Edge "${edge.source || "unknown"}" -> "${edge.target || "unknown"}" requires a sourceAnchor.`);
+      }
+
+      if (!edge.targetAnchor) {
+        throw new Error(`Edge "${edge.source || "unknown"}" -> "${edge.target || "unknown"}" requires a targetAnchor.`);
+      }
+
+      if (!edgeAnchors.includes(edge.sourceAnchor)) {
+        throw new Error(`Unsupported edge sourceAnchor: ${edge.sourceAnchor}`);
+      }
+
+      if (!edgeAnchors.includes(edge.targetAnchor)) {
+        throw new Error(`Unsupported edge targetAnchor: ${edge.targetAnchor}`);
+      }
+
+      if (edge.route !== undefined && !edgeRoutes.includes(edge.route)) {
+        throw new Error(`Unsupported edge route: ${edge.route}`);
+      }
+
+      if (edge.style?.width !== undefined) {
+        throw new Error("Edge style.width is not supported; use style.strokeWidth.");
+      }
+    }
   }
 
   function getTheme(diagram) {
@@ -227,7 +282,88 @@
     return `<text x="${centerX}" y="${startY}" text-anchor="middle" class="${className}" fill="${escapeHtml(fill)}">${tspans}</text>`;
   }
 
-  function computeNodeTextLayout(x, y, nodeWidth, nodeHeight, node) {
+  function getNodeGeometry(node, x, y, nodeWidth, nodeHeight) {
+    const shape = node.shape;
+    const centerX = x + nodeWidth / 2;
+    const centerY = y + nodeHeight / 2;
+    const inset = Math.min(nodeWidth, nodeHeight) * 0.2;
+    const textBounds = { x: x + 12, y: y + 12, width: nodeWidth - 24, height: nodeHeight - 24 };
+    const anchors = {
+      top: { x: centerX, y },
+      right: { x: x + nodeWidth, y: centerY },
+      bottom: { x: centerX, y: y + nodeHeight },
+      left: { x, y: centerY }
+    };
+    let bodyMarkup;
+
+    if (shape === "circle") {
+      const diameter = Math.min(nodeWidth, nodeHeight);
+      const circleX = centerX - diameter / 2;
+      const circleY = centerY - diameter / 2;
+      const radius = diameter / 2;
+      textBounds.x = circleX + radius * 0.3;
+      textBounds.y = circleY + radius * 0.3;
+      textBounds.width = radius * 1.4;
+      textBounds.height = radius * 1.4;
+      anchors.top.y = circleY;
+      anchors.right.x = circleX + diameter;
+      anchors.bottom.y = circleY + diameter;
+      anchors.left.x = circleX;
+      bodyMarkup = `<circle class="docdiagram-node-body" cx="${centerX}" cy="${centerY}" r="${radius}"/>`;
+    } else if (shape === "oval") {
+      textBounds.x += nodeWidth * 0.1;
+      textBounds.width -= nodeWidth * 0.2;
+      bodyMarkup = `<ellipse class="docdiagram-node-body" cx="${centerX}" cy="${centerY}" rx="${nodeWidth / 2}" ry="${nodeHeight / 2}"/>`;
+    } else if (shape === "database") {
+      const cap = Math.min(nodeHeight * 0.22, 18);
+      textBounds.y += cap / 2;
+      textBounds.height -= cap;
+      bodyMarkup = `<path class="docdiagram-node-body" d="M ${x} ${y + cap} C ${x} ${y - cap / 3} ${x + nodeWidth} ${y - cap / 3} ${x + nodeWidth} ${y + cap} V ${y + nodeHeight - cap} C ${x + nodeWidth} ${y + nodeHeight + cap / 3} ${x} ${y + nodeHeight + cap / 3} ${x} ${y + nodeHeight - cap} Z M ${x} ${y + cap} C ${x} ${y + cap * 2.3} ${x + nodeWidth} ${y + cap * 2.3} ${x + nodeWidth} ${y + cap}"/>`;
+    } else if (shape === "diamond") {
+      textBounds.x += nodeWidth * 0.25;
+      textBounds.y += nodeHeight * 0.25;
+      textBounds.width -= nodeWidth * 0.5;
+      textBounds.height -= nodeHeight * 0.5;
+      anchors.top = { x: centerX, y };
+      anchors.right = { x: x + nodeWidth, y: centerY };
+      anchors.bottom = { x: centerX, y: y + nodeHeight };
+      anchors.left = { x, y: centerY };
+      bodyMarkup = `<polygon class="docdiagram-node-body" points="${centerX},${y} ${x + nodeWidth},${centerY} ${centerX},${y + nodeHeight} ${x},${centerY}"/>`;
+    } else if (shape === "rhombus") {
+      const slant = Math.min(nodeWidth * 0.2, nodeHeight * 0.6);
+      textBounds.x += slant;
+      textBounds.width -= slant * 2;
+      anchors.left.x = x + slant / 2;
+      anchors.right.x = x + nodeWidth - slant / 2;
+      bodyMarkup = `<polygon class="docdiagram-node-body" points="${x + slant},${y} ${x + nodeWidth},${y} ${x + nodeWidth - slant},${y + nodeHeight} ${x},${y + nodeHeight}"/>`;
+    } else if (shape === "flattened-hexagon") {
+      const clip = Math.min(nodeWidth * 0.18, nodeHeight * 0.7);
+      textBounds.x += clip;
+      textBounds.width -= clip * 2;
+      bodyMarkup = `<polygon class="docdiagram-node-body" points="${x + clip},${y} ${x + nodeWidth - clip},${y} ${x + nodeWidth},${centerY} ${x + nodeWidth - clip},${y + nodeHeight} ${x + clip},${y + nodeHeight} ${x},${centerY}"/>`;
+    } else if (shape === "chevron") {
+      const point = Math.min(nodeWidth * 0.16, nodeHeight * 0.45);
+      textBounds.x += point * 1.175;
+      textBounds.width -= point * 1.35;
+      anchors.left.x = x + point;
+      bodyMarkup = `<polygon class="docdiagram-node-body" points="${x},${y} ${x + nodeWidth - point},${y} ${x + nodeWidth},${centerY} ${x + nodeWidth - point},${y + nodeHeight} ${x},${y + nodeHeight} ${x + point},${centerY}"/>`;
+    } else if (shape === "right-chevron") {
+      const point = Math.min(nodeWidth * 0.16, nodeHeight * 0.45);
+      textBounds.width -= point;
+      bodyMarkup = `<polygon class="docdiagram-node-body" points="${x},${y} ${x + nodeWidth - point},${y} ${x + nodeWidth},${centerY} ${x + nodeWidth - point},${y + nodeHeight} ${x},${y + nodeHeight}"/>`;
+    } else {
+      bodyMarkup = `<rect class="docdiagram-node-body" x="${x}" y="${y}" width="${nodeWidth}" height="${nodeHeight}" rx="12"/>`;
+    }
+
+    return { bodyMarkup, textBounds, anchors };
+  }
+
+  function computeNodeTextLayout(textBounds, node, legacyWidth, legacyHeight, legacyNode) {
+    if (typeof textBounds === "number") {
+      textBounds = { x: textBounds, y: node, width: legacyWidth, height: legacyHeight };
+      node = legacyNode;
+    }
+
     const labelLineHeight = 20;
     const subtitleLineHeight = 15;
     const labelLines = splitTextLines(node.label);
@@ -236,8 +372,8 @@
     const labelBlockHeight = labelLines.length * labelLineHeight;
     const subtitleBlockHeight = subtitleLines.length * subtitleLineHeight;
     const totalBlockHeight = labelBlockHeight + subtitleGap + subtitleBlockHeight;
-    const centerX = x + nodeWidth / 2;
-    const centerY = y + nodeHeight / 2;
+    const centerX = textBounds.x + textBounds.width / 2;
+    const centerY = textBounds.y + textBounds.height / 2;
     const blockTop = centerY - totalBlockHeight / 2;
 
     return {
@@ -249,6 +385,128 @@
       labelStartY: blockTop + labelLineHeight * 0.72,
       subtitleStartY: blockTop + labelBlockHeight + subtitleGap + subtitleLineHeight * 0.72
     };
+  }
+
+  function renderNodeBody(geometry, style, strokeWidth) {
+    return geometry.bodyMarkup.replace(
+      "/>",
+      ` fill="${escapeHtml(style.fill)}" stroke="${escapeHtml(style.stroke)}" stroke-width="${strokeWidth}"/>`
+    );
+  }
+
+  function getAnchorDirection(anchor) {
+    return {
+      top: { x: 0, y: -1 },
+      right: { x: 1, y: 0 },
+      bottom: { x: 0, y: 1 },
+      left: { x: -1, y: 0 }
+    }[anchor];
+  }
+
+  function formatPathPoint(point) {
+    return `${point.x} ${point.y}`;
+  }
+
+  function getPolylineMidpoint(points) {
+    const segments = points.slice(1).map((point, index) => {
+      const previous = points[index];
+      return {
+        start: previous,
+        end: point,
+        length: Math.hypot(point.x - previous.x, point.y - previous.y)
+      };
+    });
+    const totalLength = segments.reduce((total, segment) => total + segment.length, 0);
+    let remaining = totalLength / 2;
+
+    for (const segment of segments) {
+      if (remaining <= segment.length || segment === segments.at(-1)) {
+        const ratio = segment.length ? remaining / segment.length : 0;
+        return {
+          x: segment.start.x + (segment.end.x - segment.start.x) * ratio,
+          y: segment.start.y + (segment.end.y - segment.start.y) * ratio
+        };
+      }
+      remaining -= segment.length;
+    }
+
+    return points[0];
+  }
+
+  function buildEdgePath(source, target, sourceAnchor, targetAnchor, route = "orthogonal") {
+    const sourceDirection = getAnchorDirection(sourceAnchor);
+    const targetDirection = getAnchorDirection(targetAnchor);
+    const sourceIsHorizontal = sourceDirection.x !== 0;
+    let path;
+    let midpoint;
+    let startTangent;
+    let endTangent;
+
+    if (route === "straight") {
+      path = `M ${formatPathPoint(source)} L ${formatPathPoint(target)}`;
+      midpoint = { x: (source.x + target.x) / 2, y: (source.y + target.y) / 2 };
+      startTangent = { x: target.x - source.x, y: target.y - source.y };
+      endTangent = startTangent;
+    } else if (route === "curved") {
+      const distance = Math.max(Math.abs(target.x - source.x), Math.abs(target.y - source.y), 80);
+      const controlDistance = Math.min(distance / 2, 140);
+      const sourceControl = {
+        x: source.x + sourceDirection.x * controlDistance,
+        y: source.y + sourceDirection.y * controlDistance
+      };
+      const targetControl = {
+        x: target.x + targetDirection.x * controlDistance,
+        y: target.y + targetDirection.y * controlDistance
+      };
+      path = `M ${formatPathPoint(source)} C ${formatPathPoint(sourceControl)} ${formatPathPoint(targetControl)} ${formatPathPoint(target)}`;
+      midpoint = {
+        x: (source.x + 3 * sourceControl.x + 3 * targetControl.x + target.x) / 8,
+        y: (source.y + 3 * sourceControl.y + 3 * targetControl.y + target.y) / 8
+      };
+      startTangent = { x: sourceControl.x - source.x, y: sourceControl.y - source.y };
+      endTangent = { x: target.x - targetControl.x, y: target.y - targetControl.y };
+    } else {
+      const lead = 40;
+      const sourceLead = {
+        x: source.x + sourceDirection.x * lead,
+        y: source.y + sourceDirection.y * lead
+      };
+      const targetLead = {
+        x: target.x + targetDirection.x * lead,
+        y: target.y + targetDirection.y * lead
+      };
+      const corner = sourceIsHorizontal
+        ? { x: targetLead.x, y: sourceLead.y }
+        : { x: sourceLead.x, y: targetLead.y };
+      let points = [source, sourceLead, corner, targetLead, target];
+
+      let distinctPoints = points.filter((point, index) =>
+        index === 0 || point.x !== points[index - 1].x || point.y !== points[index - 1].y
+      );
+      if (distinctPoints.length === 1) {
+        distinctPoints = [
+          source,
+          {
+            x: source.x + sourceDirection.x * 40,
+            y: source.y + sourceDirection.y * 40
+          },
+          target
+        ];
+      }
+      path = `M ${formatPathPoint(distinctPoints[0])}${distinctPoints.slice(1).map((point) => ` L ${formatPathPoint(point)}`).join("")}`;
+      midpoint = getPolylineMidpoint(distinctPoints);
+      startTangent = {
+        x: distinctPoints[1].x - distinctPoints[0].x,
+        y: distinctPoints[1].y - distinctPoints[0].y
+      };
+      const finalSegment = distinctPoints.slice(-2);
+      endTangent = {
+        x: finalSegment[1].x - finalSegment[0].x,
+        y: finalSegment[1].y - finalSegment[0].y
+      };
+    }
+
+    return { path, midpoint, startTangent, endTangent, hitPath: path };
   }
 
   function getEdgeMarkerDimensions(strokeWidth) {
@@ -322,21 +580,31 @@
         return "";
       }
 
-      const sourceX = Number(sourceNode.position.x) + (Number(sourceNode.size.width) || 190);
-      const sourceY = Number(sourceNode.position.y) + (Number(sourceNode.size.height) || 80) / 2;
-      const targetX = Number(targetNode.position.x);
-      const targetY = Number(targetNode.position.y) + (Number(targetNode.size.height) || 80) / 2;
+      const sourceGeometry = getNodeGeometry(
+        sourceNode,
+        Number(sourceNode.position.x) || 0,
+        Number(sourceNode.position.y) || 0,
+        Number(sourceNode.size.width) || 190,
+        Number(sourceNode.size.height) || 80
+      );
+      const targetGeometry = getNodeGeometry(
+        targetNode,
+        Number(targetNode.position.x) || 0,
+        Number(targetNode.position.y) || 0,
+        Number(targetNode.size.width) || 190,
+        Number(targetNode.size.height) || 80
+      );
+      const sourceAnchor = sourceGeometry.anchors[edge.sourceAnchor];
+      const targetAnchor = targetGeometry.anchors[edge.targetAnchor];
       const route = edge.route || "orthogonal";
-      const path = route === "straight"
-        ? `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`
-        : `M ${sourceX} ${sourceY} H ${(sourceX + targetX) / 2} V ${targetY} H ${targetX}`;
-      const labelX = (sourceX + targetX) / 2;
-      const labelY = (sourceY + targetY) / 2 - 10;
+      const edgePath = buildEdgePath(sourceAnchor, targetAnchor, edge.sourceAnchor, edge.targetAnchor, route);
+      const labelX = edgePath.midpoint.x;
+      const labelY = edgePath.midpoint.y - 10;
 
       const style = getEdgeEffectiveStyle(diagram, edge);
       const isSelected = selectedEdge?.diagramIndex === diagramIndex && selectedEdge.edgeIndex === edgeIndex;
       const isEditing = isSelected && editingEdge?.diagramIndex === diagramIndex && editingEdge.edgeIndex === edgeIndex;
-      const strokeWidth = (Number(style.width) || 2) + (isSelected ? 2 : 0);
+      const strokeWidth = (Number(style.strokeWidth) || 2) + (isSelected ? 2 : 0);
       const editorWidth = 220;
       const editorHeight = 72;
       const edgeLabelLines = edge.label ? splitTextLines(edge.label) : [];
@@ -366,8 +634,8 @@
 
       return [
         `<g class="docdiagram-edge-group${isSelected ? " docdiagram-edge-selected" : ""}" data-diagram-index="${diagramIndex}" data-edge-index="${edgeIndex}">`,
-        `<path class="docdiagram-edge-hit" d="${path}" fill="none" stroke="transparent" stroke-width="16"/>`,
-        `<path class="docdiagram-edge" d="${path}"${markerAttributes} stroke="${escapeHtml(style.stroke)}" stroke-width="${strokeWidth}"/>`,
+        `<path class="docdiagram-edge-hit" d="${edgePath.hitPath}" fill="none" stroke="transparent" stroke-width="16"/>`,
+        `<path class="docdiagram-edge" d="${edgePath.path}"${markerAttributes} stroke="${escapeHtml(style.stroke)}" stroke-width="${strokeWidth}"/>`,
         isEditing
           ? `<foreignObject class="docdiagram-inline-editor-host" x="${labelX - editorWidth / 2}" y="${labelY - editorHeight / 2}" width="${editorWidth}" height="${editorHeight}"><textarea class="docdiagram-inline-editor docdiagram-inline-editor-edge" aria-label="Edit edge label. Press Enter for a new line. Press Control or Command plus Enter to save. Press Escape to cancel.">${escapeHtml(edge.label || "")}</textarea></foreignObject>`
           : edgeLabelLines.length
@@ -387,13 +655,15 @@
       const style = getNodeEffectiveStyle(diagram, node);
       const isSelected = selectedNode?.diagramIndex === diagramIndex && selectedNode.nodeId === node.id;
       const isEditing = isSelected && editingNode?.diagramIndex === diagramIndex && editingNode.nodeId === node.id;
-      const layout = computeNodeTextLayout(x, y, nodeWidth, nodeHeight, node);
+      const strokeWidth = (Number(style.strokeWidth) || 2) + (isSelected ? 2 : 0);
+      const geometry = getNodeGeometry(node, x, y, nodeWidth, nodeHeight);
+      const layout = computeNodeTextLayout(geometry.textBounds, node);
 
       return [
         `<g class="docdiagram-node${isSelected ? " docdiagram-node-selected" : ""}" data-diagram-index="${diagramIndex}" data-node-id="${escapeHtml(node.id)}">`,
-        `<rect class="docdiagram-node-body" x="${x}" y="${y}" width="${nodeWidth}" height="${nodeHeight}" rx="12" fill="${escapeHtml(style.fill)}" stroke="${escapeHtml(style.stroke)}"/>`,
+        renderNodeBody(geometry, style, strokeWidth),
         isEditing
-          ? `<foreignObject class="docdiagram-inline-editor-host" x="${x + 10}" y="${y + 10}" width="${nodeWidth - 20}" height="${nodeHeight - 20}"><textarea class="docdiagram-inline-editor docdiagram-inline-editor-node" aria-label="Edit node label. Press Enter for a new line. Press Control or Command plus Enter to save. Press Escape to cancel.">${escapeHtml(node.label)}</textarea></foreignObject>`
+          ? `<foreignObject class="docdiagram-inline-editor-host" x="${geometry.textBounds.x}" y="${geometry.textBounds.y}" width="${geometry.textBounds.width}" height="${geometry.textBounds.height}"><textarea class="docdiagram-inline-editor docdiagram-inline-editor-node" aria-label="Edit node label. Press Enter for a new line. Press Control or Command plus Enter to save. Press Escape to cancel.">${escapeHtml(node.label)}</textarea></foreignObject>`
           : renderTextBlock(layout.centerX, layout.labelStartY, layout.labelLines, layout.labelLineHeight, "docdiagram-node-label", style.text),
         !isEditing && layout.subtitleLines.length
           ? renderTextBlock(layout.centerX, layout.subtitleStartY, layout.subtitleLines, layout.subtitleLineHeight, "docdiagram-node-subtitle", style.subtitleText)
@@ -679,6 +949,11 @@
     return node;
   }
 
+  function setNodeShape(node, shape) {
+    node.shape = shape;
+    return node;
+  }
+
   function setNodeSubtitle(node, subtitle) {
     node.subtitle = String(subtitle ?? "").trim();
     return node;
@@ -693,7 +968,9 @@
     const grid = getGridSize(diagram);
     const minimum = dimension === "width" ? minimumNodeSize.width : minimumNodeSize.height;
     const size = clampNodeSize(Number(rawValue) || minimum, minimum, grid);
-    node.size = { ...node.size, [dimension]: size };
+    node.size = node.shape === "circle"
+      ? { ...node.size, width: size, height: size }
+      : { ...node.size, [dimension]: size };
     return node;
   }
 
@@ -707,15 +984,24 @@
     return edge;
   }
 
+  function setEdgeAnchor(edge, endpoint, anchor) {
+    if (endpoint === "source") {
+      edge.sourceAnchor = anchor;
+    } else {
+      edge.targetAnchor = anchor;
+    }
+    return edge;
+  }
+
   function setEdgeStyleOverride(edge, key, value) {
     edge.style = { ...edge.style, [key]: value };
     return edge;
   }
 
-  function setEdgeWidth(edge, rawValue) {
-    const width = Math.max(1, Math.round(Number(rawValue)) || 1);
-    edge.style = { ...edge.style, width };
-    return edge;
+  function setStyleStrokeWidth(element, rawValue) {
+    const strokeWidth = Math.max(1, Math.round(Number(rawValue)) || 1);
+    element.style = { ...element.style, strokeWidth };
+    return element;
   }
 
   function setEdgeMarkerStart(edge, markerStyle) {
@@ -801,8 +1087,12 @@
       `<label class="docdiagram-field">Type<select class="docdiagram-inspector-type">${nodeTypes.map(
         (type) => `<option value="${type}"${type === node.type ? " selected" : ""}>${type}</option>`
       ).join("")}</select></label>`,
+      `<label class="docdiagram-field">Shape<select class="docdiagram-inspector-shape">${nodeShapes.map(
+        (shape) => `<option value="${shape}"${shape === node.shape ? " selected" : ""}>${shape}</option>`
+      ).join("")}</select></label>`,
       `<label class="docdiagram-field">Fill<input type="color" class="docdiagram-inspector-fill" value="${escapeHtml(style.fill)}"></label>`,
       `<label class="docdiagram-field">Border<input type="color" class="docdiagram-inspector-stroke" value="${escapeHtml(style.stroke)}"></label>`,
+      `<label class="docdiagram-field">Border width<input type="number" class="docdiagram-inspector-stroke-width" value="${Number(style.strokeWidth) || 2}" min="1" step="1"></label>`,
       `<label class="docdiagram-field">Text<input type="color" class="docdiagram-inspector-text" value="${escapeHtml(style.text)}"></label>`,
       `<label class="docdiagram-field">Width<input type="number" class="docdiagram-inspector-width" value="${width}" min="${widthMinimum}" step="${step}"></label>`,
       `<label class="docdiagram-field">Height<input type="number" class="docdiagram-inspector-height" value="${height}" min="${heightMinimum}" step="${step}"></label>`
@@ -811,7 +1101,7 @@
 
   function buildEdgeInspectorFields(diagram, edge) {
     const style = getEdgeEffectiveStyle(diagram, edge);
-    const width = Number(style.width) || 2;
+    const strokeWidth = Number(style.strokeWidth) || 2;
     const route = edge.route || "orthogonal";
     const startMarkerStyle = getEdgeMarkerStyle(edge, "start");
     const endMarkerStyle = getEdgeMarkerStyle(edge, "end");
@@ -821,6 +1111,12 @@
       `<label class="docdiagram-field">Route<select class="docdiagram-inspector-route">${edgeRoutes.map(
         (candidate) => `<option value="${candidate}"${candidate === route ? " selected" : ""}>${candidate}</option>`
       ).join("")}</select></label>`,
+      `<label class="docdiagram-field">Source side<select class="docdiagram-inspector-source-anchor">${edgeAnchors.map(
+        (candidate) => `<option value="${candidate}"${candidate === edge.sourceAnchor ? " selected" : ""}>${candidate}</option>`
+      ).join("")}</select></label>`,
+      `<label class="docdiagram-field">Target side<select class="docdiagram-inspector-target-anchor">${edgeAnchors.map(
+        (candidate) => `<option value="${candidate}"${candidate === edge.targetAnchor ? " selected" : ""}>${candidate}</option>`
+      ).join("")}</select></label>`,
       `<label class="docdiagram-field">Start<select class="docdiagram-inspector-marker-start">${edgeMarkerStyles.map(
         (candidate) => `<option value="${candidate}"${candidate === startMarkerStyle ? " selected" : ""}>${candidate}</option>`
       ).join("")}</select></label>`,
@@ -829,7 +1125,7 @@
       ).join("")}</select></label>`,
       `<label class="docdiagram-field">Stroke<input type="color" class="docdiagram-inspector-stroke" value="${escapeHtml(style.stroke)}"></label>`,
       `<label class="docdiagram-field">Label colour<input type="color" class="docdiagram-inspector-text" value="${escapeHtml(style.text)}"></label>`,
-      `<label class="docdiagram-field">Width<input type="number" class="docdiagram-inspector-width" value="${width}" min="1" step="1"></label>`
+      `<label class="docdiagram-field">Stroke width<input type="number" class="docdiagram-inspector-stroke-width" value="${strokeWidth}" min="1" step="1"></label>`
     ].join("");
   }
 
@@ -858,6 +1154,10 @@
       withNode((diagram, node) => setNodeType(node, event.target.value));
     });
 
+    container.querySelector(".docdiagram-inspector-shape").addEventListener("change", (event) => {
+      withNode((diagram, node) => setNodeShape(node, event.target.value));
+    });
+
     container.querySelector(".docdiagram-inspector-fill").addEventListener("change", (event) => {
       withNode((diagram, node) => setNodeStyleOverride(node, "fill", event.target.value));
     });
@@ -868,6 +1168,10 @@
 
     container.querySelector(".docdiagram-inspector-text").addEventListener("change", (event) => {
       withNode((diagram, node) => setNodeStyleOverride(node, "text", event.target.value));
+    });
+
+    container.querySelector(".docdiagram-inspector-stroke-width").addEventListener("change", (event) => {
+      withNode((diagram, node) => setStyleStrokeWidth(node, event.target.value));
     });
 
     container.querySelector(".docdiagram-inspector-width").addEventListener("change", (event) => {
@@ -900,6 +1204,14 @@
       withEdge((diagram, edge) => setEdgeRoute(edge, event.target.value));
     });
 
+    container.querySelector(".docdiagram-inspector-source-anchor").addEventListener("change", (event) => {
+      withEdge((diagram, edge) => setEdgeAnchor(edge, "source", event.target.value));
+    });
+
+    container.querySelector(".docdiagram-inspector-target-anchor").addEventListener("change", (event) => {
+      withEdge((diagram, edge) => setEdgeAnchor(edge, "target", event.target.value));
+    });
+
     container.querySelector(".docdiagram-inspector-marker-start").addEventListener("change", (event) => {
       withEdge((diagram, edge) => setEdgeMarkerStart(edge, event.target.value));
     });
@@ -916,8 +1228,8 @@
       withEdge((diagram, edge) => setEdgeStyleOverride(edge, "text", event.target.value));
     });
 
-    container.querySelector(".docdiagram-inspector-width").addEventListener("change", (event) => {
-      withEdge((diagram, edge) => setEdgeWidth(edge, event.target.value));
+    container.querySelector(".docdiagram-inspector-stroke-width").addEventListener("change", (event) => {
+      withEdge((diagram, edge) => setStyleStrokeWidth(edge, event.target.value));
     });
   }
 
@@ -980,14 +1292,15 @@
   function updateNodeSizeMarkup(group, node, width, height) {
     const x = Number(node.position?.x) || 0;
     const y = Number(node.position?.y) || 0;
-    const nodeRect = group.querySelector(".docdiagram-node-body");
+    const nodeBody = group.querySelector(".docdiagram-node-body");
     const label = group.querySelector(".docdiagram-node-label");
     const subtitle = group.querySelector(".docdiagram-node-subtitle");
     const handle = group.querySelector(".docdiagram-resize-handle");
-    const layout = computeNodeTextLayout(x, y, width, height, node);
+    const style = getNodeEffectiveStyle(diagramModels[Number(group.dataset.diagramIndex)], node);
+    const geometry = getNodeGeometry(node, x, y, width, height);
+    const layout = computeNodeTextLayout(geometry.textBounds, node);
 
-    nodeRect.setAttribute("width", width);
-    nodeRect.setAttribute("height", height);
+    nodeBody.outerHTML = renderNodeBody(geometry, style, Number(style.strokeWidth) || 2);
 
     if (label) {
       label.setAttribute("x", layout.centerX);
@@ -1029,8 +1342,14 @@
 
     function move(moveEvent) {
       const point = svgPoint(svg, moveEvent);
-      const width = clampNodeSize(origin.width + point.x - start.x, minimumNodeSize.width, grid);
-      const height = clampNodeSize(origin.height + point.y - start.y, minimumNodeSize.height, grid);
+      let width = clampNodeSize(origin.width + point.x - start.x, minimumNodeSize.width, grid);
+      let height = clampNodeSize(origin.height + point.y - start.y, minimumNodeSize.height, grid);
+
+      if (node.shape === "circle") {
+        const diameter = Math.max(width, height);
+        width = diameter;
+        height = diameter;
+      }
 
       resized = resized || width !== origin.width || height !== origin.height;
       node.size = { ...node.size, width, height };
@@ -1448,12 +1767,8 @@
         filter: drop-shadow(0 0 4px var(--docdiagram-background));
         font-size: 15px;
       }
-      .docdiagram-node-body {
-        stroke-width: 2;
-      }
       .docdiagram-node-selected .docdiagram-node-body {
         filter: drop-shadow(0 0 4px rgb(39 117 197 / 65%));
-        stroke-width: 4;
       }
       .docdiagram-resize-handle {
         cursor: nwse-resize;
@@ -1510,6 +1825,8 @@
   globalThis.DocDiagramCore = {
     diagramThemes,
     nodeTypes,
+    nodeShapes,
+    edgeAnchors,
     edgeRoutes,
     edgeMarkerStyles,
     getTheme,
@@ -1528,18 +1845,24 @@
     serializeDiagram,
     setNodeLabel,
     setNodeType,
+    setNodeShape,
     setNodeSubtitle,
     setNodeStyleOverride,
     setNodeSize,
     setEdgeLabel,
     setEdgeRoute,
+    setEdgeAnchor,
     setEdgeStyleOverride,
-    setEdgeWidth,
+    setStyleStrokeWidth,
     setEdgeMarkerStart,
     setEdgeMarkerEnd,
     splitTextLines,
     renderTextBlock,
-    computeNodeTextLayout
+    computeNodeTextLayout,
+    getNodeGeometry,
+    renderNodeBody,
+    buildEdgePath,
+    buildEdgeInspectorFields
   };
 
   if (sourceElement && outputElement) {
