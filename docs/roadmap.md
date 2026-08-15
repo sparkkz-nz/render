@@ -169,7 +169,10 @@ presentation elements.
    `grey`, or `bw`. A light blue component, for example, uses a light-blue
    background with dark-blue text, border, and accents; dark blue reverses that
    contrast. When a component omits styling, it inherits the document's
-   light/dark theme colours. Do not attach domain meaning to a colour.
+   light/dark theme colours. The document selects the actual shade mapping once
+   with frontmatter such as `colourScheme: classic`; future schemes such as
+   `pastel` must retain the same tone and colour names. Do not attach domain
+   meaning to a colour.
 4. Define nesting, malformed-input, accessibility, and source-serialization
    behavior before adding more component types.
 

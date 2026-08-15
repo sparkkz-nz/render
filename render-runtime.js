@@ -12,6 +12,7 @@
   let editingEdge = null;
   let connectionDrag = null;
   let documentTheme = "light";
+  let documentColorScheme = "classic";
   let documentFormat = "centered";
   let savedSource = "";
   let editSessionSource = null;
@@ -40,58 +41,61 @@
   const edgeRoutes = ["orthogonal", "straight", "curved"];
   const edgeMarkerStyles = ["none", "arrow", "circle"];
   const edgeMarkerDefaults = { start: "none", end: "arrow" };
-  const nodeColorPalettes = {
-    pink: {
-      label: "Pink",
-      light: { fill: "#F6C5D8", stroke: "#9D174D", text: "#9D174D" },
-      dark: { fill: "#9D174D", stroke: "#FBCFE8", text: "#FBCFE8" }
-    },
-    red: {
-      label: "Red",
-      light: { fill: "#FECACA", stroke: "#B91C1C", text: "#B91C1C" },
-      dark: { fill: "#B91C1C", stroke: "#FEE2E2", text: "#FEE2E2" }
-    },
-    orange: {
-      label: "Orange",
-      light: { fill: "#FED7AA", stroke: "#C2410C", text: "#9A3412" },
-      dark: { fill: "#C2410C", stroke: "#FFEDD5", text: "#FFEDD5" }
-    },
-    yellow: {
-      label: "Yellow",
-      light: { fill: "#FEF08A", stroke: "#A16207", text: "#854D0E" },
-      dark: { fill: "#A16207", stroke: "#FEF9C3", text: "#FEF9C3" }
-    },
-    green: {
-      label: "Green",
-      light: { fill: "#BBF7D0", stroke: "#15803D", text: "#166534" },
-      dark: { fill: "#15803D", stroke: "#DCFCE7", text: "#DCFCE7" }
-    },
-    cyan: {
-      label: "Cyan",
-      light: { fill: "#A5F3FC", stroke: "#0E7490", text: "#155E75" },
-      dark: { fill: "#0E7490", stroke: "#CFFAFE", text: "#CFFAFE" }
-    },
-    blue: {
-      label: "Blue",
-      light: { fill: "#BFDBFE", stroke: "#1D4ED8", text: "#1E3A8A" },
-      dark: { fill: "#1D4ED8", stroke: "#DBEAFE", text: "#DBEAFE" }
-    },
-    purple: {
-      label: "Purple",
-      light: { fill: "#DDD6FE", stroke: "#6D28D9", text: "#5B21B6" },
-      dark: { fill: "#6D28D9", stroke: "#EDE9FE", text: "#EDE9FE" }
-    },
-    grey: {
-      label: "Grey",
-      light: { fill: "#E5E7EB", stroke: "#4B5563", text: "#374151" },
-      dark: { fill: "#4B5563", stroke: "#E5E7EB", text: "#F9FAFB" }
-    },
-    bw: {
-      label: "Black and white",
-      light: { fill: "#FFFFFF", stroke: "#111827", text: "#111827" },
-      dark: { fill: "#111827", stroke: "#FFFFFF", text: "#FFFFFF" }
+  const nodeColorSchemes = {
+    classic: {
+      pink: {
+        label: "Pink",
+        light: { fill: "#F6C5D8", stroke: "#9D174D", text: "#9D174D" },
+        dark: { fill: "#9D174D", stroke: "#FBCFE8", text: "#FBCFE8" }
+      },
+      red: {
+        label: "Red",
+        light: { fill: "#FECACA", stroke: "#B91C1C", text: "#B91C1C" },
+        dark: { fill: "#B91C1C", stroke: "#FEE2E2", text: "#FEE2E2" }
+      },
+      orange: {
+        label: "Orange",
+        light: { fill: "#FED7AA", stroke: "#C2410C", text: "#9A3412" },
+        dark: { fill: "#C2410C", stroke: "#FFEDD5", text: "#FFEDD5" }
+      },
+      yellow: {
+        label: "Yellow",
+        light: { fill: "#FEF08A", stroke: "#A16207", text: "#854D0E" },
+        dark: { fill: "#A16207", stroke: "#FEF9C3", text: "#FEF9C3" }
+      },
+      green: {
+        label: "Green",
+        light: { fill: "#BBF7D0", stroke: "#15803D", text: "#166534" },
+        dark: { fill: "#15803D", stroke: "#DCFCE7", text: "#DCFCE7" }
+      },
+      cyan: {
+        label: "Cyan",
+        light: { fill: "#A5F3FC", stroke: "#0E7490", text: "#155E75" },
+        dark: { fill: "#0E7490", stroke: "#CFFAFE", text: "#CFFAFE" }
+      },
+      blue: {
+        label: "Blue",
+        light: { fill: "#BFDBFE", stroke: "#1D4ED8", text: "#1E3A8A" },
+        dark: { fill: "#1D4ED8", stroke: "#DBEAFE", text: "#DBEAFE" }
+      },
+      purple: {
+        label: "Purple",
+        light: { fill: "#DDD6FE", stroke: "#6D28D9", text: "#5B21B6" },
+        dark: { fill: "#6D28D9", stroke: "#EDE9FE", text: "#EDE9FE" }
+      },
+      grey: {
+        label: "Grey",
+        light: { fill: "#E5E7EB", stroke: "#4B5563", text: "#374151" },
+        dark: { fill: "#4B5563", stroke: "#E5E7EB", text: "#F9FAFB" }
+      },
+      bw: {
+        label: "Black and white",
+        light: { fill: "#FFFFFF", stroke: "#111827", text: "#111827" },
+        dark: { fill: "#111827", stroke: "#FFFFFF", text: "#FFFFFF" }
+      }
     }
   };
+  const nodeColorPalettes = nodeColorSchemes.classic;
 
   const diagramThemes = {
     light: {
@@ -252,6 +256,13 @@
         throw new Error(`Unsupported node shape: ${node.shape}`);
       }
 
+      if (node.palette) {
+        const palette = getNodeColorPalette(documentColorScheme, node.palette.tone, node.palette.colour);
+        if (!palette) {
+          throw new Error(`Unsupported node palette: ${node.palette.tone || "unknown"} ${node.palette.colour || "unknown"}`);
+        }
+      }
+
       if (node.style?.width !== undefined) {
         throw new Error("Node style.width is not supported; use style.strokeWidth.");
       }
@@ -295,6 +306,10 @@
     return theme;
   }
 
+  function getNodeColorPalette(schemeName, tone, colour) {
+    return nodeColorSchemes[schemeName]?.[colour]?.[tone] || null;
+  }
+
   function mergeStyle(defaults, overrides) {
     return { ...defaults, ...(overrides || {}) };
   }
@@ -302,7 +317,10 @@
   function getNodeEffectiveStyle(diagram, node) {
     const theme = getTheme(diagram);
     const defaults = theme.node[node.type] || theme.node.application;
-    return mergeStyle(defaults, node.style);
+    const palette = node.palette
+      ? getNodeColorPalette(documentColorScheme, node.palette.tone, node.palette.colour)
+      : null;
+    return mergeStyle(mergeStyle(defaults, palette), node.style);
   }
 
   function getEdgeEffectiveStyle(diagram, edge) {
@@ -1037,12 +1055,17 @@
   function resolveDocument(source) {
     const document = parseDocumentFrontmatter(source);
     const theme = document.frontmatter.theme || "light";
+    const colourScheme = document.frontmatter.colourScheme || "classic";
 
     if (!diagramThemes[theme]) {
       throw new Error(`Unsupported document theme: ${theme}`);
     }
 
-    return { ...document, theme };
+    if (!nodeColorSchemes[colourScheme]) {
+      throw new Error(`Unsupported document colour scheme: ${colourScheme}`);
+    }
+
+    return { ...document, theme, colourScheme };
   }
 
   function setFrontmatterTheme(source, themeName) {
@@ -1201,17 +1224,17 @@
     return node;
   }
 
-  function setNodeColorPalette(node, tone, hue) {
-    const preset = nodeColorPalettes[hue]?.[tone];
+  function setNodeColorPalette(node, tone, colour, colorScheme = documentColorScheme) {
+    const preset = getNodeColorPalette(colorScheme, tone, colour);
     if (!preset) {
       return node;
     }
+
+    const { fill, stroke, text, ...style } = node.style || {};
     node.style = {
-      ...node.style,
-      fill: preset.fill,
-      stroke: preset.stroke,
-      text: preset.text
+      ...style
     };
+    node.palette = { tone, colour };
     return node;
   }
 
@@ -1428,24 +1451,25 @@
     const widthMinimum = grid ? Math.ceil(minimumNodeSize.width / grid) * grid : minimumNodeSize.width;
     const heightMinimum = grid ? Math.ceil(minimumNodeSize.height / grid) * grid : minimumNodeSize.height;
     const step = grid || 1;
-    const matchingPalette = Object.entries(nodeColorPalettes).find(([, palette]) =>
+    const palettes = nodeColorSchemes[documentColorScheme];
+    const matchingPalette = Object.entries(palettes).find(([, palette]) =>
       [palette.light, palette.dark].some((preset) =>
         preset.fill.toLowerCase() === style.fill.toLowerCase() &&
         preset.stroke.toLowerCase() === style.stroke.toLowerCase() &&
         preset.text.toLowerCase() === style.text.toLowerCase()
       )
     );
-    const matchingHue = matchingPalette?.[0] || "blue";
-    const matchingTone = matchingPalette && matchingPalette[1].light.fill.toLowerCase() === style.fill.toLowerCase()
+    const matchingColour = node.palette?.colour || matchingPalette?.[0] || "blue";
+    const matchingTone = node.palette?.tone || (matchingPalette && matchingPalette[1].light.fill.toLowerCase() === style.fill.toLowerCase()
       ? "light"
-      : "dark";
+      : "dark");
 
     return [
       `<label class="docdiagram-field docdiagram-field-wide">Label<textarea class="docdiagram-inspector-label docdiagram-inspector-textarea" rows="2">${escapeHtml(node.label)}</textarea></label>`,
       `<label class="docdiagram-field docdiagram-field-wide">Subtitle<textarea class="docdiagram-inspector-subtitle docdiagram-inspector-textarea" rows="2">${escapeHtml(node.subtitle || "")}</textarea></label>`,
       `<label class="docdiagram-field">Tone<select class="docdiagram-inspector-tone"><option value="light"${matchingTone === "light" ? " selected" : ""}>Light</option><option value="dark"${matchingTone === "dark" ? " selected" : ""}>Dark</option></select></label>`,
-      `<label class="docdiagram-field">Colour<select class="docdiagram-inspector-colour">${Object.entries(nodeColorPalettes).map(
-        ([name, palette]) => `<option value="${name}"${name === matchingHue ? " selected" : ""}>${palette.label}</option>`
+      `<label class="docdiagram-field">Colour<select class="docdiagram-inspector-colour">${Object.entries(palettes).map(
+        ([name, palette]) => `<option value="${name}"${name === matchingColour ? " selected" : ""}>${palette.label}</option>`
       ).join("")}</select></label>`,
       `<label class="docdiagram-field">Shape<select class="docdiagram-inspector-shape">${nodeShapes.map(
         (shape) => `<option value="${shape}"${shape === node.shape ? " selected" : ""}>${shape}</option>`
@@ -2197,6 +2221,7 @@
     try {
       parsedDocument = resolveDocument(getSource());
       documentTheme = parsedDocument.theme;
+      documentColorScheme = parsedDocument.colourScheme;
     } catch (error) {
       applyPageTheme(documentTheme);
       removeToolbarChrome();
@@ -2557,6 +2582,7 @@
 
   globalThis.DocDiagramCore = {
     diagramThemes,
+    nodeColorSchemes,
     nodeTypes,
     nodeColorPalettes,
     nodeShapes,

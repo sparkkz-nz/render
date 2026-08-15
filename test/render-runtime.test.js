@@ -18,6 +18,7 @@ vm.runInContext(runtime, context, { filename: "render-runtime.js" });
 const {
   nodeTypes,
   nodeColorPalettes,
+  nodeColorSchemes,
   nodeShapes,
   edgeAnchors,
   edgeRoutes,
@@ -162,6 +163,15 @@ test("rejects an unsupported document theme", () => {
   assert.throws(
     () => resolveDocument("---\ntheme: neon\n---\n# Payments"),
     /Unsupported document theme: neon/
+  );
+});
+
+test("resolves the classic colour scheme by default and rejects unsupported schemes", () => {
+  assert.equal(resolveDocument("# Payments").colourScheme, "classic");
+  assert.equal(resolveDocument("---\ncolourScheme: classic\n---\n# Payments").colourScheme, "classic");
+  assert.throws(
+    () => resolveDocument("---\ncolourScheme: pastel\n---\n# Payments"),
+    /Unsupported document colour scheme: pastel/
   );
 });
 
@@ -373,17 +383,22 @@ test("nodeTypes, nodeShapes, edgeAnchors, edgeRoutes, and edgeMarkerStyles expos
 test("node color palettes replace manual fill, stroke, and text overrides together", () => {
   const node = {
     type: "application",
-    style: { fill: "#ffffff", stroke: "#000000", text: "#222222" }
+    style: { fill: "#ffffff", stroke: "#000000", strokeWidth: 3, text: "#222222" }
   };
 
   setNodeColorPalette(node, "dark", "pink");
 
-  assert.equal(node.style.fill, nodeColorPalettes.pink.dark.fill);
-  assert.equal(node.style.stroke, nodeColorPalettes.pink.dark.stroke);
-  assert.equal(node.style.text, nodeColorPalettes.pink.dark.text);
+  assert.equal(JSON.stringify(node.palette), JSON.stringify({ tone: "dark", colour: "pink" }));
+  assert.equal(JSON.stringify(node.style), JSON.stringify({ strokeWidth: 3 }));
+  const style = getNodeEffectiveStyle({ theme: "light" }, node);
+  assert.equal(style.fill, nodeColorPalettes.pink.dark.fill);
+  assert.equal(style.stroke, nodeColorPalettes.pink.dark.stroke);
+  assert.equal(style.text, nodeColorPalettes.pink.dark.text);
+  assert.equal(style.strokeWidth, 3);
 });
 
 test("node color palettes include neutral grey and black-and-white tones", () => {
+  assert.deepEqual(Object.keys(nodeColorSchemes), ["classic"]);
   assert.deepEqual(Object.keys(nodeColorPalettes), [
     "pink",
     "red",
