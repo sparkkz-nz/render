@@ -1,0 +1,782 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const test = require("node:test");
+const vm = require("node:vm");
+
+const runtime = fs.readFileSync(
+  path.resolve(__dirname, "..", "docdiagram-runtime.js"),
+  "utf8"
+);
+const context = vm.createContext({
+  document: { querySelector: () => null },
+  globalThis: {}
+});
+
+vm.runInContext(runtime, context, { filename: "docdiagram-runtime.js" });
+
+const {
+  nodeTypes,
+  edgeRoutes,
+  edgeMarkerStyles,
+  getTheme,
+  getGridSize,
+  getNodeEffectiveStyle,
+  getEdgeEffectiveStyle,
+  getEdgeMarkerStyle,
+  getEdgeMarkerDimensions,
+  parseDiagram,
+  parseDocumentFrontmatter,
+  resolveDocument,
+  setFrontmatterTheme,
+  renderDiagram,
+  snapToGrid,
+  clampNodeSize,
+  serializeDiagram,
+  setNodeLabel,
+  setNodeType,
+  setNodeSubtitle,
+  setNodeStyleOverride,
+  setNodeSize,
+  setEdgeLabel,
+  setEdgeRoute,
+  setEdgeStyleOverride,
+  setEdgeWidth,
+  setEdgeMarkerStart,
+  setEdgeMarkerEnd,
+  splitTextLines,
+  renderTextBlock,
+  computeNodeTextLayout
+} = context.globalThis.DocDiagramCore;
+
+function readTemplateSource(filePath) {
+  const html = fs.readFileSync(filePath, "utf8");
+  const template = html.match(/<template id="source"[^>]*>([\s\S]*?)<\/template>/);
+
+  assert.ok(template, "Expected an HTML template with id=\"source\"");
+  return template[1];
+}
+
+test("extracts document frontmatter without treating it as Markdown content", () => {
+  const document = parseDocumentFrontmatter("\n---\ntheme: dark\n---\n\n# Payments");
+
+  assert.equal(document.frontmatter.theme, "dark");
+  assert.equal(document.content, "\n# Payments");
+});
+
+test("resolves the actual example document's dark theme", () => {
+  const source = readTemplateSource(path.resolve(__dirname, "..", "example.html"));
+  const document = resolveDocument(source);
+
+  assert.equal(document.theme, "dark");
+  assert.match(document.content, /^# Payments architecture/m);
+  assert.doesNotMatch(document.content, /^---$/m);
+});
+
+test("rejects an unsupported document theme", () => {
+  assert.throws(
+    () => resolveDocument("---\ntheme: neon\n---\n# Payments"),
+    /Unsupported document theme: neon/
+  );
+});
+
+test("uses an opt-in canvas grid to normalize positions and dimensions", () => {
+  assert.equal(getGridSize({ canvas: { grid: 5 } }), 5);
+  assert.equal(getGridSize({ canvas: { grid: 0 } }), 0);
+  assert.equal(getGridSize({ canvas: {} }), 0);
+  assert.equal(snapToGrid(122, 5), 120);
+  assert.equal(snapToGrid(123, 5), 125);
+  assert.equal(snapToGrid(122.4, 0), 122);
+  assert.equal(clampNodeSize(118, 120, 5), 120);
+  assert.equal(clampNodeSize(123, 120, 5), 125);
+  assert.equal(clampNodeSize(58, 60, 5), 60);
+});
+
+test("parses and serializes diagram themes and style overrides", () => {
+  const source = [
+    "version: 1",
+    "id: themed-flow",
+    "theme: dark",
+    "canvas:",
+    "  width: 600",
+    "  height: 300",
+    "  grid: 5",
+    "nodes:",
+    "  - id: api",
+    "    label: Payments API",
+    "    type: service",
+    "    position: { x: 20, y: 40 }",
+    "    size: { width: 180, height: 80 }",
+    "    style: { fill: #123456, text: #FFFFFF }",
+    "edges:",
+    "  - source: api",
+    "    target: api",
+    "    style: { stroke: #ABCDEF, width: 3 }"
+  ].join("\n");
+  const diagram = parseDiagram(source);
+
+  assert.equal(diagram.theme, "dark");
+  assert.equal(diagram.canvas.grid, 5);
+  assert.equal(JSON.stringify(diagram.nodes[0].style), JSON.stringify({ fill: "#123456", text: "#FFFFFF" }));
+  assert.equal(JSON.stringify(diagram.edges[0].style), JSON.stringify({ stroke: "#ABCDEF", width: 3 }));
+  assert.equal(
+    JSON.stringify(parseDiagram(serializeDiagram(diagram))),
+    JSON.stringify(diagram)
+  );
+});
+
+test("rejects an unsupported diagram theme", () => {
+  assert.throws(() => getTheme({ theme: "neon" }), /Unsupported diagram theme: neon/);
+});
+
+test("renders themed defaults and explicit style overrides", () => {
+  const source = [
+    "theme: dark",
+    "canvas:",
+    "  width: 600",
+    "  height: 300",
+    "nodes:",
+    "  - id: api",
+    "    label: Payments API",
+    "    type: service",
+    "    position: { x: 20, y: 40 }",
+    "    size: { width: 180, height: 80 }",
+    "    style: { fill: #123456 }",
+    "  - id: db",
+    "    label: Payments DB",
+    "    type: datastore",
+    "    position: { x: 300, y: 40 }",
+    "    size: { width: 180, height: 80 }",
+    "edges:",
+    "  - source: api",
+    "    target: db",
+    "    style: { stroke: #ABCDEF, width: 3 }"
+  ].join("\n");
+
+  const markup = renderDiagram(source, 0);
+
+  assert.match(markup, /fill="#123456"/);
+  assert.match(markup, /stroke="#ABCDEF" stroke-width="3"/);
+  assert.match(markup, /fill="#F3F8FC"/);
+});
+
+test("renders edges as selectable groups with a wide hit target", () => {
+  const source = [
+    "theme: light",
+    "canvas:",
+    "  width: 600",
+    "  height: 300",
+    "nodes:",
+    "  - id: api",
+    "    label: Payments API",
+    "    type: service",
+    "    position: { x: 20, y: 40 }",
+    "    size: { width: 180, height: 80 }",
+    "  - id: db",
+    "    label: Payments DB",
+    "    type: datastore",
+    "    position: { x: 300, y: 40 }",
+    "    size: { width: 180, height: 80 }",
+    "edges:",
+    "  - source: api",
+    "    target: db",
+    "    label: Reads and writes"
+  ].join("\n");
+
+  const markup = renderDiagram(source, 2);
+
+  assert.match(markup, /<g class="docdiagram-edge-group" data-diagram-index="2" data-edge-index="0">/);
+  assert.match(markup, /<path class="docdiagram-edge-hit"[^>]*stroke="transparent"/);
+  assert.match(markup, /Reads and writes/);
+});
+
+test("nodeTypes, edgeRoutes, and edgeMarkerStyles expose the supported inspector option sets", () => {
+  assert.equal(JSON.stringify([...nodeTypes]), JSON.stringify(["application", "service", "datastore", "note"]));
+  assert.equal(JSON.stringify([...edgeRoutes]), JSON.stringify(["orthogonal", "straight"]));
+  assert.equal(JSON.stringify([...edgeMarkerStyles]), JSON.stringify(["none", "arrow", "circle"]));
+});
+
+test("resolves effective node and edge styles from theme defaults and overrides", () => {
+  const diagram = { theme: "dark", canvas: {}, nodes: [], edges: [] };
+  const node = { id: "api", label: "Payments API", type: "service" };
+  const styledNode = { ...node, style: { fill: "#123456" } };
+
+  assert.equal(getNodeEffectiveStyle(diagram, node).fill, "#164A38");
+  assert.equal(getNodeEffectiveStyle(diagram, styledNode).fill, "#123456");
+  assert.equal(getNodeEffectiveStyle(diagram, styledNode).stroke, "#66D39A");
+
+  const edge = { source: "api", target: "api" };
+  const styledEdge = { ...edge, style: { stroke: "#ABCDEF" } };
+
+  assert.equal(getEdgeEffectiveStyle(diagram, edge).stroke, "#B8C7D5");
+  assert.equal(getEdgeEffectiveStyle(diagram, styledEdge).stroke, "#ABCDEF");
+});
+
+test("setFrontmatterTheme updates an existing theme key without disturbing other frontmatter", () => {
+  const source = "---\ntitle: Payments\ntheme: light\nowner: payments-team\n---\n\n# Payments";
+  const updated = setFrontmatterTheme(source, "dark");
+
+  assert.equal(
+    updated,
+    "---\ntitle: Payments\ntheme: dark\nowner: payments-team\n---\n\n# Payments"
+  );
+  assert.equal(resolveDocument(updated).theme, "dark");
+});
+
+test("setFrontmatterTheme inserts a theme key when frontmatter exists without one", () => {
+  const source = "---\ntitle: Payments\n---\n\n# Payments";
+  const updated = setFrontmatterTheme(source, "dark");
+
+  assert.equal(resolveDocument(updated).frontmatter.title, "Payments");
+  assert.equal(resolveDocument(updated).theme, "dark");
+});
+
+test("setFrontmatterTheme creates a frontmatter block when none exists", () => {
+  const source = "# Payments architecture\n\nNo frontmatter here.";
+  const updated = setFrontmatterTheme(source, "dark");
+
+  assert.equal(resolveDocument(updated).theme, "dark");
+  assert.match(updated, /^---\ntheme: dark\n---\n# Payments architecture/);
+});
+
+test("node inspector helpers mutate the canonical model and round-trip through YAML", () => {
+  const source = [
+    "canvas:",
+    "  width: 600",
+    "  height: 300",
+    "  grid: 10",
+    "nodes:",
+    "  - id: api",
+    "    label: Payments API",
+    "    type: service",
+    "    position: { x: 20, y: 40 }",
+    "    size: { width: 180, height: 80 }",
+    "edges:",
+    "  - source: api",
+    "    target: api"
+  ].join("\n");
+  const diagram = parseDiagram(source);
+  const node = diagram.nodes[0];
+
+  setNodeLabel(node, "  Payment Gateway  ");
+  setNodeType(node, "application");
+  setNodeStyleOverride(node, "fill", "#0000ff");
+  setNodeSize(diagram, node, "width", 123);
+  setNodeSize(diagram, node, "height", 58);
+
+  assert.equal(node.label, "Payment Gateway");
+  assert.equal(node.type, "application");
+  assert.equal(node.style.fill, "#0000ff");
+  assert.equal(node.size.width, 120);
+  assert.equal(node.size.height, 60);
+
+  const reparsed = parseDiagram(serializeDiagram(diagram));
+  assert.equal(reparsed.nodes[0].label, "Payment Gateway");
+  assert.equal(reparsed.nodes[0].type, "application");
+  assert.equal(reparsed.nodes[0].style.fill, "#0000ff");
+  assert.equal(reparsed.nodes[0].size.width, 120);
+  assert.equal(reparsed.nodes[0].size.height, 60);
+});
+
+test("setNodeLabel keeps the previous label when the new value is blank", () => {
+  const node = { id: "api", label: "Payments API" };
+  setNodeLabel(node, "   ");
+  assert.equal(node.label, "Payments API");
+});
+
+test("edge inspector helpers mutate the canonical model and round-trip through YAML", () => {
+  const source = [
+    "canvas:",
+    "  width: 600",
+    "  height: 300",
+    "nodes:",
+    "  - id: api",
+    "    label: Payments API",
+    "    position: { x: 20, y: 40 }",
+    "    size: { width: 180, height: 80 }",
+    "edges:",
+    "  - source: api",
+    "    target: api",
+    "    label: Retry"
+  ].join("\n");
+  const diagram = parseDiagram(source);
+  const edge = diagram.edges[0];
+
+  setEdgeLabel(edge, "  Create payment intent  ");
+  setEdgeRoute(edge, "straight");
+  setEdgeStyleOverride(edge, "stroke", "#ff0000");
+  setEdgeStyleOverride(edge, "text", "#00ff00");
+  setEdgeWidth(edge, "4.7");
+
+  assert.equal(edge.label, "Create payment intent");
+  assert.equal(edge.route, "straight");
+  assert.equal(edge.style.stroke, "#ff0000");
+  assert.equal(edge.style.text, "#00ff00");
+  assert.equal(edge.style.width, 5);
+
+  const reparsed = parseDiagram(serializeDiagram(diagram));
+  assert.equal(reparsed.edges[0].label, "Create payment intent");
+  assert.equal(reparsed.edges[0].route, "straight");
+  assert.equal(reparsed.edges[0].style.stroke, "#ff0000");
+  assert.equal(reparsed.edges[0].style.width, 5);
+});
+
+test("setEdgeWidth never produces a width below one", () => {
+  const edge = { source: "a", target: "b" };
+  setEdgeWidth(edge, "-5");
+  assert.equal(edge.style.width, 1);
+  setEdgeWidth(edge, "not-a-number");
+  assert.equal(edge.style.width, 1);
+});
+
+test("splitTextLines normalizes CRLF and splits on newlines", () => {
+  assert.equal(JSON.stringify(splitTextLines("one")), JSON.stringify(["one"]));
+  assert.equal(JSON.stringify(splitTextLines("one\ntwo")), JSON.stringify(["one", "two"]));
+  assert.equal(JSON.stringify(splitTextLines("one\r\ntwo\r\nthree")), JSON.stringify(["one", "two", "three"]));
+  assert.equal(JSON.stringify(splitTextLines("")), JSON.stringify([""]));
+  assert.equal(JSON.stringify(splitTextLines(undefined)), JSON.stringify([""]));
+});
+
+test("computeNodeTextLayout stacks label and subtitle lines and keeps the block centered", () => {
+  const labelOnly = computeNodeTextLayout(20, 40, 180, 80, { label: "Payments API" });
+  assert.equal(labelOnly.centerX, 20 + 90);
+  assert.equal(labelOnly.labelLines.length, 1);
+  assert.equal(labelOnly.subtitleLines.length, 0);
+
+  const withSubtitle = computeNodeTextLayout(20, 40, 180, 80, {
+    label: "Payments API\nGateway",
+    subtitle: "Handles card capture"
+  });
+
+  assert.equal(withSubtitle.labelLines.length, 2);
+  assert.equal(withSubtitle.subtitleLines.length, 1);
+  // The label block should start above the subtitle block so the stack reads top-to-bottom.
+  assert.ok(withSubtitle.labelStartY < withSubtitle.subtitleStartY);
+});
+
+test("parses and serializes a node subtitle, including multiline values, with a safe roundtrip", () => {
+  const source = [
+    "canvas:",
+    "  width: 600",
+    "  height: 300",
+    "nodes:",
+    "  - id: api",
+    "    label: Payments API",
+    "    type: service",
+    "    subtitle: Handles card capture",
+    "    position: { x: 20, y: 40 }",
+    "    size: { width: 180, height: 80 }",
+    "edges:",
+    "  - source: api",
+    "    target: api"
+  ].join("\n");
+  const diagram = parseDiagram(source);
+
+  assert.equal(diagram.nodes[0].subtitle, "Handles card capture");
+
+  setNodeSubtitle(diagram.nodes[0], "Line one\nLine two");
+  setNodeLabel(diagram.nodes[0], "Multiline\nLabel");
+  assert.equal(diagram.nodes[0].subtitle, "Line one\nLine two");
+  assert.equal(diagram.nodes[0].label, "Multiline\nLabel");
+
+  const serialized = serializeDiagram(diagram);
+  // Newline-bearing scalars must be JSON-quoted so the YAML-like format stays one physical line per entry.
+  assert.match(serialized, /subtitle: "Line one\\nLine two"/);
+  assert.match(serialized, /label: "Multiline\\nLabel"/);
+
+  const reparsed = parseDiagram(serialized);
+  assert.equal(reparsed.nodes[0].subtitle, "Line one\nLine two");
+  assert.equal(reparsed.nodes[0].label, "Multiline\nLabel");
+  assert.equal(JSON.stringify(reparsed), JSON.stringify(diagram));
+});
+
+test("setNodeSubtitle trims whitespace and allows clearing the subtitle back to empty", () => {
+  const node = { id: "api", label: "Payments API", subtitle: "Old subtitle" };
+  setNodeSubtitle(node, "  New subtitle  ");
+  assert.equal(node.subtitle, "New subtitle");
+  setNodeSubtitle(node, "   ");
+  assert.equal(node.subtitle, "");
+});
+
+test("multiline edge labels round-trip through serialization safely", () => {
+  const source = [
+    "canvas:",
+    "  width: 600",
+    "  height: 300",
+    "nodes:",
+    "  - id: api",
+    "    label: Payments API",
+    "    position: { x: 20, y: 40 }",
+    "    size: { width: 180, height: 80 }",
+    "edges:",
+    "  - source: api",
+    "    target: api"
+  ].join("\n");
+  const diagram = parseDiagram(source);
+  const edge = diagram.edges[0];
+
+  setEdgeLabel(edge, "Retry\nwith backoff");
+  assert.equal(edge.label, "Retry\nwith backoff");
+
+  const serialized = serializeDiagram(diagram);
+  assert.match(serialized, /label: "Retry\\nwith backoff"/);
+
+  const reparsed = parseDiagram(serialized);
+  assert.equal(reparsed.edges[0].label, "Retry\nwith backoff");
+});
+
+test("renders a node subtitle below the label and never renders the internal type as SVG text", () => {
+  const source = [
+    "theme: dark",
+    "canvas:",
+    "  width: 600",
+    "  height: 300",
+    "nodes:",
+    "  - id: api",
+    "    label: Payments API",
+    "    type: service",
+    "    subtitle: Card capture and auth",
+    "    position: { x: 20, y: 40 }",
+    "    size: { width: 180, height: 80 }",
+    "edges:",
+    "  - source: api",
+    "    target: api"
+  ].join("\n");
+
+  const markup = renderDiagram(source, 0);
+
+  assert.match(markup, /class="docdiagram-node-subtitle"/);
+  assert.match(markup, /Card capture and auth/);
+  // The semantic type key must stay internal-only: no SVG text output should mention "service".
+  assert.doesNotMatch(markup, /docdiagram-node-type/);
+  assert.doesNotMatch(markup, />service</);
+});
+
+test("renders multiline node labels and subtitles as stacked tspans", () => {
+  const source = [
+    "theme: light",
+    "canvas:",
+    "  width: 600",
+    "  height: 300",
+    "nodes:",
+    "  - id: api",
+    "    label: \"Payments\\nAPI\"",
+    "    type: service",
+    "    subtitle: \"Card capture\\nand auth\"",
+    "    position: { x: 20, y: 40 }",
+    "    size: { width: 180, height: 100 }",
+    "edges:",
+    "  - source: api",
+    "    target: api"
+  ].join("\n");
+
+  const markup = renderDiagram(source, 0);
+  const labelGroup = markup.match(/<text[^>]*class="docdiagram-node-label"[^>]*>[\s\S]*?<\/text>/);
+  const subtitleGroup = markup.match(/<text[^>]*class="docdiagram-node-subtitle"[^>]*>[\s\S]*?<\/text>/);
+
+  assert.ok(labelGroup, "Expected a node label text block");
+  assert.ok(subtitleGroup, "Expected a node subtitle text block");
+  assert.equal((labelGroup[0].match(/<tspan/g) || []).length, 2);
+  assert.match(labelGroup[0], />Payments<\/tspan>/);
+  assert.match(labelGroup[0], />API<\/tspan>/);
+  assert.equal((subtitleGroup[0].match(/<tspan/g) || []).length, 2);
+  assert.match(subtitleGroup[0], />Card capture<\/tspan>/);
+  assert.match(subtitleGroup[0], />and auth<\/tspan>/);
+});
+
+test("renders multiline edge labels as stacked tspans while preserving stroke/width overrides", () => {
+  const source = [
+    "theme: light",
+    "canvas:",
+    "  width: 600",
+    "  height: 300",
+    "nodes:",
+    "  - id: api",
+    "    label: Payments API",
+    "    position: { x: 20, y: 40 }",
+    "    size: { width: 180, height: 80 }",
+    "  - id: db",
+    "    label: Payments DB",
+    "    position: { x: 300, y: 40 }",
+    "    size: { width: 180, height: 80 }",
+    "edges:",
+    "  - source: api",
+    "    target: db",
+    "    label: \"Retry\\nwith backoff\"",
+    "    style: { stroke: #ABCDEF, width: 3 }"
+  ].join("\n");
+
+  const markup = renderDiagram(source, 0);
+  const edgeLabelGroup = markup.match(/<text[^>]*class="docdiagram-edge-label"[^>]*>[\s\S]*?<\/text>/);
+
+  assert.ok(edgeLabelGroup, "Expected an edge label text block");
+  assert.equal((edgeLabelGroup[0].match(/<tspan/g) || []).length, 2);
+  assert.match(edgeLabelGroup[0], />Retry<\/tspan>/);
+  assert.match(edgeLabelGroup[0], />with backoff<\/tspan>/);
+  assert.match(markup, /stroke="#ABCDEF" stroke-width="3"/);
+});
+
+test("inspector edge style overrides for stroke and width are reflected in the rendered markup", () => {
+  const source = [
+    "theme: light",
+    "canvas:",
+    "  width: 600",
+    "  height: 300",
+    "nodes:",
+    "  - id: api",
+    "    label: Payments API",
+    "    position: { x: 20, y: 40 }",
+    "    size: { width: 180, height: 80 }",
+    "  - id: db",
+    "    label: Payments DB",
+    "    position: { x: 300, y: 40 }",
+    "    size: { width: 180, height: 80 }",
+    "edges:",
+    "  - source: api",
+    "    target: db"
+  ].join("\n");
+  const diagram = parseDiagram(source);
+  const edge = diagram.edges[0];
+
+  // Simulate the inspector mutating the selected edge, then re-rendering from the mutated model.
+  setEdgeStyleOverride(edge, "stroke", "#ff00ff");
+  setEdgeWidth(edge, "6");
+
+  const markup = renderDiagram(serializeDiagram(diagram), 0);
+
+  assert.match(markup, /stroke="#ff00ff" stroke-width="6"/);
+});
+
+test("the injected .docdiagram-edge CSS rule no longer hard-codes stroke or stroke-width so inline overrides win", () => {
+  const edgeRuleMatch = runtime.match(/\.docdiagram-edge\s*\{([^}]*)\}/);
+
+  assert.ok(edgeRuleMatch, "Expected a .docdiagram-edge CSS rule in the stylesheet template");
+  assert.doesNotMatch(edgeRuleMatch[1], /stroke\s*:/);
+  assert.doesNotMatch(edgeRuleMatch[1], /stroke-width\s*:/);
+});
+
+test("edge labels use the document background as a soft contrast shadow", () => {
+  const labelRuleMatch = runtime.match(/\.docdiagram-edge-label\s*\{([^}]*)\}/);
+
+  assert.ok(labelRuleMatch, "Expected a .docdiagram-edge-label CSS rule in the stylesheet template");
+  assert.match(labelRuleMatch[1], /filter:\s*drop-shadow\(0 0 4px var\(--docdiagram-background\)\)/);
+});
+
+test("node and edge inline editors share focused, accessible textarea markup with newline/commit hints", () => {
+  assert.match(runtime, /class="docdiagram-inline-editor docdiagram-inline-editor-node"/);
+  assert.match(runtime, /class="docdiagram-inline-editor docdiagram-inline-editor-edge"/);
+  assert.match(runtime, /aria-label="Edit node label\. Press Enter for a new line\. Press Control or Command plus Enter to save\. Press Escape to cancel\."/);
+  assert.match(runtime, /aria-label="Edit edge label\. Press Enter for a new line\. Press Control or Command plus Enter to save\. Press Escape to cancel\."/);
+});
+
+function twoNodeEdgeSource(edgeLines) {
+  return [
+    "theme: light",
+    "canvas:",
+    "  width: 600",
+    "  height: 300",
+    "nodes:",
+    "  - id: api",
+    "    label: Payments API",
+    "    position: { x: 20, y: 40 }",
+    "    size: { width: 180, height: 80 }",
+    "  - id: db",
+    "    label: Payments DB",
+    "    position: { x: 300, y: 40 }",
+    "    size: { width: 180, height: 80 }",
+    "edges:",
+    "  - source: api",
+    "    target: db",
+    ...edgeLines
+  ].join("\n");
+}
+
+test("getEdgeMarkerStyle defaults start to none and end to arrow when start/end are omitted", () => {
+  const edge = { source: "api", target: "db" };
+
+  assert.equal(getEdgeMarkerStyle(edge, "start"), "none");
+  assert.equal(getEdgeMarkerStyle(edge, "end"), "arrow");
+});
+
+test("getEdgeMarkerStyle falls back to the default for an unrecognised marker style", () => {
+  const edge = { source: "api", target: "db", start: "hexagon", end: "hexagon" };
+
+  assert.equal(getEdgeMarkerStyle(edge, "start"), "none");
+  assert.equal(getEdgeMarkerStyle(edge, "end"), "arrow");
+});
+
+test("renders no start marker and an end arrow for default backwards-compatible edges", () => {
+  const markup = renderDiagram(twoNodeEdgeSource([]), 0);
+
+  assert.doesNotMatch(markup, /marker-start=/);
+  // A start: none default should still render an end arrow, matching pre-existing edge visuals.
+  assert.match(markup, /marker-end="url\(#docdiagram-marker-0-0-end\)"/);
+  assert.match(markup, /<marker id="docdiagram-marker-0-0-end"/);
+  assert.doesNotMatch(markup, /<marker id="docdiagram-marker-0-0-start"/);
+});
+
+test("renders marker-start and marker-end attributes and defs for each supported marker style", () => {
+  for (const style of edgeMarkerStyles) {
+    const markup = renderDiagram(twoNodeEdgeSource([`    start: ${style}`, `    end: ${style}`]), 0);
+
+    if (style === "none") {
+      assert.doesNotMatch(markup, /marker-start=/, `expected no marker-start for style ${style}`);
+      assert.doesNotMatch(markup, /marker-end=/, `expected no marker-end for style ${style}`);
+      assert.doesNotMatch(markup, /<marker /, `expected no marker defs for style ${style}`);
+      continue;
+    }
+
+    assert.match(markup, /marker-start="url\(#docdiagram-marker-0-0-start\)"/, `expected marker-start for style ${style}`);
+    assert.match(markup, /marker-end="url\(#docdiagram-marker-0-0-end\)"/, `expected marker-end for style ${style}`);
+    assert.match(markup, /<marker id="docdiagram-marker-0-0-start"/, `expected a start marker def for style ${style}`);
+    assert.match(markup, /<marker id="docdiagram-marker-0-0-end"/, `expected an end marker def for style ${style}`);
+
+    if (style === "circle") {
+      assert.match(markup, /<circle cx="5\.5" cy="5\.5" r="4\.18"/);
+    }
+
+    if (style === "arrow") {
+      assert.match(markup, /orient="auto-start-reverse"/);
+      assert.match(markup, /orient="auto"/);
+    }
+  }
+});
+
+test("each edge gets unique marker ids so overrides on one edge cannot leak into another edge's markers", () => {
+  const source = [
+    "theme: light",
+    "canvas:",
+    "  width: 900",
+    "  height: 300",
+    "nodes:",
+    "  - id: a",
+    "    label: A",
+    "    position: { x: 0, y: 0 }",
+    "    size: { width: 100, height: 60 }",
+    "  - id: b",
+    "    label: B",
+    "    position: { x: 200, y: 0 }",
+    "    size: { width: 100, height: 60 }",
+    "  - id: c",
+    "    label: C",
+    "    position: { x: 400, y: 0 }",
+    "    size: { width: 100, height: 60 }",
+    "edges:",
+    "  - source: a",
+    "    target: b",
+    "    start: circle",
+    "    end: circle",
+    "    style: { stroke: \"#ff0000\" }",
+    "  - source: b",
+    "    target: c",
+    "    start: circle",
+    "    end: circle",
+    "    style: { stroke: \"#00ff00\" }"
+  ].join("\n");
+
+  const markup = renderDiagram(source, 3);
+
+  assert.match(markup, /id="docdiagram-marker-3-0-start"/);
+  assert.match(markup, /id="docdiagram-marker-3-0-end"/);
+  assert.match(markup, /id="docdiagram-marker-3-1-start"/);
+  assert.match(markup, /id="docdiagram-marker-3-1-end"/);
+
+  const markerIds = [...markup.matchAll(/<marker id="([^"]+)"/g)].map((match) => match[1]);
+  assert.equal(new Set(markerIds).size, markerIds.length, "expected every marker id to be unique");
+
+  // Each edge's own markers must use its own resolved stroke, not the other edge's stroke.
+  const firstMarkerDefs = markup.slice(markup.indexOf('id="docdiagram-marker-3-0-start"'), markup.indexOf('id="docdiagram-marker-3-1-start"'));
+  assert.match(firstMarkerDefs, /fill="#ff0000"/);
+  assert.doesNotMatch(firstMarkerDefs, /fill="#00ff00"/);
+});
+
+test("marker defs use user-space units and scale gently with edge stroke width", () => {
+  const markup = renderDiagram(twoNodeEdgeSource([
+    "    start: circle",
+    "    end: arrow",
+    "    style: { width: 12 }"
+  ]), 0);
+
+  const markerDefs = [...markup.matchAll(/<marker [^>]*>/g)];
+  assert.ok(markerDefs.length >= 2, "expected both a start and end marker def");
+
+  for (const markerDef of markerDefs) {
+    assert.match(markerDef[0], /markerUnits="userSpaceOnUse"/);
+  }
+
+  // The wide stroke-width must not be applied as a marker stroke, but dimensions
+  // should increase at a moderated rate to remain visible without becoming huge.
+  for (const markerDef of markerDefs) {
+    assert.doesNotMatch(markerDef[0], /stroke-width="12"/);
+    assert.match(markerDef[0], /markerWidth="36" markerHeight="36"/);
+  }
+});
+
+test("marker dimensions scale moderately and keep circles wider than their edge", () => {
+  assert.equal(JSON.stringify(getEdgeMarkerDimensions(2)), JSON.stringify({ size: 11, circleRadius: 4.18 }));
+  assert.equal(JSON.stringify(getEdgeMarkerDimensions(6)), JSON.stringify({ size: 21, circleRadius: 7.98 }));
+  assert.equal(JSON.stringify(getEdgeMarkerDimensions(12)), JSON.stringify({ size: 36, circleRadius: 13.68 }));
+});
+
+test("marker fill/stroke colour resolves from the edge's effective line stroke, never the label text colour", () => {
+  const markup = renderDiagram(twoNodeEdgeSource([
+    "    start: circle",
+    "    end: arrow",
+    "    style: { stroke: \"#123abc\", text: \"#abcdef\" }"
+  ]), 0);
+
+  const markerStart = markup.match(/<marker id="docdiagram-marker-0-0-start"[^>]*>[\s\S]*?<\/marker>/)[0];
+  const markerEnd = markup.match(/<marker id="docdiagram-marker-0-0-end"[^>]*>[\s\S]*?<\/marker>/)[0];
+
+  assert.match(markerStart, /fill="#123abc"/);
+  assert.match(markerEnd, /fill="#123abc"/);
+  assert.doesNotMatch(markerStart, /#abcdef/);
+  assert.doesNotMatch(markerEnd, /#abcdef/);
+});
+
+test("start/end marker styles parse from YAML and round-trip through serialization", () => {
+  const source = twoNodeEdgeSource(["    start: circle", "    end: none"]);
+  const diagram = parseDiagram(source);
+
+  assert.equal(diagram.edges[0].start, "circle");
+  assert.equal(diagram.edges[0].end, "none");
+
+  const reparsed = parseDiagram(serializeDiagram(diagram));
+  assert.equal(reparsed.edges[0].start, "circle");
+  assert.equal(reparsed.edges[0].end, "none");
+  assert.equal(JSON.stringify(reparsed), JSON.stringify(diagram));
+});
+
+test("an edge without start/end fields omits them from the parsed model, preserving the implicit defaults", () => {
+  const diagram = parseDiagram(twoNodeEdgeSource([]));
+
+  assert.equal(diagram.edges[0].start, undefined);
+  assert.equal(diagram.edges[0].end, undefined);
+  assert.equal(getEdgeMarkerStyle(diagram.edges[0], "start"), "none");
+  assert.equal(getEdgeMarkerStyle(diagram.edges[0], "end"), "arrow");
+});
+
+test("setEdgeMarkerStart and setEdgeMarkerEnd mutate the canonical model and round-trip through YAML", () => {
+  const diagram = parseDiagram(twoNodeEdgeSource([]));
+  const edge = diagram.edges[0];
+
+  setEdgeMarkerStart(edge, "circle");
+  setEdgeMarkerEnd(edge, "none");
+
+  assert.equal(edge.start, "circle");
+  assert.equal(edge.end, "none");
+
+  const reparsed = parseDiagram(serializeDiagram(diagram));
+  assert.equal(reparsed.edges[0].start, "circle");
+  assert.equal(reparsed.edges[0].end, "none");
+});
+
+test("setEdgeMarkerStart and setEdgeMarkerEnd normalize unsupported values back to their defaults", () => {
+  const edge = { source: "api", target: "db" };
+
+  setEdgeMarkerStart(edge, "hexagon");
+  setEdgeMarkerEnd(edge, "hexagon");
+
+  assert.equal(edge.start, "none");
+  assert.equal(edge.end, "arrow");
+});

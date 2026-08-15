@@ -12,13 +12,77 @@ The proof of concept now supports:
   positions, and dimensions;
 - polished SVG flow diagrams with semantic application, service, datastore,
   and note styles;
+- an internal-only node `type`: it still drives theme colours and is editable
+  in the inspector, but it is never rendered as SVG text;
+- an optional free-text node `subtitle`, rendered below the label (styled with
+  the theme's `subtitleText` colour) and editable only in the properties
+  inspector;
+- multiline support for node labels, node subtitles, and edge labels: the
+  inspector uses `<textarea>` controls, and the SVG renderer stacks each
+  value's lines as centred `<tspan>`s (`splitTextLines`/`renderTextBlock`/
+  `computeNodeTextLayout`) so multi-line content remains vertically centred
+  and evenly spaced within the node or along the edge;
 - view/edit modes;
 - node selection, label editing, and drag positioning;
-- source serialization after edits;
+- in-place, multiline label editing for both nodes and edges: first click
+  selects, second click opens a focused `foreignObject`/`<textarea>` editor
+  (`aria-label` documents the shortcuts); Enter inserts a newline, Ctrl/Cmd+
+  Enter commits, Escape cancels and discards the edit, and blur commits —
+  none of this interferes with node dragging, resizing, or edge/node
+  selection;
+- selected-node bottom-right resize handles with minimum dimensions;
+- edge selection in edit mode, with a wide invisible hit target and a clear
+  selected-edge highlight, without disturbing node drag/resize/label
+  interactions;
+- opt-in `canvas.grid` snapping for move and resize edits;
+- independent edge endpoint marker selectors: edge `start`/`end` fields each
+  accept `none`, `arrow`, or `circle` (defaulting to backwards-compatible
+  `start: none` / `end: arrow` when omitted). Every edge renders its own
+  uniquely-scoped `<marker>` defs (`docdiagram-marker-<diagram>-<edge>-start`/
+  `-end`) with `markerUnits="userSpaceOnUse"` so marker size stays fixed
+  regardless of the edge's stroke width, and each marker's fill/stroke always
+  resolves from that edge's effective line `stroke` (never the label `text`
+  colour), so overrides never bleed between edges. `marker-start`/`marker-end`
+  attributes (and their `<marker>` defs) are only emitted for non-`none`
+  endpoints. Arrow markers use `orient="auto-start-reverse"` at the start so
+  they point the right way regardless of which end they're on;
+- built-in `light` and `dark` themes selected in Markdown YAML frontmatter,
+  consistently styling the surrounding page (`html`/`body`), prose, controls,
+  and diagrams; a diagram may override the document theme, with optional
+  per-node and per-edge style overrides — including edge `stroke` and
+  `width`, which now render and persist correctly (see bug fix below);
+- a toolbar theme selector that rewrites the `theme` YAML frontmatter field
+  directly (preserving any other frontmatter keys/comments) and rerenders;
+- a compact toolbar properties inspector that follows the selected node or
+  edge: node label/subtitle/type/fill/border/text colour/width/height
+  (clamped to the minimum size and grid), and edge
+  label/route/start/end/stroke/label colour/width — `Start` and `End`
+  selects expose the three marker styles; every inspector edit persists to
+  the canonical YAML through the existing serializer;
+- source serialization after edits, including safe multiline round-tripping:
+  any label/subtitle containing `\n` is JSON-quoted by the existing
+  serializer (`formatScalar`'s unquoted-safe regex already rejects newlines),
+  so line breaks always survive a parse → serialize → parse cycle;
 - **Save a copy**, which downloads an updated HTML document.
 
 The main sample is [example.html](../example.html), driven by
-[docdiagram-runtime.js](../docdiagram-runtime.js).
+[docdiagram-runtime.js](../docdiagram-runtime.js). It now demonstrates a node
+subtitle, a multiline node label, and a multiline edge label alongside an
+edge `style` override, plus non-default edge endpoint markers (`start:
+circle`/`end: arrow` on one edge, `end: circle` on the other).
+
+## Bug fix: edge stroke/width not visibly updating
+
+Inspector changes to an edge's `style.stroke` and `style.width` were always
+computed and serialized correctly, but never rendered: the injected
+stylesheet's `.docdiagram-edge` rule hard-coded `stroke` and `stroke-width`,
+and CSS declarations always beat SVG presentation attributes in the cascade,
+regardless of selector specificity. The fix removes those hard-coded
+declarations (and the now-redundant `marker-end`) from `.docdiagram-edge`, so
+each edge's inline `stroke="…"`/`stroke-width="…"` attributes (already
+correctly computed by `getEdgeEffectiveStyle`) take effect. Verified visually
+in a real browser: changing stroke/width in the inspector now immediately
+recolors/rethickens the selected edge, and the change survives a rerender.
 
 ## Development runtime
 
@@ -37,21 +101,58 @@ replace it with an immutable public runtime URL as described in
 ## Validation completed
 
 - `node --check docdiagram-runtime.js`
+- `node --test test/docdiagram-runtime.test.js` — 39 tests covering helpers,
+  frontmatter persistence, node/edge YAML round-trip, the new `subtitle`
+  field (including multiline round-trip), multiline node label/subtitle/edge
+  label rendering as stacked `<tspan>`s, absence of `node.type` as SVG text,
+  edge `stroke`/`width` overrides reflected in rendered markup, a regression
+  guard asserting the `.docdiagram-edge` CSS rule no longer hard-codes
+  `stroke`/`stroke-width`, and edge endpoint markers: `start`/`end` defaults,
+  markup for each of `none`/`arrow`/`circle`, unique per-edge marker ids
+  (with no cross-edge stroke bleed), `markerUnits="userSpaceOnUse"` staying
+  independent of stroke-width, marker colour resolving from the edge stroke
+  rather than the label text colour, and YAML parse/serialize/mutator
+  round-trips (including normalization of unsupported marker values)
 - `git diff --check`
 - Headless Chrome rendering through `file://`
 - Browser round trip: select node, edit label, drag node, save HTML, and
   reopen the saved copy with the edit preserved
 - Loading an HTML file from `/tmp` through the absolute local runtime URL
+- Manual browser pass for this slice (Chrome via `file://` on the updated
+  `example.html`): confirmed node subtitle displays below the label with no
+  visible `type` text; edited a node's multiline label and subtitle via the
+  inspector textareas and saw both stack correctly; edited an edge's stroke
+  colour and width via the inspector and saw the rendered edge visibly
+  recolor/thicken (confirming the CSS fix); selected an edge, clicked it
+  again to open the in-place multiline editor, confirmed Enter inserts a
+  newline, Ctrl+Enter commits, and Escape discards an in-progress edit
+  without leaking it (including through the editor's forced blur on
+  rerender); confirmed node dragging and the resize handle still work
+  unchanged with the new subtitle/multiline layout in place
+
+This slice's inspector/theme-selector/edge-selection UI was implemented and
+covered by the Node test suite above and the manual browser pass; hamburger/
+offline-menu work remains explicitly deferred (see below).
 
 ## Next recommended work
 
-Proceed with the visual refinement slice:
+Continue visual refinement:
 
-1. improve selected-node indication and editing affordances;
-2. refine node layout, labels, and connector presentation;
-3. add configurable node and connector styles to the diagram schema;
-4. add focused automated parser/serialization tests before expanding supported
-   Markdown or diagram types.
+1. add multi-select and bulk style editing for nodes/edges;
+2. support creating and deleting nodes/edges from the toolbar;
+3. expand focused automated coverage as new Markdown and diagram features are
+   added.
+
+Defer **Save offline version** until there is a deterministic packaging step
+that can embed a pinned runtime release. The requirement and design constraint
+are recorded in [plan.md](plan.md).
+
+Continue visual refinement:
+
+1. add multi-select and bulk style editing for nodes/edges;
+2. support creating and deleting nodes/edges from the toolbar;
+3. expand focused automated coverage as new Markdown and diagram features are
+   added.
 
 Defer **Save offline version** until there is a deterministic packaging step
 that can embed a pinned runtime release. The requirement and design constraint
