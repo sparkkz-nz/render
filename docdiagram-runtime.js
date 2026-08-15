@@ -12,27 +12,39 @@
   let documentTheme = "light";
   const minimumNodeSize = { width: 120, height: 60 };
   const nodeTypes = ["application", "service", "datastore", "note"];
-  const edgeRoutes = ["orthogonal", "straight"];
+  const nodeShapes = [
+    "rounded-rectangle",
+    "circle",
+    "oval",
+    "database",
+    "diamond",
+    "rhombus",
+    "flattened-hexagon",
+    "chevron",
+    "right-chevron"
+  ];
+  const edgeAnchors = ["top", "right", "bottom", "left"];
+  const edgeRoutes = ["orthogonal", "straight", "curved"];
   const edgeMarkerStyles = ["none", "arrow", "circle"];
   const edgeMarkerDefaults = { start: "none", end: "arrow" };
 
   const diagramThemes = {
     light: {
-      edge: { stroke: "#52616B", text: "#3E4A54" },
+      edge: { stroke: "#52616B", strokeWidth: 2, text: "#3E4A54" },
       node: {
-        application: { fill: "#EAF2FF", stroke: "#3574C7", text: "#17202A", subtitleText: "#52616B" },
-        service: { fill: "#E9F8F0", stroke: "#24824A", text: "#17202A", subtitleText: "#52616B" },
-        datastore: { fill: "#F7F1FF", stroke: "#7A4CC2", text: "#17202A", subtitleText: "#52616B" },
-        note: { fill: "#FFF8DF", stroke: "#9B7B00", text: "#17202A", subtitleText: "#52616B" }
+        application: { fill: "#EAF2FF", stroke: "#3574C7", strokeWidth: 2, text: "#17202A", subtitleText: "#52616B" },
+        service: { fill: "#E9F8F0", stroke: "#24824A", strokeWidth: 2, text: "#17202A", subtitleText: "#52616B" },
+        datastore: { fill: "#F7F1FF", stroke: "#7A4CC2", strokeWidth: 2, text: "#17202A", subtitleText: "#52616B" },
+        note: { fill: "#FFF8DF", stroke: "#9B7B00", strokeWidth: 2, text: "#17202A", subtitleText: "#52616B" }
       }
     },
     dark: {
-      edge: { stroke: "#B8C7D5", text: "#D9E4ED" },
+      edge: { stroke: "#B8C7D5", strokeWidth: 2, text: "#D9E4ED" },
       node: {
-        application: { fill: "#193A61", stroke: "#71AEF7", text: "#F3F8FC", subtitleText: "#C5D5E5" },
-        service: { fill: "#164A38", stroke: "#66D39A", text: "#F3F8FC", subtitleText: "#C5D5E5" },
-        datastore: { fill: "#3D285D", stroke: "#B796FF", text: "#F3F8FC", subtitleText: "#C5D5E5" },
-        note: { fill: "#594819", stroke: "#F1CC58", text: "#F3F8FC", subtitleText: "#DDE7EF" }
+        application: { fill: "#193A61", stroke: "#71AEF7", strokeWidth: 2, text: "#F3F8FC", subtitleText: "#C5D5E5" },
+        service: { fill: "#164A38", stroke: "#66D39A", strokeWidth: 2, text: "#F3F8FC", subtitleText: "#C5D5E5" },
+        datastore: { fill: "#3D285D", stroke: "#B796FF", strokeWidth: 2, text: "#F3F8FC", subtitleText: "#C5D5E5" },
+        note: { fill: "#594819", stroke: "#F1CC58", strokeWidth: 2, text: "#F3F8FC", subtitleText: "#DDE7EF" }
       }
     }
   };
@@ -161,7 +173,50 @@
       throw new Error(`Cannot parse diagram line: ${rawLine}`);
     }
 
+    validateDiagram(diagram);
     return diagram;
+  }
+
+  function validateDiagram(diagram) {
+    for (const node of diagram.nodes) {
+      if (!node.shape) {
+        throw new Error(`Node "${node.id || node.label || "unknown"}" requires a shape.`);
+      }
+
+      if (!nodeShapes.includes(node.shape)) {
+        throw new Error(`Unsupported node shape: ${node.shape}`);
+      }
+
+      if (node.style?.width !== undefined) {
+        throw new Error("Node style.width is not supported; use style.strokeWidth.");
+      }
+    }
+
+    for (const edge of diagram.edges) {
+      if (!edge.sourceAnchor) {
+        throw new Error(`Edge "${edge.source || "unknown"}" -> "${edge.target || "unknown"}" requires a sourceAnchor.`);
+      }
+
+      if (!edge.targetAnchor) {
+        throw new Error(`Edge "${edge.source || "unknown"}" -> "${edge.target || "unknown"}" requires a targetAnchor.`);
+      }
+
+      if (!edgeAnchors.includes(edge.sourceAnchor)) {
+        throw new Error(`Unsupported edge sourceAnchor: ${edge.sourceAnchor}`);
+      }
+
+      if (!edgeAnchors.includes(edge.targetAnchor)) {
+        throw new Error(`Unsupported edge targetAnchor: ${edge.targetAnchor}`);
+      }
+
+      if (edge.route !== undefined && !edgeRoutes.includes(edge.route)) {
+        throw new Error(`Unsupported edge route: ${edge.route}`);
+      }
+
+      if (edge.style?.width !== undefined) {
+        throw new Error("Edge style.width is not supported; use style.strokeWidth.");
+      }
+    }
   }
 
   function getTheme(diagram) {
@@ -336,7 +391,7 @@
       const style = getEdgeEffectiveStyle(diagram, edge);
       const isSelected = selectedEdge?.diagramIndex === diagramIndex && selectedEdge.edgeIndex === edgeIndex;
       const isEditing = isSelected && editingEdge?.diagramIndex === diagramIndex && editingEdge.edgeIndex === edgeIndex;
-      const strokeWidth = (Number(style.width) || 2) + (isSelected ? 2 : 0);
+      const strokeWidth = (Number(style.strokeWidth) || 2) + (isSelected ? 2 : 0);
       const editorWidth = 220;
       const editorHeight = 72;
       const edgeLabelLines = edge.label ? splitTextLines(edge.label) : [];
@@ -387,11 +442,12 @@
       const style = getNodeEffectiveStyle(diagram, node);
       const isSelected = selectedNode?.diagramIndex === diagramIndex && selectedNode.nodeId === node.id;
       const isEditing = isSelected && editingNode?.diagramIndex === diagramIndex && editingNode.nodeId === node.id;
+      const strokeWidth = (Number(style.strokeWidth) || 2) + (isSelected ? 2 : 0);
       const layout = computeNodeTextLayout(x, y, nodeWidth, nodeHeight, node);
 
       return [
         `<g class="docdiagram-node${isSelected ? " docdiagram-node-selected" : ""}" data-diagram-index="${diagramIndex}" data-node-id="${escapeHtml(node.id)}">`,
-        `<rect class="docdiagram-node-body" x="${x}" y="${y}" width="${nodeWidth}" height="${nodeHeight}" rx="12" fill="${escapeHtml(style.fill)}" stroke="${escapeHtml(style.stroke)}"/>`,
+        `<rect class="docdiagram-node-body" x="${x}" y="${y}" width="${nodeWidth}" height="${nodeHeight}" rx="12" fill="${escapeHtml(style.fill)}" stroke="${escapeHtml(style.stroke)}" stroke-width="${strokeWidth}"/>`,
         isEditing
           ? `<foreignObject class="docdiagram-inline-editor-host" x="${x + 10}" y="${y + 10}" width="${nodeWidth - 20}" height="${nodeHeight - 20}"><textarea class="docdiagram-inline-editor docdiagram-inline-editor-node" aria-label="Edit node label. Press Enter for a new line. Press Control or Command plus Enter to save. Press Escape to cancel.">${escapeHtml(node.label)}</textarea></foreignObject>`
           : renderTextBlock(layout.centerX, layout.labelStartY, layout.labelLines, layout.labelLineHeight, "docdiagram-node-label", style.text),
@@ -712,10 +768,10 @@
     return edge;
   }
 
-  function setEdgeWidth(edge, rawValue) {
-    const width = Math.max(1, Math.round(Number(rawValue)) || 1);
-    edge.style = { ...edge.style, width };
-    return edge;
+  function setStyleStrokeWidth(element, rawValue) {
+    const strokeWidth = Math.max(1, Math.round(Number(rawValue)) || 1);
+    element.style = { ...element.style, strokeWidth };
+    return element;
   }
 
   function setEdgeMarkerStart(edge, markerStyle) {
@@ -803,6 +859,7 @@
       ).join("")}</select></label>`,
       `<label class="docdiagram-field">Fill<input type="color" class="docdiagram-inspector-fill" value="${escapeHtml(style.fill)}"></label>`,
       `<label class="docdiagram-field">Border<input type="color" class="docdiagram-inspector-stroke" value="${escapeHtml(style.stroke)}"></label>`,
+      `<label class="docdiagram-field">Border width<input type="number" class="docdiagram-inspector-stroke-width" value="${Number(style.strokeWidth) || 2}" min="1" step="1"></label>`,
       `<label class="docdiagram-field">Text<input type="color" class="docdiagram-inspector-text" value="${escapeHtml(style.text)}"></label>`,
       `<label class="docdiagram-field">Width<input type="number" class="docdiagram-inspector-width" value="${width}" min="${widthMinimum}" step="${step}"></label>`,
       `<label class="docdiagram-field">Height<input type="number" class="docdiagram-inspector-height" value="${height}" min="${heightMinimum}" step="${step}"></label>`
@@ -811,7 +868,7 @@
 
   function buildEdgeInspectorFields(diagram, edge) {
     const style = getEdgeEffectiveStyle(diagram, edge);
-    const width = Number(style.width) || 2;
+    const strokeWidth = Number(style.strokeWidth) || 2;
     const route = edge.route || "orthogonal";
     const startMarkerStyle = getEdgeMarkerStyle(edge, "start");
     const endMarkerStyle = getEdgeMarkerStyle(edge, "end");
@@ -829,7 +886,7 @@
       ).join("")}</select></label>`,
       `<label class="docdiagram-field">Stroke<input type="color" class="docdiagram-inspector-stroke" value="${escapeHtml(style.stroke)}"></label>`,
       `<label class="docdiagram-field">Label colour<input type="color" class="docdiagram-inspector-text" value="${escapeHtml(style.text)}"></label>`,
-      `<label class="docdiagram-field">Width<input type="number" class="docdiagram-inspector-width" value="${width}" min="1" step="1"></label>`
+      `<label class="docdiagram-field">Stroke width<input type="number" class="docdiagram-inspector-stroke-width" value="${strokeWidth}" min="1" step="1"></label>`
     ].join("");
   }
 
@@ -868,6 +925,10 @@
 
     container.querySelector(".docdiagram-inspector-text").addEventListener("change", (event) => {
       withNode((diagram, node) => setNodeStyleOverride(node, "text", event.target.value));
+    });
+
+    container.querySelector(".docdiagram-inspector-stroke-width").addEventListener("change", (event) => {
+      withNode((diagram, node) => setStyleStrokeWidth(node, event.target.value));
     });
 
     container.querySelector(".docdiagram-inspector-width").addEventListener("change", (event) => {
@@ -916,8 +977,8 @@
       withEdge((diagram, edge) => setEdgeStyleOverride(edge, "text", event.target.value));
     });
 
-    container.querySelector(".docdiagram-inspector-width").addEventListener("change", (event) => {
-      withEdge((diagram, edge) => setEdgeWidth(edge, event.target.value));
+    container.querySelector(".docdiagram-inspector-stroke-width").addEventListener("change", (event) => {
+      withEdge((diagram, edge) => setStyleStrokeWidth(edge, event.target.value));
     });
   }
 
@@ -1448,12 +1509,8 @@
         filter: drop-shadow(0 0 4px var(--docdiagram-background));
         font-size: 15px;
       }
-      .docdiagram-node-body {
-        stroke-width: 2;
-      }
       .docdiagram-node-selected .docdiagram-node-body {
         filter: drop-shadow(0 0 4px rgb(39 117 197 / 65%));
-        stroke-width: 4;
       }
       .docdiagram-resize-handle {
         cursor: nwse-resize;
@@ -1510,6 +1567,8 @@
   globalThis.DocDiagramCore = {
     diagramThemes,
     nodeTypes,
+    nodeShapes,
+    edgeAnchors,
     edgeRoutes,
     edgeMarkerStyles,
     getTheme,
@@ -1534,7 +1593,7 @@
     setEdgeLabel,
     setEdgeRoute,
     setEdgeStyleOverride,
-    setEdgeWidth,
+    setStyleStrokeWidth,
     setEdgeMarkerStart,
     setEdgeMarkerEnd,
     splitTextLines,
