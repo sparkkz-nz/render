@@ -1256,16 +1256,17 @@
 
       const title = attributes.title ? `<div class="docdiagram-component-title">${renderInline(attributes.title)}</div>` : "";
       const body = renderBlocks(start + 1, close);
+      const componentClass = `docdiagram-component${name === "callout" ? "" : ` docdiagram-${name}`}${style ? " docdiagram-component-styled" : ""}`;
       if (name === "callout") {
         const kind = attributes.kind || "info";
         return {
-          html: `<aside class="docdiagram-component docdiagram-callout docdiagram-callout-${kind}" style="${style}" aria-label="${escapeHtml(attributes.title || kind)} callout"><div class="docdiagram-callout-kind">${escapeHtml(kind)}</div>${title}${body}</aside>`,
+          html: `<aside class="${componentClass} docdiagram-callout docdiagram-callout-${kind}"${style ? ` style="${style}"` : ""} aria-label="${escapeHtml(attributes.title || kind)} callout"><div class="docdiagram-callout-kind">${escapeHtml(kind)}</div>${title}${body}</aside>`,
           next: close + 1
         };
       }
 
       return {
-        html: `<section class="docdiagram-component docdiagram-${name}"${style ? ` style="${style}"` : ""}>${title}${body}</section>`,
+        html: `<section class="${componentClass}"${style ? ` style="${style}"` : ""}>${title}${body}</section>`,
         next: close + 1
       };
     }
@@ -2703,7 +2704,7 @@
         margin: 1rem 0;
         padding: 1rem;
       }
-      #rendered-document .docdiagram-section {
+      #rendered-document .docdiagram-section:not(.docdiagram-component-styled) {
         background: transparent;
       }
       #rendered-document .docdiagram-component-title {
@@ -2713,6 +2714,23 @@
       }
       #rendered-document .docdiagram-component > :last-child {
         margin-bottom: 0;
+      }
+      #rendered-document .docdiagram-component a {
+        color: inherit;
+      }
+      #rendered-document .docdiagram-component :not(pre) > code {
+        background: transparent;
+        border: 1px solid currentColor;
+      }
+      #rendered-document .docdiagram-component pre,
+      #rendered-document .docdiagram-component th {
+        background: transparent;
+        border-color: currentColor;
+        color: inherit;
+      }
+      #rendered-document .docdiagram-component blockquote {
+        border-color: currentColor;
+        color: inherit;
       }
       #rendered-document .docdiagram-callout {
         border-left-width: 4px;

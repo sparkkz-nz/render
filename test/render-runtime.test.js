@@ -224,9 +224,9 @@ test("renders nested formatting components and responsive grid layouts", () => {
   ].join("\n"));
 
   assert.match(markup, /class="docdiagram-grid" style="--docdiagram-grid-columns:minmax\(0, 2fr\) minmax\(0, 1fr\)"/);
-  assert.match(markup, /class="docdiagram-component docdiagram-panel" style="--docdiagram-component-fill:#BFDBFE;--docdiagram-component-stroke:#1D4ED8;--docdiagram-component-text:#1E3A8A"/);
+  assert.match(markup, /class="docdiagram-component docdiagram-panel docdiagram-component-styled" style="--docdiagram-component-fill:#BFDBFE;--docdiagram-component-stroke:#1D4ED8;--docdiagram-component-text:#1E3A8A"/);
   assert.match(markup, /class="docdiagram-stack"/);
-  assert.match(markup, /<aside class="docdiagram-component docdiagram-callout docdiagram-callout-warning".*aria-label="Review required callout">/);
+  assert.match(markup, /<aside class="docdiagram-component docdiagram-component-styled docdiagram-callout docdiagram-callout-warning".*aria-label="Review required callout">/);
   assert.match(markup, /<div class="docdiagram-callout-kind">warning<\/div>/);
   assert.match(markup, /Primary <strong>Markdown<\/strong> content\./);
   assert.match(markup, /Confirm the <em>operational<\/em> assumptions\./);
@@ -242,7 +242,7 @@ test("renders the documented formatting extension fixture", () => {
   const markup = renderMarkdown(document.content);
 
   assert.match(markup, /class="docdiagram-grid".*repeat\(3, minmax\(0, 1fr\)\)/);
-  assert.match(markup, /class="docdiagram-component docdiagram-callout docdiagram-callout-success"/);
+  assert.match(markup, /class="docdiagram-component docdiagram-component-styled docdiagram-callout docdiagram-callout-success"/);
   assert.match(markup, /class="docdiagram-grid".*minmax\(0, 2fr\) minmax\(0, 1fr\)/);
   assert.match(markup, /class="docdiagram-stack"/);
 });
@@ -273,6 +273,26 @@ test("does not treat directive-looking fenced code as nested components", () => 
   ].join("\n"));
 
   assert.match(markup, /<section class="docdiagram-component docdiagram-panel"><pre><code class="language-markdown">:::panel<\/code><\/pre><\/section>/);
+});
+
+test("marks explicitly styled components so their palette takes precedence over document theme styles", () => {
+  const markup = renderMarkdown([
+    ':::section { tone=dark colour=blue }',
+    "[Reference](https://example.com), `code`, and a table header.",
+    "",
+    "| Name | Value |",
+    "| --- | --- |",
+    "| One | Two |",
+    "",
+    "> Quoted content.",
+    ":::"
+  ].join("\n"));
+
+  assert.match(markup, /class="docdiagram-component docdiagram-section docdiagram-component-styled"/);
+  assert.match(markup, /--docdiagram-component-fill:#1D4ED8;--docdiagram-component-stroke:#DBEAFE;--docdiagram-component-text:#DBEAFE/);
+  assert.match(runtime, /docdiagram-section:not\(\.docdiagram-component-styled\)/);
+  assert.match(runtime, /\.docdiagram-component pre,[\s\S]*background: transparent/);
+  assert.match(runtime, /\.docdiagram-component blockquote \{[\s\S]*color: inherit/);
 });
 
 test("diagram markup provides compact view-mode zoom and edit controls", () => {
