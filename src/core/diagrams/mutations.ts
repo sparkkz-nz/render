@@ -178,12 +178,17 @@ export function setNodeSubtitle(node: FlowchartNode, subtitle: string): Flowchar
   return node;
 }
 
-export function setNodeStyleOverride(node: FlowchartNode, key: string, value: unknown): FlowchartNode {
+export function setNodeStyleOverride<T extends { style?: FlowchartNode["style"] }>(node: T, key: string, value: unknown): T {
   node.style = { ...node.style, [key]: value } as FlowchartNode["style"];
   return node;
 }
 
-export function setNodeColorPalette(node: FlowchartNode, tone: string, colour: string, colorScheme = "classic"): FlowchartNode {
+export function setNodeColorPalette<T extends { style?: FlowchartNode["style"]; palette?: FlowchartNode["palette"] }>(
+  node: T,
+  tone: string,
+  colour: string,
+  colorScheme = "classic"
+): T {
   const preset = getNodeColorPalette(colorScheme, tone, colour);
   if (!preset) {
     return node;
@@ -238,7 +243,7 @@ export function setEdgeStyleOverride(edge: FlowchartEdge, key: string, value: un
   return edge;
 }
 
-export function setStyleStrokeWidth(element: { style?: any }, rawValue: unknown): any {
+export function setStyleStrokeWidth<T extends { style?: FlowchartNode["style"] }>(element: T, rawValue: unknown): T {
   const strokeWidth = Math.max(1, Math.round(Number(rawValue)) || 1);
   element.style = { ...element.style, strokeWidth };
   return element;

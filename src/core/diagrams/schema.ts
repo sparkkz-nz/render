@@ -91,7 +91,7 @@ export interface SequenceActivation {
 
 export interface SequenceNote {
   at?: string;
-  after?: string;
+  after?: number;
   label?: string;
   palette?: NodePalette;
   style?: NodeStyle;
