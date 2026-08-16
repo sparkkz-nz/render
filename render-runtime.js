@@ -16,6 +16,11 @@
   let documentFormat = "centered";
   let savedSource = "";
   let editSessionSource = null;
+  let sourceEditorOpen = false;
+  let sourceEditorDraft = "";
+  let sourceEditorError = "";
+  let sourceEditorRenderTimer = null;
+  let sourceEditorResizeObserver = null;
   const diagramZooms = new Map();
   const minimumNodeSize = { width: 120, height: 60 };
   const defaultNode = {
@@ -262,8 +267,12 @@
 
   function validateDiagram(diagram) {
     for (const node of diagram.nodes) {
+      if (!node.id || !node.label) {
+        throw new Error("Every node requires an id and label.");
+      }
+
       if (!node.shape) {
-        throw new Error(`Node "${node.id || node.label || "unknown"}" requires a shape.`);
+        throw new Error(`Node "${node.id}" requires a shape.`);
       }
 
       if (!nodeShapes.includes(node.shape)) {
@@ -307,6 +316,8 @@
         throw new Error("Edge style.width is not supported; use style.strokeWidth.");
       }
     }
+
+    getTheme(diagram);
   }
 
   function getTheme(diagram) {
@@ -788,12 +799,7 @@
       return `<section class="docdiagram-error"><strong>Diagram could not be rendered.</strong><br>${escapeHtml(error.message)}</section>`;
     }
 
-    let theme;
-    try {
-      theme = getTheme(diagram);
-    } catch (error) {
-      return `<section class="docdiagram-error"><strong>Diagram could not be rendered.</strong><br>${escapeHtml(error.message)}</section>`;
-    }
+    const theme = getTheme(diagram);
 
     diagramModels[diagramIndex] = diagram;
     const width = Number(diagram.canvas.width) || 1000;
@@ -801,10 +807,6 @@
     const nodes = new Map();
 
     for (const node of diagram.nodes) {
-      if (!node.id || !node.label) {
-        return `<section class="docdiagram-error"><strong>Diagram could not be rendered.</strong><br>Every node requires an id and label.</section>`;
-      }
-
       nodes.set(node.id, {
         ...node,
         position: node.position || {},
@@ -1421,6 +1423,40 @@
     return { ...document, theme, colourScheme };
   }
 
+  function validateDocumentSource(source) {
+    const document = resolveDocument(source);
+    const lines = document.content.replaceAll("\r\n", "\n").split("\n");
+    let index = 0;
+
+    while (index < lines.length) {
+      const line = lines[index].replace(/^(?: {0,3}> ?)+/, "");
+      const fence = line.match(/^```([\w-]*)\s*$/);
+      if (!fence) {
+        index += 1;
+        continue;
+      }
+
+      const closeOffset = lines
+        .slice(index + 1)
+        .findIndex((candidate) => /^```\s*$/.test(candidate.replace(/^(?: {0,3}> ?)+/, "")));
+      if (closeOffset === -1) {
+        throw new Error("Unclosed code block.");
+      }
+
+      const closeIndex = index + closeOffset + 1;
+      if (fence[1] === "diagram") {
+        const diagramSource = lines
+          .slice(index + 1, closeIndex)
+          .map((candidate) => candidate.replace(/^(?: {0,3}> ?)+/, ""))
+          .join("\n");
+        parseDiagram(diagramSource);
+      }
+      index = closeIndex + 1;
+    }
+
+    return document;
+  }
+
   function setFrontmatterTheme(source, themeName) {
     const normalized = source.replaceAll("\r\n", "\n");
     const lines = normalized.split("\n");
@@ -1521,6 +1557,175 @@
 
   function setSource(source) {
     sourceElement.content.replaceChildren(document.createTextNode(source));
+  }
+
+  function isEditableElement(element) {
+    return element instanceof Element &&
+      element.matches("input, textarea, select, [contenteditable]");
+  }
+
+  function findSourceTextRange(source, text) {
+    const selectedText = text.trim();
+    const start = selectedText ? source.indexOf(selectedText) : -1;
+
+    return start === -1 ? null : { start, end: start + selectedText.length };
+  }
+
+  function scrollSourceEditorToRange(editor, range) {
+    const lineHeight = Number.parseFloat(globalThis.getComputedStyle(editor).lineHeight) || 20;
+    const lineIndex = editor.value.slice(0, range.start).split("\n").length - 1;
+    const visibleLineCount = Math.max(1, Math.floor(editor.clientHeight / lineHeight));
+
+    editor.scrollTop = Math.max(0, (lineIndex - Math.floor(visibleLineCount / 2)) * lineHeight);
+  }
+
+  function revealSourceText(text) {
+    const range = findSourceTextRange(getSource(), text);
+    if (!range || (sourceEditorOpen && sourceEditorDraft !== getSource())) {
+      return false;
+    }
+
+    if (!sourceEditorOpen) {
+      openSourceEditor();
+    }
+
+    const selectMatch = () => {
+      const editor = document.querySelector(".docdiagram-source-editor");
+      if (!editor) {
+        return;
+      }
+      editor.focus();
+      editor.setSelectionRange(range.start, range.end);
+      scrollSourceEditorToRange(editor, range);
+    };
+
+    globalThis.requestAnimationFrame?.(selectMatch) ?? selectMatch();
+    return true;
+  }
+
+  function scheduleSourceEditorRender() {
+    globalThis.clearTimeout(sourceEditorRenderTimer);
+    sourceEditorRenderTimer = globalThis.setTimeout(() => {
+      sourceEditorRenderTimer = null;
+      renderSourceEditorDraft();
+    }, 250);
+  }
+
+  function renderSourceEditorDraft() {
+    globalThis.clearTimeout(sourceEditorRenderTimer);
+    sourceEditorRenderTimer = null;
+    return renderDocument(sourceEditorDraft, { preserveOnError: true });
+  }
+
+  function flushSourceEditorRender() {
+    return sourceEditorRenderTimer === null ? true : renderSourceEditorDraft();
+  }
+
+  function updateSourceEditorStatus() {
+    const tray = document.querySelector(".docdiagram-source-tray");
+    if (!tray) {
+      return;
+    }
+
+    const status = tray.querySelector(".docdiagram-source-status");
+    const error = tray.querySelector(".docdiagram-source-error");
+    status.textContent = sourceEditorError ? "Source has errors; showing the last valid render." : "Changes render automatically.";
+    error.hidden = !sourceEditorError;
+    error.textContent = sourceEditorError;
+  }
+
+  function focusSourceEditor() {
+    const editor = document.querySelector(".docdiagram-source-editor");
+    if (!editor) {
+      return;
+    }
+
+    editor.focus();
+    editor.setSelectionRange(editor.value.length, editor.value.length);
+  }
+
+  function createSourceEditorTray() {
+    let tray = document.querySelector(".docdiagram-source-tray");
+    if (!sourceEditorOpen) {
+      sourceEditorResizeObserver?.disconnect();
+      sourceEditorResizeObserver = null;
+      tray?.remove();
+      delete outputElement.dataset.sourceEditorOpen;
+      outputElement.style.removeProperty("--docdiagram-source-tray-height");
+      return;
+    }
+
+    if (tray) {
+      tray.dataset.theme = documentTheme;
+      outputElement.dataset.sourceEditorOpen = "true";
+      updateSourceEditorStatus();
+      return;
+    }
+
+    tray = document.createElement("section");
+    tray.className = "docdiagram-source-tray";
+    tray.dataset.theme = documentTheme;
+    tray.setAttribute("aria-label", "Document source editor");
+    tray.innerHTML = [
+      `<header class="docdiagram-source-header">`,
+      `<div><strong>Source</strong><span class="docdiagram-source-shortcut">Cmd/Ctrl+Shift+E to close</span></div>`,
+      `<button type="button" class="docdiagram-source-close">Close source editor</button>`,
+      `</header>`,
+      `<label class="docdiagram-source-label">Canonical Markdown<textarea class="docdiagram-source-editor" spellcheck="false"></textarea></label>`,
+      `<p class="docdiagram-source-status" aria-live="polite"></p>`,
+      `<p class="docdiagram-source-error" role="alert"></p>`
+    ].join("");
+    const editor = tray.querySelector(".docdiagram-source-editor");
+    const closeButton = tray.querySelector(".docdiagram-source-close");
+
+    editor.value = sourceEditorDraft;
+    editor.addEventListener("input", () => {
+      sourceEditorDraft = editor.value;
+      sourceEditorError = "";
+      updateSourceEditorStatus();
+      scheduleSourceEditorRender();
+    });
+    closeButton.addEventListener("click", closeSourceEditor);
+    outputElement.after(tray);
+    outputElement.dataset.sourceEditorOpen = "true";
+    const syncTrayHeight = () => {
+      outputElement.style.setProperty("--docdiagram-source-tray-height", `${tray.offsetHeight}px`);
+    };
+    sourceEditorResizeObserver?.disconnect();
+    if (globalThis.ResizeObserver) {
+      sourceEditorResizeObserver = new globalThis.ResizeObserver(syncTrayHeight);
+      sourceEditorResizeObserver.observe(tray);
+    }
+    syncTrayHeight();
+    updateSourceEditorStatus();
+  }
+
+  function openSourceEditor() {
+    globalThis.clearTimeout(sourceEditorRenderTimer);
+    sourceEditorDraft = getSource();
+    sourceEditorError = "";
+    sourceEditorOpen = true;
+    if (editMode) {
+      editMode = false;
+      editSessionSource = null;
+      clearEditorState();
+    }
+    renderDocument();
+    globalThis.requestAnimationFrame?.(focusSourceEditor) ?? focusSourceEditor();
+  }
+
+  function closeSourceEditor() {
+    flushSourceEditorRender();
+    if (sourceEditorError && sourceEditorDraft !== getSource() &&
+      !globalThis.confirm("Discard the invalid source changes?")) {
+      return;
+    }
+
+    sourceEditorOpen = false;
+    sourceEditorDraft = "";
+    sourceEditorError = "";
+    createSourceEditorTray();
+    document.querySelector(".docdiagram-menu-toggle")?.focus();
   }
 
   function persistDiagramModels() {
@@ -1672,6 +1877,7 @@
       `<option value="centered"${documentFormat === "centered" ? " selected" : ""}>Centered</option>`,
       `<option value="full-width"${documentFormat === "full-width" ? " selected" : ""}>Full width</option>`,
       `</select></label>`,
+      `<button type="button" class="docdiagram-edit-source">Edit source</button>`,
       `<button type="button" class="docdiagram-save">Save As</button>`,
       `<button type="button" class="docdiagram-offline-save" disabled>Save for Offline (coming soon)</button>`,
       `</div>`,
@@ -1685,6 +1891,7 @@
     const menuToggle = toolbar.querySelector(".docdiagram-menu-toggle");
     const menu = toolbar.querySelector(".docdiagram-menu");
     const saveButton = toolbar.querySelector(".docdiagram-save");
+    const editSourceButton = toolbar.querySelector(".docdiagram-edit-source");
     const themeSelect = toolbar.querySelector(".docdiagram-theme-select");
     const formatSelect = toolbar.querySelector(".docdiagram-format-select");
 
@@ -1695,6 +1902,10 @@
     });
 
     saveButton.addEventListener("click", downloadDocument);
+    editSourceButton.addEventListener("click", () => {
+      closeDocumentMenu();
+      openSourceEditor();
+    });
     themeSelect.addEventListener("change", () => {
       setSource(setFrontmatterTheme(getSource(), themeSelect.value));
       renderDocument();
@@ -2522,13 +2733,20 @@
   }
 
   function downloadDocument() {
+    flushSourceEditorRender();
+    if (sourceEditorError && sourceEditorDraft !== getSource() &&
+      !globalThis.confirm("Source has errors. Save the last valid version instead?")) {
+      return;
+    }
     const copy = document.documentElement.cloneNode(true);
     const sourceCopy = copy.querySelector("#source");
     const toolbar = copy.querySelector(".docdiagram-toolbar");
+    const sourceTray = copy.querySelector(".docdiagram-source-tray");
     const output = copy.querySelector("#rendered-document");
 
     sourceCopy.content.replaceChildren(document.createTextNode(getSource()));
     toolbar?.remove();
+    sourceTray?.remove();
     output.replaceChildren();
 
     const blob = new Blob([`<!doctype html>\n${copy.outerHTML}`], {
@@ -2567,32 +2785,51 @@
     toggle.setAttribute("aria-expanded", "false");
   }
 
-  function renderDocument() {
+  function renderDocument(source = getSource(), { preserveOnError = false } = {}) {
     const scrollPositions = new Map(
       [...outputElement.querySelectorAll(".docdiagram")].map((diagram) => [
         Number(diagram.dataset.diagramIndex),
         { left: diagram.scrollLeft, top: diagram.scrollTop }
       ])
     );
+    const pageScroll = { x: globalThis.scrollX || 0, y: globalThis.scrollY || 0 };
+    const previousModels = [...diagramModels];
+    const previousTheme = documentTheme;
+    const previousColorScheme = documentColorScheme;
     diagramModels.length = 0;
     let parsedDocument;
+    let markup;
     try {
-      parsedDocument = resolveDocument(getSource());
+      parsedDocument = preserveOnError ? validateDocumentSource(source) : resolveDocument(source);
       documentTheme = parsedDocument.theme;
       documentColorScheme = parsedDocument.colourScheme;
+      markup = renderMarkdown(parsedDocument.content);
     } catch (error) {
+      diagramModels.length = 0;
+      diagramModels.push(...previousModels);
+      if (preserveOnError) {
+        documentTheme = previousTheme;
+        documentColorScheme = previousColorScheme;
+        sourceEditorError = error.message;
+        updateSourceEditorStatus();
+        return false;
+      }
       applyPageTheme(documentTheme);
       removeToolbarChrome();
       outputElement.innerHTML = `<section class="docdiagram-error"><strong>Document could not be rendered.</strong><br>${escapeHtml(error.message)}</section>`;
-      return;
+      createSourceEditorTray();
+      return false;
     }
 
+    setSource(source);
+    sourceEditorError = "";
     outputElement.dataset.theme = documentTheme;
     outputElement.dataset.format = documentFormat;
     applyPageTheme(documentTheme);
-    outputElement.innerHTML = renderMarkdown(parsedDocument.content);
+    outputElement.innerHTML = markup;
     removeToolbarChrome();
     createToolbar();
+    createSourceEditorTray();
     enableCanvasPanning();
 
     if (editMode) {
@@ -2606,6 +2843,8 @@
         diagram.scrollTop = position.top;
       }
     }
+    globalThis.scrollTo?.(pageScroll.x, pageScroll.y);
+    return true;
   }
 
   function injectStyles() {
@@ -2639,6 +2878,9 @@
       #rendered-document[data-format="full-width"] {
         margin: 0;
         max-width: none;
+      }
+      #rendered-document[data-source-editor-open="true"] {
+        padding-bottom: calc(2rem + var(--docdiagram-source-tray-height, 0px));
       }
       #rendered-document pre {
         background: var(--docdiagram-code-background);
@@ -2773,7 +3015,8 @@
         }
       }
       #rendered-document[data-theme="light"],
-      .docdiagram-toolbar[data-theme="light"] {
+      .docdiagram-toolbar[data-theme="light"],
+      .docdiagram-source-tray[data-theme="light"] {
         --docdiagram-background: #ffffff;
         --docdiagram-border: #dce3ea;
         --docdiagram-control-background: #ffffff;
@@ -2783,7 +3026,8 @@
         --docdiagram-muted: #52616b;
       }
       #rendered-document[data-theme="dark"],
-      .docdiagram-toolbar[data-theme="dark"] {
+      .docdiagram-toolbar[data-theme="dark"],
+      .docdiagram-source-tray[data-theme="dark"] {
         --docdiagram-background: #17202a;
         --docdiagram-border: #3b5263;
         --docdiagram-control-background: #263947;
@@ -2849,6 +3093,79 @@
       }
       .docdiagram-menu[hidden] {
         display: none;
+      }
+      .docdiagram-source-tray {
+        background: var(--docdiagram-background);
+        border: 1px solid var(--docdiagram-border);
+        border-bottom: 0;
+        box-shadow: 0 -4px 16px rgb(21 41 62 / 20%);
+        box-sizing: border-box;
+        color: var(--docdiagram-text);
+        display: flex;
+        flex-direction: column;
+        height: min(42vh, 32rem);
+        min-height: 12rem;
+        padding: .75rem 1rem 1rem;
+        position: fixed;
+        resize: vertical;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 40;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      .docdiagram-source-header {
+        align-items: center;
+        display: flex;
+        gap: 1rem;
+        justify-content: space-between;
+        margin-bottom: .5rem;
+      }
+      .docdiagram-source-shortcut {
+        color: var(--docdiagram-muted);
+        font-size: .8rem;
+        margin-left: .75rem;
+      }
+      .docdiagram-source-close {
+        background: var(--docdiagram-control-background);
+        border: 1px solid var(--docdiagram-border);
+        border-radius: 6px;
+        color: var(--docdiagram-text);
+        cursor: pointer;
+        font: inherit;
+        padding: .35rem .55rem;
+      }
+      .docdiagram-source-label {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        font-size: .85rem;
+        gap: .35rem;
+        min-height: 0;
+      }
+      .docdiagram-source-editor {
+        background: var(--docdiagram-code-background);
+        border: 1px solid var(--docdiagram-border);
+        border-radius: 6px;
+        box-sizing: border-box;
+        color: var(--docdiagram-text);
+        flex: 1;
+        font: .85rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        min-height: 0;
+        padding: .65rem;
+        resize: none;
+        width: 100%;
+      }
+      .docdiagram-source-status,
+      .docdiagram-source-error {
+        font-size: .8rem;
+        margin: .45rem 0 0;
+      }
+      .docdiagram-source-status {
+        color: var(--docdiagram-muted);
+      }
+      .docdiagram-source-error {
+        color: #c2410c;
       }
       .docdiagram-theme-control {
         align-items: center;
@@ -3111,6 +3428,9 @@
     setStyleStrokeWidth,
     setEdgeMarkerStart,
     setEdgeMarkerEnd,
+    validateDocumentSource,
+    findSourceTextRange,
+    scrollSourceEditorToRange,
     splitTextLines,
     renderTextBlock,
     computeNodeTextLayout,
@@ -3125,13 +3445,25 @@
     injectStyles();
     savedSource = getSource();
     globalThis.addEventListener("beforeunload", (event) => {
-      if (!isDirty()) {
+      const hasUncommittedSourceDraft = sourceEditorOpen && sourceEditorDraft !== getSource();
+      if (!isDirty() && !hasUncommittedSourceDraft) {
         return;
       }
       event.preventDefault();
       event.returnValue = "";
     });
     document.addEventListener("keydown", (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "e" &&
+        (sourceEditorOpen || !isEditableElement(event.target))) {
+        event.preventDefault();
+        sourceEditorOpen ? closeSourceEditor() : openSourceEditor();
+        return;
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        downloadDocument();
+        return;
+      }
       if (event.key === "Escape") {
         closeDocumentMenu();
       }
@@ -3141,6 +3473,13 @@
       if (toolbar && !toolbar.contains(event.target)) {
         closeDocumentMenu();
       }
+    });
+    outputElement.addEventListener("dblclick", (event) => {
+      if (event.target.closest("button, input, textarea, select, [contenteditable]")) {
+        return;
+      }
+
+      revealSourceText(globalThis.getSelection?.().toString() || "");
     });
     renderDocument();
   }

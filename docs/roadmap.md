@@ -190,13 +190,13 @@ presentation elements.
 - The extension syntax is fully specified in the user reference and generated
   correctly by the agent skill.
 
-## Milestone 5: Live source-editor tray (stretch goal)
+## Milestone 5: Live source-editor tray
 
 Extend document editing beyond diagrams by exposing the canonical Markdown
 source in a dedicated editor tray. This offers safe, direct source editing with
-immediate rendered feedback, rather than attempting a full WYSIWYG editor. It
-is a stretch goal because it depends on a stable Markdown compatibility contract
-and clear source-serialization behavior.
+immediate rendered feedback, rather than attempting a full WYSIWYG editor. Its
+transactional rendering depends on the Markdown compatibility contract and
+clear source-serialization behavior.
 
 ### Initial scope
 
