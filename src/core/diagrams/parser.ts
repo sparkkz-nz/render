@@ -15,7 +15,7 @@ import {
 } from "./schema";
 
 const diagramCollectionNames = ["nodes", "edges", "participants", "messages", "activations", "notes", "groups"] as const;
-const flowchartNodeFields = ["id", "label", "shape", "position", "size", "style", "palette", "subtitle", "textAAlign", "textHAlign", "children"] as const;
+const flowchartNodeFields = ["id", "label", "shape", "position", "size", "style", "palette", "subtitle", "textVAlign", "textHAlign", "children"] as const;
 const flowchartEdgeFields = ["source", "target", "sourceAnchor", "targetAnchor", "route", "label", "style", "start", "end"] as const;
 const flowchartNodeStyleFields = ["fill", "stroke", "strokeWidth", "text"] as const;
 const flowchartEdgeStyleFields = ["stroke", "strokeWidth", "text"] as const;
@@ -236,8 +236,8 @@ function validateFlowchartDiagram(diagram: FlowchartDiagram, colorScheme = "clas
     if (!nodeShapes.includes(node.shape as (typeof nodeShapes)[number])) {
       throw new Error(`Unsupported node shape: ${node.shape}`);
     }
-    if (node.textAAlign !== undefined && !nodeTextVAlignments.includes(node.textAAlign)) {
-      throw new Error(`Unsupported node textAAlign: ${node.textAAlign}`);
+    if (node.textVAlign !== undefined && !nodeTextVAlignments.includes(node.textVAlign)) {
+      throw new Error(`Unsupported node textVAlign: ${node.textVAlign}`);
     }
     if (node.textHAlign !== undefined && !nodeTextHAlignments.includes(node.textHAlign)) {
       throw new Error(`Unsupported node textHAlign: ${node.textHAlign}`);

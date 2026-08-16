@@ -37,7 +37,7 @@ export interface FlowchartNode {
   style?: NodeStyle;
   palette?: NodePalette;
   subtitle?: string;
-  textAAlign?: "top" | "center";
+  textVAlign?: "top" | "center";
   textHAlign?: "left" | "center" | "right";
   children?: FlowchartNode[];
 }

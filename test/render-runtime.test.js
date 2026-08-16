@@ -560,14 +560,14 @@ test("flowchart node text stack alignment parses, renders, and round-trips", () 
     "    shape: rounded-rectangle",
     "    position: { x: 40, y: 50 }",
     "    size: { width: 200, height: 120 }",
-    "    textAAlign: top",
+    "    textVAlign: top",
     "    textHAlign: left",
     "edges:"
   ].join("\n"));
   const diagram = parseDiagram(source);
   const markup = renderDiagram(source, 0);
 
-  assert.equal(diagram.nodes[0].textAAlign, "top");
+  assert.equal(diagram.nodes[0].textVAlign, "top");
   assert.equal(diagram.nodes[0].textHAlign, "left");
   assert.match(markup, /<text x="52" y="76\.4" text-anchor="start" class="docdiagram-node-label"/);
   assert.equal(JSON.stringify(parseDiagram(serializeDiagram(diagram))), JSON.stringify(diagram));

@@ -158,7 +158,7 @@ export function computeNodeTextLayout(
       : resolvedBounds.x + resolvedBounds.width / 2;
   const textAnchor = textHAlign === "left" ? "start" : textHAlign === "right" ? "end" : "middle";
   const centerY = resolvedBounds.y + resolvedBounds.height / 2;
-  const blockTop = resolvedNode.textAAlign === "top"
+  const blockTop = resolvedNode.textVAlign === "top"
     ? resolvedBounds.y
     : centerY - totalBlockHeight / 2;
 
