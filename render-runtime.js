@@ -948,7 +948,12 @@
 
   function isSafeUrl(value, allowDataImage = false) {
     const normalized = String(value).trim();
-    if (!normalized || normalized.startsWith("#") || normalized.startsWith("/") ||
+    if (normalized.startsWith("//") || normalized.startsWith("\\")) {
+      return false;
+    }
+
+    if (!normalized || normalized.startsWith("#") ||
+      normalized.startsWith("/") ||
       normalized.startsWith("./") || normalized.startsWith("../") || normalized.startsWith("?")) {
       return true;
     }
@@ -1028,9 +1033,8 @@
     return line.match(/^(\s*)([-+*]|\d+[.)])\s+(.+)$/);
   }
 
-  function renderMarkdown(source) {
+  function renderMarkdown(source, state = { diagramIndex: 0 }) {
     const lines = source.replaceAll("\r\n", "\n").split("\n");
-    const state = { diagramIndex: 0 };
 
     function isBlockStart(index) {
       const line = lines[index] || "";
@@ -1140,7 +1144,7 @@
             quoteLines.push(lines[index].replace(/^ {0,3}> ?/, ""));
             index += 1;
           }
-          output.push(`<blockquote>${renderMarkdown(quoteLines.join("\n"))}</blockquote>`);
+          output.push(`<blockquote>${renderMarkdown(quoteLines.join("\n"), state)}</blockquote>`);
           continue;
         }
 

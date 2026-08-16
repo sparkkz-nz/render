@@ -159,6 +159,8 @@ test("renders only safe links and images while keeping unsafe URLs readable", ()
   assert.match(markup, /&lt;script&gt;alert\(&#39;literal&#39;\)&lt;\/script&gt;/);
   assert.equal(isSafeUrl("mailto:author@example.com"), true);
   assert.equal(isSafeUrl("javascript:alert(1)"), false);
+  assert.equal(isSafeUrl("//untrusted.example/path"), false);
+  assert.equal(isSafeUrl("\\\\untrusted.example\\path"), false);
   assert.equal(renderInline("`<literal>`"), "<code>&lt;literal&gt;</code>");
 });
 
@@ -179,6 +181,29 @@ test("keeps diagram fences distinct from language-labelled code fences", () => {
 
   assert.match(markup, /<pre><code class="language-text">diagram<\/code><\/pre>/);
   assert.match(markup, /<figure class="docdiagram"/);
+});
+
+test("shares diagram indices with diagrams nested in block quotes", () => {
+  const diagram = [
+    "```diagram",
+    "canvas:",
+    "  width: 600",
+    "  height: 300",
+    "nodes:",
+    "edges:",
+    "```"
+  ];
+  const source = [
+    ...diagram,
+    "",
+    ...diagram.map((line) => `> ${line}`),
+    "",
+    ...diagram
+  ].join("\n");
+  const indices = [...renderMarkdown(source).matchAll(/data-diagram-index="(\d+)"/g)]
+    .map((match) => match[1]);
+
+  assert.deepEqual([...new Set(indices)], ["0", "1", "2"]);
 });
 
 test("diagram markup provides compact view-mode zoom and edit controls", () => {
