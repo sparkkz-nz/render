@@ -5,7 +5,7 @@
   const sourceElement = document.querySelector("#source");
   const outputElement = document.querySelector("#rendered-document");
   const diagramModels = [];
-  let editMode = false;
+  let editingDiagramIndex = null;
   let selectedNode = null;
   let selectedEdge = null;
   let selectedSequenceElement = null;
@@ -16,13 +16,18 @@
   let documentColorScheme = "classic";
   let documentFormat = "centered";
   let savedSource = "";
-  let editSessionSource = null;
+  let editSessionDiagram = null;
   let sourceEditorOpen = false;
   let sourceEditorDraft = "";
   let sourceEditorError = "";
   let sourceEditorRenderTimer = null;
   let sourceEditorResizeObserver = null;
   const diagramZooms = new Map();
+
+  function isDiagramEditing(diagramIndex) {
+    return editingDiagramIndex === diagramIndex;
+  }
+
   const minimumNodeSize = { width: 120, height: 60 };
   const documentMinimumNodeSize = { width: 140, height: 84 };
   const defaultNode = {
@@ -1018,7 +1023,7 @@
       `<button type="button" class="docdiagram-icon-button docdiagram-zoom-out" data-diagram-index="${diagramIndex}" aria-label="Zoom out" title="Zoom out">−</button>`,
       `<button type="button" class="docdiagram-icon-button docdiagram-fit" data-diagram-index="${diagramIndex}" aria-label="Zoom to fit" title="Zoom to fit">⊡</button>`,
       allowsEditing
-        ? editMode
+        ? isDiagramEditing(diagramIndex)
           ? `<button type="button" class="docdiagram-icon-button docdiagram-done-editing" aria-label="Done editing" title="Done editing">✓</button><button type="button" class="docdiagram-icon-button docdiagram-cancel-editing" aria-label="Cancel editing and discard changes" title="Cancel editing and discard changes">×</button>${allowsNodeCreation ? `<button type="button" class="docdiagram-icon-button docdiagram-create-node" data-diagram-index="${diagramIndex}" aria-label="New node" title="New node">+</button>` : ""}`
           : `<button type="button" class="docdiagram-icon-button docdiagram-start-editing" aria-label="Edit diagram" title="Edit diagram">✎</button>`
         : "",
@@ -1093,7 +1098,7 @@
         edgeMarkerDefs.push(buildEdgeMarkerDef(endMarkerId, endMarkerStyle, "end", style.stroke, strokeWidth));
       }
 
-      if (isSelected && editMode) {
+      if (isSelected && isDiagramEditing(diagramIndex)) {
         edgeEndpointMarkup.push(
           `<circle class="docdiagram-edge-endpoint" data-diagram-index="${diagramIndex}" data-edge-index="${edgeIndex}" data-endpoint="source" cx="${sourceAnchor.x}" cy="${sourceAnchor.y}" r="7"/>`,
           `<circle class="docdiagram-edge-endpoint" data-diagram-index="${diagramIndex}" data-edge-index="${edgeIndex}" data-endpoint="target" cx="${targetAnchor.x}" cy="${targetAnchor.y}" r="7"/>`
@@ -1141,10 +1146,10 @@
         !isEditing && layout.subtitleLines.length
           ? renderTextBlock(layout.centerX, layout.subtitleStartY, layout.subtitleLines, layout.subtitleLineHeight, "docdiagram-node-subtitle", style.text)
           : "",
-        isSelected && editMode && !isEditing
+        isSelected && isDiagramEditing(diagramIndex) && !isEditing
           ? `<rect class="docdiagram-resize-handle" x="${x + nodeWidth - 7}" y="${y + nodeHeight - 7}" width="14" height="14" rx="3"/>`
           : "",
-        isSelected && editMode && !isEditing
+        isSelected && isDiagramEditing(diagramIndex) && !isEditing
           ? edgeAnchors.map((anchor) => {
             const point = geometry.anchors[anchor];
             return `<circle class="docdiagram-connection-port" data-anchor="${anchor}" cx="${point.x}" cy="${point.y}" r="7" aria-label="${anchor} connection port"/>`;
@@ -1158,7 +1163,7 @@
     const height = Number(diagram.canvas.height) || 560;
 
     return [
-      `<figure class="docdiagram" data-diagram-index="${diagramIndex}" data-diagram-type="flowchart">`,
+      `<figure class="docdiagram" data-diagram-index="${diagramIndex}" data-diagram-type="flowchart" data-editing="${isDiagramEditing(diagramIndex)}">`,
       renderDiagramToolbar(diagramIndex, "flowchart"),
       `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Architecture diagram" data-diagram-index="${diagramIndex}" style="width: ${diagramZooms.get(diagramIndex) || 100}%">`,
       `<defs>${edgeMarkerDefs.join("")}</defs>`,
@@ -1336,7 +1341,7 @@
     }).join("");
 
     return [
-      `<figure class="docdiagram" data-diagram-index="${diagramIndex}" data-diagram-type="sequence">`,
+      `<figure class="docdiagram" data-diagram-index="${diagramIndex}" data-diagram-type="sequence" data-editing="${isDiagramEditing(diagramIndex)}">`,
       renderDiagramToolbar(diagramIndex, "sequence"),
       `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Sequence diagram" data-diagram-index="${diagramIndex}" style="width: ${diagramZooms.get(diagramIndex) || 100}%">`,
       `<defs>${buildEdgeMarkerDef(sequenceMarkerId, "arrow", "end", theme.edge.stroke, 2)}</defs>`,
@@ -2150,9 +2155,9 @@
     sourceEditorDraft = getSource();
     sourceEditorError = "";
     sourceEditorOpen = true;
-    if (editMode) {
-      editMode = false;
-      editSessionSource = null;
+    if (editingDiagramIndex !== null) {
+      editingDiagramIndex = null;
+      editSessionDiagram = null;
       clearEditorState();
     }
     renderDocument();
@@ -2365,12 +2370,12 @@
   function createToolbar() {
     const toolbar = document.createElement("section");
     toolbar.className = "docdiagram-toolbar";
-    toolbar.dataset.editing = String(editMode);
+    toolbar.dataset.editing = String(editingDiagramIndex !== null);
     toolbar.dataset.theme = documentTheme;
     toolbar.dataset.format = documentFormat;
 
-    const node = editMode ? getSelectedNode() : null;
-    const edge = editMode && !node ? getSelectedEdge() : null;
+    const node = selectedNode && isDiagramEditing(selectedNode.diagramIndex) ? getSelectedNode() : null;
+    const edge = selectedEdge && isDiagramEditing(selectedEdge.diagramIndex) && !node ? getSelectedEdge() : null;
     const sequenceElement = !node && !edge ? getSelectedSequenceElement() : null;
     const inspectorDiagram = node
       ? diagramModels[selectedNode.diagramIndex]
@@ -2518,14 +2523,13 @@
     }
   }
 
-  function exitEditing(discard) {
-    if (discard && editSessionSource !== null) {
-      setSource(editSessionSource);
-    } else if (!discard && isDirty()) {
-      globalThis.confirm("Save changes before leaving edit mode?") && downloadDocument();
+  function exitEditing(diagramIndex, discard) {
+    if (discard && editSessionDiagram !== null) {
+      diagramModels[diagramIndex] = editSessionDiagram;
+      persistDiagramModels();
     }
-    editMode = false;
-    editSessionSource = null;
+    editingDiagramIndex = null;
+    editSessionDiagram = null;
     clearEditorState();
     renderDocument();
   }
@@ -2561,17 +2565,18 @@
 
     for (const button of outputElement.querySelectorAll(".docdiagram-start-editing")) {
       button.addEventListener("click", () => {
-        editSessionSource = getSource();
-        editMode = true;
+        const diagramIndex = Number(button.closest(".docdiagram")?.dataset.diagramIndex);
+        editSessionDiagram = parseDiagram(serializeDiagram(diagramModels[diagramIndex]));
+        editingDiagramIndex = diagramIndex;
         clearEditorState();
         renderDocument();
       });
     }
     for (const button of outputElement.querySelectorAll(".docdiagram-done-editing")) {
-      button.addEventListener("click", () => exitEditing(false));
+      button.addEventListener("click", () => exitEditing(editingDiagramIndex, false));
     }
     for (const button of outputElement.querySelectorAll(".docdiagram-cancel-editing")) {
-      button.addEventListener("click", () => exitEditing(true));
+      button.addEventListener("click", () => exitEditing(editingDiagramIndex, true));
     }
     for (const button of outputElement.querySelectorAll(".docdiagram-create-node")) {
       button.addEventListener("click", () => createNewNode(Number(button.dataset.diagramIndex)));
@@ -3109,7 +3114,7 @@
   function enableSequenceSelection() {
     for (const svg of outputElement.querySelectorAll('.docdiagram[data-diagram-type="sequence"] svg')) {
       svg.addEventListener("click", (event) => {
-        if (!editMode) {
+        if (!isDiagramEditing(Number(svg.dataset.diagramIndex))) {
           return;
         }
         const participant = event.target.closest(".docdiagram-sequence-participant");
@@ -3145,6 +3150,9 @@
 
   function enableEditing() {
     for (const svg of outputElement.querySelectorAll(".docdiagram svg")) {
+      if (!isDiagramEditing(Number(svg.dataset.diagramIndex))) {
+        continue;
+      }
       svg.addEventListener("click", (event) => {
         if (event.target.closest(".docdiagram-inline-editor")) {
           return;
@@ -3322,7 +3330,7 @@
     if (!outputElement.dataset.deleteShortcutBound) {
       outputElement.dataset.deleteShortcutBound = "true";
       document.addEventListener("keydown", (event) => {
-        if (!editMode || (event.key !== "Delete" && event.key !== "Backspace")) {
+        if (editingDiagramIndex === null || (event.key !== "Delete" && event.key !== "Backspace")) {
           return;
         }
         if (event.target.matches("input, textarea, select, [contenteditable]")) {
@@ -3437,7 +3445,7 @@
     enableCanvasPanning();
     enableSequenceSelection();
 
-    if (editMode) {
+    if (editingDiagramIndex !== null) {
       enableEditing();
     }
 
@@ -3894,10 +3902,10 @@
       .docdiagram-edge-group {
         cursor: default;
       }
-      .docdiagram-toolbar[data-editing="true"] + #rendered-document .docdiagram-edge-group {
+      .docdiagram[data-editing="true"] .docdiagram-edge-group {
         cursor: pointer;
       }
-      .docdiagram-toolbar[data-editing="true"] + #rendered-document .docdiagram-edge-group:has(.docdiagram-inline-editor) {
+      .docdiagram[data-editing="true"] .docdiagram-edge-group:has(.docdiagram-inline-editor) {
         cursor: text;
       }
       .docdiagram-edge-selected .docdiagram-edge {
@@ -3939,13 +3947,13 @@
       .docdiagram-node {
         cursor: default;
       }
-      .docdiagram-toolbar[data-editing="true"] + #rendered-document .docdiagram-node {
+      .docdiagram[data-editing="true"] .docdiagram-node {
         cursor: grab;
       }
       #rendered-document .docdiagram svg {
         cursor: grab;
       }
-      .docdiagram-toolbar[data-editing="true"] + #rendered-document .docdiagram-node:has(.docdiagram-inline-editor) {
+      .docdiagram[data-editing="true"] .docdiagram-node:has(.docdiagram-inline-editor) {
         cursor: text;
       }
       .docdiagram-node-label {
