@@ -1,15 +1,17 @@
 # render reference
 
 This reference describes the source format accepted by the current
-[render runtime](../render-runtime.js). Source is embedded in an HTML document
-and remains canonical after diagram edits.
+[Skryb runtime](../dist/skryb-runtime.js). Source is embedded in an HTML document
+and remains canonical after diagram edits. The legacy `render-runtime.js`
+artifact remains available for backwards compatibility; new documents should use
+`skryb-runtime.js`.
 
 ## HTML document shell
 
 A render document requires:
 
 ```html
-<script src="https://sparkkz-nz.github.io/render/render-runtime.js" defer></script>
+<script src="https://sparkkz-nz.github.io/render/skryb-runtime.js" defer></script>
 <template id="source" type="text/markdown">
 # Document title
 </template>
@@ -152,6 +154,7 @@ content:
 The primary explanation and diagram go here.
 
 ```diagram
+type: flowchart
 canvas:
   width: 600
   height: 300
@@ -219,8 +222,8 @@ numeric `canvas.grid` enables snapping while moving or resizing; omit it or use
 
 ### Nodes
 
-Every node requires `shape`. In practice, use `id`, `label`, `type`, `position`,
-and `size` as well:
+Every node requires `shape`. In practice, use `id`, `label`, `position`, and
+`size` as well:
 
 ```yaml
 - id: payments-api
@@ -236,8 +239,8 @@ and `size` as well:
 | Field | Values / behaviour |
 | --- | --- |
 | `id` | Stable identifier used by edges. |
-| `label` | Node text. Newlines are supported. |
-| `subtitle` | Optional text below the label; newlines are supported. |
+| `label` | Node text. Newlines are supported with `\n` inside a double-quoted scalar, for example `label: "Payments\nAPI"`. |
+| `subtitle` | Optional text below the label; use the same double-quoted `\n` form for multiple lines. |
 | `shape` | **Required.** `rounded-rectangle`, `circle`, `oval`, `database`, `diamond`, `rhombus`, `flattened-hexagon`, `chevron`, `right-chevron`, or `document`. The `document` shape is a sheet of paper with a folded top-right corner. |
 | `position` | `{ x: number, y: number }` top-left canvas position. |
 | `size` | `{ width: number, height: number }`. Nodes have a minimum size; circles remain square. |
@@ -370,10 +373,11 @@ content to source; source text does not attempt to infer a rendered location.
 
 ## Runtime channels and limitations
 
-Use `render-runtime.js` from `main` for normal use, `/dev/` only for
+Use `skryb-runtime.js` from `main` for normal use, `/dev/` only for
 short-lived branch testing, and `/releases/<tag>/` for immutable published
+documents. The legacy `render-runtime.js` remains available only for existing
 documents. See [getting started](getting-started.md) for URLs and examples.
 
 Current limitations include the intentionally small Markdown subset, flowcharts
-as the only diagram type, no Mermaid import, and no offline runtime embedding.
+and sequence diagrams, no Mermaid import, and no offline runtime embedding.
 Planned work is listed in the [roadmap](roadmap.md).

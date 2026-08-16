@@ -16,7 +16,7 @@ Save the following as `architecture.html`:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Checkout architecture</title>
   <script
-    src="https://sparkkz-nz.github.io/render/render-runtime.js"
+    src="https://sparkkz-nz.github.io/render/skryb-runtime.js"
     defer>
   </script>
 </head>
@@ -120,22 +120,23 @@ Use the appropriate script URL for the document's purpose:
 
 | Purpose | Runtime URL |
 | --- | --- |
-| Normal use or local experimentation | `https://sparkkz-nz.github.io/render/render-runtime.js` |
-| Pre-merge testing of a branch | `https://sparkkz-nz.github.io/render/dev/render-runtime.js` |
-| Published or distributed document | `https://sparkkz-nz.github.io/render/releases/<version>/render-runtime.js` |
+| Normal use or local experimentation | `https://sparkkz-nz.github.io/render/skryb-runtime.js` |
+| Pre-merge testing of a branch | `https://sparkkz-nz.github.io/render/dev/skryb-runtime.js` |
+| Published or distributed document | `https://sparkkz-nz.github.io/render/releases/<version>/skryb-runtime.js` |
 
 The development URL is shared and replaced by the next branch build. Replace
 `<version>` with a released tag such as `v1.2.0` when pinning a published
 document.
 
-For fully offline development, store `render-runtime.js` next to the document
-and load it with `<script src="./render-runtime.js" defer></script>`. Do not use
-a machine-specific `file:///...` runtime URL in a document you share.
+For fully offline development, store `skryb-runtime.js` next to the document
+and load it with `<script src="./skryb-runtime.js" defer></script>`. Do not use
+a machine-specific `file:///...` runtime URL in a document you share. The legacy
+`render-runtime.js` remains available for existing documents.
 
 ## Next steps
 
 - Read the [syntax reference](reference.md) before authoring a diagram beyond
   this example.
-- Use [example.html](../example.html) as a richer local fixture for shapes,
-  labels, palettes, and connector styling.
+- Use [skryb-example.html](../skryb-example.html) as a richer local fixture for
+  shapes, labels, palettes, and connector styling.
 - See the [roadmap](roadmap.md) for future Markdown, editor, and diagram work.
