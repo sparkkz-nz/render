@@ -731,7 +731,11 @@ test("sequence diagrams parse, round-trip, and render with lightweight edit cont
 test("clampZoom limits diagram zoom to supported discrete bounds", () => {
   assert.equal(clampZoom(10), 25);
   assert.equal(clampZoom(125), 125);
-  assert.equal(clampZoom(250), 200);
+  assert.equal(clampZoom(600), 600);
+});
+
+test("diagram viewports can be vertically resized", () => {
+  assert.match(runtime, /\.docdiagram \{[\s\S]*resize: vertical/);
 });
 
 test("expanding a canvas keeps a moved node and padding inside its bounds", () => {

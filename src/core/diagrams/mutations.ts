@@ -283,5 +283,5 @@ export function setEdgeMarkerEnd(edge: FlowchartEdge, markerStyle: string): Flow
 }
 
 export function clampZoom(value: unknown): number {
-  return Math.min(200, Math.max(25, Number(value) || 100));
+  return Math.max(25, Number(value) || 100);
 }

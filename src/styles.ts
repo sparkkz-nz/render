@@ -398,9 +398,11 @@ export function injectStyles(): void {
       box-shadow: 0 2px 8px rgb(21 41 62 / 8%);
       margin: 1.5rem 0;
       height: min(70vh, 42rem);
+      min-height: 16rem;
       overflow: auto;
       padding: 1rem;
       position: relative;
+      resize: vertical;
     }
     .docdiagram-panning svg {
       cursor: grabbing;
