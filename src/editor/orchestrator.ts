@@ -17,6 +17,7 @@ import {
 } from "../core/diagrams/schema";
 import { escapeHtml, parseDiagram } from "../core/diagrams/parser";
 import { serializeDiagram } from "../core/diagrams/serializer";
+import { findFlowchartNode, flattenFlowchartNodes, getFlowchartNodeBounds, reparentFlowchartNode } from "../core/diagrams/hierarchy";
 import {
   clampZoom,
   createNode,
@@ -328,6 +329,9 @@ export class BrowserRuntime {
       getTheme: (diagram: { theme?: string }) => getTheme(diagram, this.state.documentTheme),
       getGridSize,
       expandCanvasForNode,
+      flattenFlowchartNodes,
+      getFlowchartNodeBounds,
+      reparentFlowchartNode,
       createUniqueNodeId,
       getDefaultNodePosition,
       createNode,
@@ -472,7 +476,7 @@ export class BrowserRuntime {
     const selected = this.state.selectedNode;
     const diagram = selected ? this.state.diagramModels[selected.diagramIndex] : null;
     return selected && diagram?.type === "flowchart" && isDiagramEditing(this.state, selected.diagramIndex)
-      ? diagram.nodes.find((node) => node.id === selected.nodeId) || null
+      ? findFlowchartNode(diagram, selected.nodeId)?.node || null
       : null;
   }
 

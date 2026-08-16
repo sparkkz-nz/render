@@ -1,6 +1,7 @@
 import {
   type Diagram,
   type FlowchartDiagram,
+  type FlowchartNode,
   type SequenceDiagram,
   diagramThemes,
   edgeAnchors,
@@ -12,7 +13,7 @@ import {
 } from "./schema";
 
 const diagramCollectionNames = ["nodes", "edges", "participants", "messages", "activations", "notes", "groups"] as const;
-const flowchartNodeFields = ["id", "label", "shape", "position", "size", "style", "palette", "subtitle"] as const;
+const flowchartNodeFields = ["id", "label", "shape", "position", "size", "style", "palette", "subtitle", "children"] as const;
 const flowchartEdgeFields = ["source", "target", "sourceAnchor", "targetAnchor", "route", "label", "style", "start", "end"] as const;
 const flowchartNodeStyleFields = ["fill", "stroke", "strokeWidth", "text"] as const;
 const flowchartEdgeStyleFields = ["stroke", "strokeWidth", "text"] as const;
@@ -92,87 +93,65 @@ export function parseScalar(value: string): unknown {
 
 export function parseDiagram(source: string, colorScheme = "classic"): Diagram {
   const lines = source.replace(/\r\n/g, "\n").split("\n");
-  const diagram: ParsedObject & { canvas?: ParsedObject } = {};
-  let collection: string | null = null;
-  let item: ParsedObject | null = null;
-  let nestedObject: ParsedObject | null = null;
-
-  for (const rawLine of lines) {
-    if (!rawLine.trim() || rawLine.trimStart().startsWith("#")) {
+  const meaningfulLines = lines.filter((line) => line.trim() && !line.trimStart().startsWith("#"));
+  for (const line of meaningfulLines) {
+    if (line.trimStart() !== line || !line.trimEnd().endsWith(":")) {
       continue;
     }
-
-    const indent = rawLine.length - rawLine.trimStart().length;
-    const line = rawLine.trim();
-    const itemMatch = line.match(/^- ([^:]+):\s*(.*)$/);
-    const propertyMatch = line.match(/^([^:]+):\s*(.*)$/);
-
-    if (indent === 0 && propertyMatch) {
-      const [, key, value] = propertyMatch;
-      item = null;
-      nestedObject = null;
-
-      if (!value) {
-        if (key !== "canvas" && !diagramCollectionNames.includes(key as (typeof diagramCollectionNames)[number])) {
-          throw new Error(`Unsupported diagram section: ${key}`);
-        }
-
-        collection = key;
-        if (key === "canvas") {
-          diagram.canvas = {};
-        } else {
-          diagram[key] = [];
-        }
-        continue;
-      }
-
-      diagram[key] = parseScalar(value);
-      collection = null;
-      continue;
+    const key = line.trim().slice(0, -1);
+    if (key !== "canvas" && !diagramCollectionNames.includes(key as (typeof diagramCollectionNames)[number])) {
+      throw new Error(`Unsupported diagram section: ${key}`);
     }
-
-    if (indent === 2 && itemMatch && collection !== null && diagramCollectionNames.includes(collection as (typeof diagramCollectionNames)[number])) {
-      const [, key, value] = itemMatch;
-      item = {};
-      item[key] = parseScalar(value);
-      const items = diagram[collection];
-      if (!Array.isArray(items)) {
-        throw new Error(`Unsupported diagram section: ${collection}`);
-      }
-      items.push(item);
-      nestedObject = null;
-      continue;
-    }
-
-    if (indent === 2 && propertyMatch && collection === "canvas") {
-      const [, key, value] = propertyMatch;
-      if (!diagram.canvas) {
-        diagram.canvas = {};
-      }
-      diagram.canvas[key] = parseScalar(value);
-      continue;
-    }
-
-    if (indent === 4 && propertyMatch && item) {
-      const [, key, value] = propertyMatch;
-      if (!value) {
-        item[key] = {};
-        nestedObject = item[key] as ParsedObject;
-      } else {
-        item[key] = parseScalar(value);
-        nestedObject = null;
-      }
-      continue;
-    }
-
-    if (indent === 6 && propertyMatch && nestedObject) {
-      const [, key, value] = propertyMatch;
-      nestedObject[key] = parseScalar(value);
-      continue;
-    }
-
-    throw new Error(`Cannot parse diagram line: ${rawLine}`);
   }
+  let cursor = 0;
+  const indentation = (line: string) => line.length - line.trimStart().length;
+  const property = (line: string) => line.trim().match(/^([^:]+):\s*(.*)$/);
+  const item = (line: string) => line.trim().match(/^- ([^:]+):\s*(.*)$/);
+  const parseValue = (indent: number): unknown => {
+    if (cursor >= meaningfulLines.length || indentation(meaningfulLines[cursor]) <= indent) {
+      return {};
+    }
+    return meaningfulLines[cursor].trimStart().startsWith("- ")
+      ? parseList(indentation(meaningfulLines[cursor]))
+      : parseObject(indentation(meaningfulLines[cursor]));
+  };
+  const parseObject = (indent: number): ParsedObject => {
+    const object: ParsedObject = {};
+    while (cursor < meaningfulLines.length && indentation(meaningfulLines[cursor]) === indent) {
+      const rawLine = meaningfulLines[cursor];
+      const match = property(rawLine);
+      if (!match) {
+        throw new Error(`Cannot parse diagram line: ${rawLine}`);
+      }
+      cursor += 1;
+      object[match[1]] = match[2] ? parseScalar(match[2]) : parseValue(indent);
+    }
+    return object;
+  };
+  const parseList = (indent: number): ParsedObject[] => {
+    const list: ParsedObject[] = [];
+    while (cursor < meaningfulLines.length && indentation(meaningfulLines[cursor]) === indent) {
+      const rawLine = meaningfulLines[cursor];
+      const match = item(rawLine);
+      if (!match) {
+        throw new Error(`Cannot parse diagram line: ${rawLine}`);
+      }
+      cursor += 1;
+      const object: ParsedObject = { [match[1]]: match[2] ? parseScalar(match[2]) : parseValue(indent) };
+      while (cursor < meaningfulLines.length && indentation(meaningfulLines[cursor]) > indent) {
+        const propertyIndent = indentation(meaningfulLines[cursor]);
+        const next = property(meaningfulLines[cursor]);
+        if (!next) {
+          throw new Error(`Cannot parse diagram line: ${meaningfulLines[cursor]}`);
+        }
+        cursor += 1;
+        object[next[1]] = next[2] ? parseScalar(next[2]) : parseValue(propertyIndent);
+      }
+      list.push(object);
+    }
+    return list;
+  };
+  const diagram = parseObject(0) as ParsedObject & { canvas?: ParsedObject };
 
   if (!diagram.type) {
     throw new Error(`Diagram type is required and must be one of: ${supportedDiagramTypes.join(", ")}.`);
@@ -236,7 +215,8 @@ function validateFlowchartDiagram(diagram: FlowchartDiagram, colorScheme = "clas
     throw new Error("Flowchart diagrams do not support sequence sections.");
   }
 
-  for (const node of diagram.nodes) {
+  const nodeIds = new Set<string>();
+  const validateNode = (node: FlowchartNode): void => {
     if ("type" in node) {
       throw new Error(`Node "${node.id || "unknown"}" uses removed field "type".`);
     }
@@ -268,6 +248,20 @@ function validateFlowchartDiagram(diagram: FlowchartDiagram, colorScheme = "clas
     }
 
     assertAllowedStyleFields(node.style as Record<string, unknown> | undefined, flowchartNodeStyleFields, `node "${node.id}"`);
+    if (nodeIds.has(node.id)) {
+      throw new Error(`Duplicate flowchart node id: ${node.id}`);
+    }
+    nodeIds.add(node.id);
+    if (node.children !== undefined && !Array.isArray(node.children)) {
+      throw new Error(`Children for node "${node.id}" must be a list.`);
+    }
+    for (const child of node.children || []) {
+      validateNode(child);
+    }
+  };
+
+  for (const node of diagram.nodes) {
+    validateNode(node);
   }
 
   for (const edge of diagram.edges) {

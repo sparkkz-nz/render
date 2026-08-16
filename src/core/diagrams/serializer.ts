@@ -17,13 +17,23 @@ function formatScalar(value: unknown): string {
     : JSON.stringify(String(value));
 }
 
-function serializeItem(item: Record<string, unknown>): string[] {
+function serializeItem(item: Record<string, unknown>, indent = 2): string[] {
   const entries = Object.entries(item);
   const [firstKey, firstValue] = entries[0];
-  const lines = [`  - ${firstKey}: ${formatScalar(firstValue)}`];
+  const lines = [`${" ".repeat(indent)}- ${firstKey}: ${formatScalar(firstValue)}`];
 
   for (const [key, value] of entries.slice(1)) {
-    lines.push(`    ${key}: ${formatScalar(value)}`);
+    if (key === "children" && Array.isArray(value) && !value.length) {
+      continue;
+    }
+    if (key === "children" && Array.isArray(value)) {
+      lines.push(`${" ".repeat(indent + 2)}children:`);
+      for (const child of value) {
+        lines.push(...serializeItem(child as Record<string, unknown>, indent + 4));
+      }
+    } else {
+      lines.push(`${" ".repeat(indent + 2)}${key}: ${formatScalar(value)}`);
+    }
   }
 
   return lines;

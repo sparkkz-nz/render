@@ -37,6 +37,7 @@ export interface FlowchartNode {
   style?: NodeStyle;
   palette?: NodePalette;
   subtitle?: string;
+  children?: FlowchartNode[];
 }
 
 export interface FlowchartEdge {
