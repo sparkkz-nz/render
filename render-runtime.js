@@ -2733,7 +2733,8 @@
   }
 
   function downloadDocument() {
-    if (!flushSourceEditorRender() &&
+    flushSourceEditorRender();
+    if (sourceEditorError && sourceEditorDraft !== getSource() &&
       !globalThis.confirm("Source has errors. Save the last valid version instead?")) {
       return;
     }
