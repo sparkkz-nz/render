@@ -121,40 +121,21 @@ test("extracts document frontmatter without treating it as Markdown content", ()
 });
 
 test("renders the documented CommonMark and GFM compatibility baseline semantically", () => {
-  const markup = renderMarkdown([
-    "# Architecture",
-    "",
-    "1. First",
-    "   - Nested item",
-    "2. Second",
-    "",
-    "> Quoted **guidance**.",
-    "",
-    "---",
-    "",
-    "Use *emphasis*, **strong text**, ~~removed text~~, and `inline code`.",
-    "",
-    "```javascript",
-    "const enabled = true;",
-    "```",
-    "",
-    "| Name | State | Detail |",
-    "| :--- | :---: | ---: |",
-    "| API\\|edge | ready | 42 |",
-    "",
-    "- [x] Completed",
-    "- [ ] Pending"
-  ].join("\n"));
+  const source = fs.readFileSync(
+    path.resolve(__dirname, "fixtures", "markdown", "compatibility-baseline.md"),
+    "utf8"
+  );
+  const markup = renderMarkdown(source);
 
-  assert.match(markup, /<ol><li>First<ul><li>Nested item<\/li><\/ul><\/li><li>Second<\/li><\/ol>/);
-  assert.match(markup, /<blockquote><p>Quoted <strong>guidance<\/strong>\.<\/p><\/blockquote>/);
+  assert.match(markup, /<ol><li>Define the public contract\.<ul><li>Include the API edge case\.<\/li><\/ul><\/li><li>Publish the implementation\.<\/li><\/ol>/);
+  assert.match(markup, /<blockquote><p><strong>Important:<\/strong> keep existing document source portable\.<\/p><\/blockquote>/);
   assert.match(markup, /<hr>/);
   assert.match(markup, /<em>emphasis<\/em>, <strong>strong text<\/strong>, <del>removed text<\/del>, and <code>inline code<\/code>/);
   assert.match(markup, /<pre><code class="language-javascript">const enabled = true;<\/code><\/pre>/);
   assert.match(markup, /<table><thead><tr><th style="text-align:left">Name<\/th><th style="text-align:center">State<\/th><th style="text-align:right">Detail<\/th>/);
   assert.match(markup, /<td style="text-align:left">API\|edge<\/td>/);
-  assert.match(markup, /<li class="docdiagram-task-list-item"><input type="checkbox" disabled checked> Completed<\/li>/);
-  assert.match(markup, /<li class="docdiagram-task-list-item"><input type="checkbox" disabled> Pending<\/li>/);
+  assert.match(markup, /<li class="docdiagram-task-list-item"><input type="checkbox" disabled checked> Complete the migration<\/li>/);
+  assert.match(markup, /<li class="docdiagram-task-list-item"><input type="checkbox" disabled> Publish the release notes<\/li>/);
 });
 
 test("renders only safe links and images while keeping unsafe URLs readable", () => {

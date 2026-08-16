@@ -2455,6 +2455,55 @@
         overflow: auto;
         padding: 1rem;
       }
+      #rendered-document :not(pre) > code {
+        background: var(--docdiagram-code-background);
+        border-radius: 4px;
+        font-size: .9em;
+        padding: .12em .3em;
+      }
+      #rendered-document blockquote {
+        border-left: 4px solid var(--docdiagram-border);
+        color: var(--docdiagram-muted);
+        margin-left: 0;
+        padding-left: 1rem;
+      }
+      #rendered-document hr {
+        border: 0;
+        border-top: 1px solid var(--docdiagram-border);
+        margin: 2rem 0;
+      }
+      #rendered-document a {
+        color: inherit;
+        text-decoration-thickness: .1em;
+        text-underline-offset: .15em;
+      }
+      #rendered-document img {
+        height: auto;
+        max-width: 100%;
+      }
+      #rendered-document table {
+        border-collapse: collapse;
+        display: block;
+        max-width: 100%;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+      #rendered-document th,
+      #rendered-document td {
+        border: 1px solid var(--docdiagram-border);
+        padding: .55rem .75rem;
+      }
+      #rendered-document th {
+        background: var(--docdiagram-code-background);
+        font-weight: 600;
+      }
+      #rendered-document .docdiagram-task-list-item {
+        list-style: none;
+      }
+      #rendered-document .docdiagram-task-list-item input {
+        accent-color: currentColor;
+        margin: 0 .45rem 0 0;
+      }
       #rendered-document[data-theme="light"],
       .docdiagram-toolbar[data-theme="light"] {
         --docdiagram-background: #ffffff;

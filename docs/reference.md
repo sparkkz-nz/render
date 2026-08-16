@@ -40,18 +40,41 @@ runtime reports unsupported `theme` and `colourScheme` values.
 
 ## Markdown compatibility
 
-The current compact renderer supports:
+render supports a deliberately defined compatibility target: CommonMark-style
+document structure plus the GFM additions listed below. It is not an open-ended
+Markdown implementation; unsupported syntax remains visible source instead of
+being silently removed or converted.
 
-- headings with one to three `#` characters;
-- paragraphs;
-- unordered lists using `-`;
-- ordinary fenced code blocks;
-- `diagram` fenced blocks.
+| Construct | Status | Notes |
+| --- | --- | --- |
+| Headings | Supported | Levels 1 through 6. |
+| Paragraphs and thematic breaks | Supported | Use blank lines between paragraphs; `---`, `***`, and `___` create a thematic break. |
+| Ordered and unordered lists | Supported | Nested lists are supported. Ordered lists retain a non-`1` start value. |
+| Block quotes | Supported | Prefix consecutive lines with `>`. |
+| Emphasis, strong text, and strikethrough | Supported | Use `*text*`, `**text**`, and `~~text~~`. |
+| Inline code | Supported | Use backticks, such as `` `value` ``. |
+| Links | Supported with safe URLs | Relative URLs, fragments, `http:`, `https:`, and `mailto:` are rendered. Other schemes, including `javascript:`, stay readable Markdown source. |
+| Fenced code blocks | Supported | The fence language produces a `language-<name>` class on `<code>`; render does not provide syntax highlighting. |
+| Tables | Supported | Header rows, left/centre/right alignment, and escaped cell separators (`\|`) are supported. |
+| Task lists | Supported | `- [ ]` and `- [x]` render as disabled checkboxes because prose editing is not available. |
+| Images | Supported with safe URLs | Relative images and safe `http:`, `https:`, or `data:image/(gif\|jpeg\|png\|webp);base64,...` sources render with their Markdown alt text. |
+| Raw HTML | Intentionally literal | HTML is escaped and displayed as source; it is never executed or interpreted. |
+| Other Markdown extensions | Intentionally literal | Keep unsupported input readable rather than relying on undocumented output. |
 
-Text is escaped before rendering. Ordered and nested lists, block quotes,
-emphasis, links, tables, images, task lists, raw HTML, and language-specific
-code-block classes are not yet Markdown features. Keep unsupported constructs
-readable as source rather than expecting semantic rendering.
+`diagram` remains a render-specific fence rather than an ordinary code block.
+All other fenced blocks, including a `text` block containing the word `diagram`,
+render as code.
+
+### Table example
+
+```markdown
+| Component | Owner | Status |
+| :--- | :---: | ---: |
+| API\|gateway | Platform | Ready |
+```
+
+The alignment separator row is required. Escape a literal pipe inside a cell
+with a backslash.
 
 ## Diagram fences
 
