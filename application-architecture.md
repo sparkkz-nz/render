@@ -56,7 +56,7 @@ mutation helpers for Node tests.
 - Document parsing reads optional YAML frontmatter and accepts the `light` or `dark` theme. The selected theme styles both the surrounding document and diagram defaults.
 - Markdown rendering intentionally supports a compact subset: headings, paragraphs, unordered lists, ordinary fenced code blocks, and fenced `diagram` blocks.
 - Diagram parsing accepts a restricted YAML structure with a canvas, nodes, and edges. Validation requires every node to declare a supported shape and every edge to declare source and target anchors.
-- SVG rendering resolves semantic node types and optional per-item style overrides, builds shape geometry and anchors, draws edge routes and markers, and renders multiline labels as centred `tspan` elements.
+- SVG rendering resolves node palettes and optional per-item style overrides, builds shape geometry and anchors, draws edge routes and markers, and renders multiline labels as centred `tspan` elements.
 - Edit orchestration owns selection, drag and resize behavior, inline text editing, connector creation/reconnection, the inspector, zoom, and source persistence.
 
 ```mermaid
@@ -100,6 +100,7 @@ theme: dark
 # A technical document
 
 ```diagram
+type: flowchart
 version: 1
 canvas:
   width: 800
@@ -107,7 +108,6 @@ canvas:
 nodes:
   - id: api
     label: API
-    type: service
     shape: rounded-rectangle
     position: { x: 100, y: 100 }
     size: { width: 190, height: 80 }
@@ -115,9 +115,8 @@ edges:
 ```
 ````
 
-Each node has an identifier, label, semantic type, shape, position, and size.
-Supported node types are `application`, `service`, `datastore`, and `note`;
-type selects default colour treatment rather than rendering visible text.
+Each node has an identifier, label, shape, position, and size. A node may select
+a `palette` with a `tone` and `colour`, or use explicit style overrides.
 Supported shapes include rounded rectangles, circles, ovals, databases,
 diamonds, rhombuses, flattened hexagons, chevrons, and right chevrons.
 

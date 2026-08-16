@@ -178,10 +178,12 @@ reordering, and custom breakpoints are intentionally unsupported.
 
 ## Diagram fences
 
-Use a `diagram` fenced block containing the flowchart YAML model:
+Use a `diagram` fenced block. Every diagram declares its `type`, which selects
+its canonical YAML model:
 
 ````markdown
 ```diagram
+type: flowchart
 version: 1
 id: payment-flow
 canvas:
@@ -201,12 +203,15 @@ object fields use six spaces. Blank lines and `#` comments are allowed.
 
 | Field | Required | Description |
 | --- | --- | --- |
+| `type` | Yes | `flowchart` or `sequence`. |
 | `version` | No | A document-defined diagram version, commonly `1`. |
 | `id` | No | A document-defined diagram identifier. |
 | `theme` | No | `light` or `dark`; overrides document `theme`. |
 | `canvas` | Yes | Canvas mapping containing `width`, `height`, and optional `grid`. |
-| `nodes` | Yes | List of nodes. |
-| `edges` | Yes | List of connectors. |
+| `nodes` | Flowchart | List of flowchart nodes. |
+| `edges` | Flowchart | List of flowchart connectors. |
+| `participants` | Sequence | Ordered sequence participants. |
+| `messages` | Sequence | Ordered sequence messages. |
 
 `canvas.width` and `canvas.height` are numeric SVG canvas dimensions. A positive
 numeric `canvas.grid` enables snapping while moving or resizing; omit it or use
@@ -221,7 +226,6 @@ and `size` as well:
 - id: payments-api
   label: Payments API
   subtitle: Owns payment intents
-  type: service
   shape: oval
   position: { x: 420, y: 210 }
   size: { width: 220, height: 100 }
@@ -234,11 +238,10 @@ and `size` as well:
 | `id` | Stable identifier used by edges. |
 | `label` | Node text. Newlines are supported. |
 | `subtitle` | Optional text below the label; newlines are supported. |
-| `type` | Semantic theme default: `application`, `service`, `datastore`, or `note`. It is not shown as node text. |
-| `shape` | **Required.** `rounded-rectangle`, `circle`, `oval`, `database`, `diamond`, `rhombus`, `flattened-hexagon`, `chevron`, or `right-chevron`. |
+| `shape` | **Required.** `rounded-rectangle`, `circle`, `oval`, `database`, `diamond`, `rhombus`, `flattened-hexagon`, `chevron`, `right-chevron`, or `document`. The `document` shape is a sheet of paper with a folded top-right corner. |
 | `position` | `{ x: number, y: number }` top-left canvas position. |
 | `size` | `{ width: number, height: number }`. Nodes have a minimum size; circles remain square. |
-| `palette` | Optional `{ tone, colour }`; replaces the default semantic colours and explicit node colour overrides. |
+| `palette` | Optional `{ tone, colour }`; selects the node's standard colours and clears explicit node colour overrides. |
 | `style` | Optional overrides: `fill`, `stroke`, `text`, and `strokeWidth`. `style.width` is rejected. |
 
 Palette `tone` is `light` or `dark`. Palette `colour` is `pink`, `red`,
@@ -273,6 +276,60 @@ Every edge requires both explicit endpoint anchors:
 Anchors resolve on the rendered shape perimeter. Endpoint markers follow the
 edge stroke colour and maintain their own definitions, so one edge's styling
 does not affect another.
+
+### Sequence diagrams
+
+Sequence diagrams use a separate model with deterministic layout. Participants
+appear left to right in source order and messages appear top to bottom in source
+order. They are edited through canonical source rather than the flowchart's
+graphical editor.
+
+```yaml
+type: sequence
+version: 1
+id: payment-authorisation
+participants:
+  - id: shopper
+    label: Shopper
+    kind: actor
+  - id: payments-api
+    label: Payments API
+messages:
+  - from: shopper
+    to: payments-api
+    label: Authorise payment
+    style: solid
+  - from: payments-api
+    to: shopper
+    label: Approved
+    style: dashed
+activations:
+  - participant: payments-api
+    from: 1
+    to: 2
+notes:
+  - at: payments-api
+    after: 1
+    label: Idempotency key checked
+groups:
+  - from: 1
+    to: 2
+    label: Payment flow
+```
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `participants` | Yes | Ordered entries with unique `id`, visible `label`, optional `kind: actor`, and optional `palette`, `style`, or `size`. Participant presentation also styles its activation bars. |
+| `messages` | Yes | Ordered entries with existing `from` and `to` participant IDs, visible `label`, and optional `style: solid` or `dashed`. |
+| `activations` | No | Entries with `participant` and inclusive one-based `from`/`to` message positions. |
+| `notes` | No | Entries with `at` participant ID, `after` message position, visible `label`, and optional `palette`, `style`, or `size`. Notes render above activation bars. |
+| `groups` | No | Entries with inclusive one-based `from`/`to` message positions and visible `label`. |
+
+For participants and notes, `palette` uses `{ tone, colour }`, `style` supports
+`fill`, `stroke`, `text`, and `strokeWidth`, and `size` supports positive
+`width` and `height` values. The graphical sequence inspector can edit
+participant, note, and message presentation, but structural changes remain
+source-editor-only.
 
 ## Editing and serialization
 

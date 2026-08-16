@@ -53,7 +53,7 @@ Make the project understandable and usable without reading the source code.
    - frontmatter keys and supported values;
    - supported Markdown;
    - diagram fences and the complete flowchart YAML schema;
-   - node types, shapes, palettes, styles, edge routes, anchors, markers, and
+   - node shapes, palettes, styles, edge routes, anchors, markers, and
      editing behavior;
    - runtime URL and release conventions;
    - known limitations.

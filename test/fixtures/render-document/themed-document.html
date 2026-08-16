@@ -18,6 +18,7 @@ colourScheme: classic
 This dark-themed document uses the classic colour scheme.
 
 ```diagram
+type: flowchart
 version: 1
 id: operations-overview
 canvas:
@@ -27,14 +28,12 @@ canvas:
 nodes:
   - id: monitor
     label: Monitoring
-    type: application
     shape: diamond
     position: { x: 60, y: 100 }
     size: { width: 160, height: 100 }
     palette: { tone: dark, colour: cyan }
   - id: on-call
     label: On-call engineer
-    type: note
     shape: chevron
     position: { x: 460, y: 100 }
     size: { width: 180, height: 100 }

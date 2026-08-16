@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Checkout request sequence</title>
+  <script src="https://sparkkz-nz.github.io/render/render-runtime.js" defer></script>
+</head>
+<body>
+  <template id="source" type="text/markdown">
+---
+theme: light
+---
+
+# Checkout request sequence
+
+The shopper submits a checkout request and receives the resulting response.
+
+```diagram
+type: sequence
+version: 1
+id: checkout-request
+participants:
+  - id: shopper
+    label: Shopper
+    kind: actor
+  - id: checkout
+    label: Checkout service
+    palette: { tone: light, colour: blue }
+    size: { width: 190, height: 48 }
+  - id: payments
+    label: Payments API
+messages:
+  - from: shopper
+    to: checkout
+    label: Submit checkout
+  - from: checkout
+    to: payments
+    label: Authorise payment
+    style: solid
+  - from: payments
+    to: checkout
+    label: Approved
+    style: dashed
+activations:
+  - participant: payments
+    from: 2
+    to: 3
+notes:
+  - at: payments
+    after: 2
+    label: Idempotency key checked
+    palette: { tone: light, colour: yellow }
+    size: { width: 210, height: 64 }
+groups:
+  - from: 1
+    to: 3
+    label: Checkout flow
+```
+  </template>
+  <main id="rendered-document"></main>
+</body>
+</html>
