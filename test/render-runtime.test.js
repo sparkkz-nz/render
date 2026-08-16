@@ -62,6 +62,8 @@ const {
   setStyleStrokeWidth,
   setEdgeMarkerStart,
   setEdgeMarkerEnd,
+  validateDocumentSource,
+  findSourceTextRange,
   splitTextLines,
   renderTextBlock,
   computeNodeTextLayout,
@@ -118,6 +120,122 @@ test("extracts document frontmatter without treating it as Markdown content", ()
 
   assert.equal(document.frontmatter.theme, "dark");
   assert.equal(document.content, "\n# Payments");
+});
+
+test("validates a complete source document before it is committed", () => {
+  const document = validateDocumentSource([
+    "---",
+    "theme: dark",
+    "---",
+    "",
+    "# Payments"
+  ].join("\n"));
+
+  assert.equal(document.theme, "dark");
+  assert.equal(document.content, "\n# Payments");
+});
+
+test("finds the first canonical source range for rendered text navigation", () => {
+  const source = "# Payments\n\nThe Payments API creates an intent.";
+  const range = findSourceTextRange(source, "Payments");
+
+  assert.equal(range.start, 2);
+  assert.equal(range.end, 10);
+  assert.equal(findSourceTextRange(source, "Missing"), null);
+  assert.equal(findSourceTextRange(source, "   "), null);
+});
+
+test("rejects malformed frontmatter before source commit", () => {
+  assert.throws(
+    () => validateDocumentSource("---\ntheme dark\n---\n\n# Payments"),
+    /Cannot parse document frontmatter line/
+  );
+});
+
+test("rejects invalid diagram source before source commit", () => {
+  assert.throws(
+    () => validateDocumentSource([
+      "# Payments",
+      "",
+      "```diagram",
+      "version: 1",
+      "canvas:",
+      "  width: 800",
+      "  height: 500",
+      "nodes:",
+      "  - id: api",
+      "    label: API",
+      "    type: service",
+      "    shape: rounded-rectangle",
+      "    position: { x: 100, y: 100 }",
+      "    size: { width: 190, height: 80 }",
+      "edges:",
+      "  - source: api",
+      "    target: api",
+      "    targetAnchor: left",
+      "```"
+    ].join("\n")),
+    /requires a sourceAnchor/
+  );
+});
+
+test("rejects diagrams missing a node identifier or label before source commit", () => {
+  assert.throws(
+    () => validateDocumentSource([
+      "```diagram",
+      "version: 1",
+      "canvas:",
+      "  width: 400",
+      "  height: 200",
+      "nodes:",
+      "  - id: api",
+      "    type: service",
+      "    shape: rounded-rectangle",
+      "edges:",
+      "```"
+    ].join("\n")),
+    /Every node requires an id and label/
+  );
+});
+
+test("validates diagram fences with trailing closing-fence whitespace", () => {
+  assert.throws(
+    () => validateDocumentSource([
+      "```diagram",
+      "this is not valid diagram YAML",
+      "```   "
+    ].join("\n")),
+    /Cannot parse diagram line/
+  );
+});
+
+test("rejects an unclosed code fence before source commit", () => {
+  assert.throws(
+    () => validateDocumentSource("```diagram\nversion: 1"),
+    /Unclosed code block/
+  );
+});
+
+test("keeps rendering document content around an invalid diagram outside source editing", () => {
+  const markup = renderMarkdown([
+    "# Before",
+    "",
+    "```diagram",
+    "version: 1",
+    "canvas:",
+    "  width: 400",
+    "  height: 200",
+    "nodes:",
+    "  - id: api",
+    "    label: API",
+    "edges:",
+    "```",
+    "",
+    "## After"
+  ].join("\n"));
+
+  assert.match(markup, /Diagram could not be rendered/);
+  assert.match(markup, /<h2>After<\/h2>/);
 });
 
 test("renders the documented CommonMark and GFM compatibility baseline semantically", () => {

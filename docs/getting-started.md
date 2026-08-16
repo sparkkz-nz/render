@@ -73,11 +73,16 @@ there. Do not place authored content directly inside `#rendered-document`.
 
 1. Open `architecture.html` in a modern browser, including directly through a
    `file://` URL.
-2. Use the diagram toolbar's **Edit diagram** action.
-3. Select a node or edge to change its supported properties, or drag and resize
+2. Choose **Edit source** from the document menu to open the lower source tray.
+   Markdown changes render after a short pause without a refresh. If the draft is
+   invalid, the tray reports the problem while the last valid document remains
+   visible.
+3. Use the diagram toolbar's **Edit diagram** action.
+4. Select a node or edge to change its supported properties, or drag and resize
    nodes. The runtime updates the embedded diagram source.
-4. Use **Save a copy** from the document menu to download a new HTML file.
-5. Open the downloaded file to verify the edits survived.
+5. Use **Save a copy** from the document menu (or Cmd/Ctrl+S) to download a new
+   HTML file.
+6. Open the downloaded file to verify the edits survived.
 
 The document needs network access when it references a hosted runtime. Its
 source and saved edits remain inside the downloaded HTML file.

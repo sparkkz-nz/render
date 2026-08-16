@@ -283,8 +283,33 @@ lines: **Enter** adds a line, **Ctrl/Cmd+Enter** commits, and **Escape** cancels
 
 Every retained edit serializes the diagram back into its matching `diagram`
 fence in `template#source`. **Save a copy** downloads a complete HTML document
-containing that updated source. Diagram editing is source-preserving for the
-supported diagram model; there is no general Markdown source editor yet.
+containing that updated source.
+
+The document menu's **Edit source** action opens a resizable lower tray with the
+complete canonical Markdown source. Valid changes are rendered after a short
+debounce and committed directly to `template#source`; the tray stays open and
+keeps focus while the document updates. The runtime preserves the reader and
+diagram scroll positions where possible.
+
+If a draft has a frontmatter or diagram schema error, the last valid rendered
+document and its canonical source remain unchanged. The tray retains the draft
+and reports the precise error, so correcting it resumes live rendering. Saving
+always uses the latest valid canonical source; an invalid draft cannot be saved
+into a portable document. Closing a tray with an invalid draft asks whether to
+discard that draft. Saving while an invalid draft is open asks whether to save
+the last valid version instead.
+
+Use Cmd/Ctrl+Shift+E to open or close the source tray; opening is suppressed
+while focus is in another editable field, but the shortcut closes an open tray
+even from its textarea. Escape closes an open document menu but does not discard
+source text. Cmd/Ctrl+S downloads the current valid source. Native textarea undo
+and redo work normally and each undo or redo follows the same live-render path.
+Closing the tray returns keyboard focus to the document-menu button.
+
+Double-click rendered document text to open the source tray and select its first
+matching canonical-source occurrence. Generated controls and text with no exact
+source match are ignored. This navigation intentionally runs only from rendered
+content to source; source text does not attempt to infer a rendered location.
 
 ## Runtime channels and limitations
 
@@ -293,5 +318,5 @@ short-lived branch testing, and `/releases/<tag>/` for immutable published
 documents. See [getting started](getting-started.md) for URLs and examples.
 
 Current limitations include the intentionally small Markdown subset, flowcharts
-as the only diagram type, no Mermaid import, no source-editor tray, and no
-offline runtime embedding. Planned work is listed in the [roadmap](roadmap.md).
+as the only diagram type, no Mermaid import, and no offline runtime embedding.
+Planned work is listed in the [roadmap](roadmap.md).
