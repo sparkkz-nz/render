@@ -10,15 +10,24 @@
   <template id="source" type="text/markdown">
 ---
 theme: dark
+colourScheme: classic
 ---
 
-# Payments architecture
+# Payments architecture and document components
 
+This editable example combines a **payment-intent architecture** with the
+Markdown, component, and responsive-layout features available to render.
+
+:::callout { kind=info title="Editing this document" tone=dark colour=cyan }
+The Markdown in this document is canonical. Diagram controls can change node
+positions, sizes, labels, connectors, and styles; **Save a copy** retains those
+diagram changes in the source.
+::: (editing information)
+
+:::section { title="Payment intent flow" tone=dark colour=blue }
 The Payments API owns the payment-intent lifecycle and persists the resulting
-state.
-
-- Diagram placement is intentional and stored in source.
-- The visual output is SVG, so it remains crisp at any zoom level.
+state. Diagram placement is intentional and stored in source, while the SVG
+output remains crisp at any zoom level.
 
 ```diagram
 version: 1
@@ -66,6 +75,127 @@ edges:
     route: curved
     end: circle
 ```
+::: (payment intent flow)
+
+---
+
+:::grid { columns=3 }
+:::panel { title="Plan" tone=dark colour=blue }
+## Define the contract
+
+1. Accept a payment request.
+   - Reuse an idempotency key for retries.
+   - Validate the requested amount and currency.
+2. Return a stable payment-intent identifier.
+
+The public endpoint is [`POST /payments`](https://example.com/api/payments).
+::: (plan panel)
+
+:::panel { title="Build" tone=dark colour=green }
+## Store state safely
+
+| Component | Responsibility | Status |
+| :--- | :---: | ---: |
+| Web app | Collect customer input | Ready |
+| Payments API | Create intents | Ready |
+| Payments DB | Persist encrypted records | Ready |
+
+Use inline code such as `paymentIntentId` for field names.
+::: (build panel)
+
+:::callout { kind=success title="Validate before release" tone=dark colour=purple }
+## Release checklist
+
+- [x] Diagram has explicit node shapes and edge anchors.
+- [x] Retry behaviour is documented.
+- [ ] Confirm production credentials and monitoring.
+
+> **Reminder:** a successful response does not guarantee downstream settlement.
+::: (validation callout)
+::: (three-column delivery grid)
+
+:::section { title="Asymmetric supporting detail" }
+The following layout uses a two-thirds primary column and a one-third stack.
+It collapses to a single column on narrow screens while preserving this source
+order.
+
+:::grid { columns="2fr 1fr" }
+:::panel { title="Request lifecycle" tone=dark colour=cyan }
+### Handling a request
+
+The service creates an intent, records it, and responds to the caller. It may
+later send an event to a processor or ledger.
+
+```javascript
+const response = await createPaymentIntent(request);
+```
+
+```diagram
+version: 1
+id: request-lifecycle
+canvas:
+  width: 820
+  height: 320
+nodes:
+  - id: request
+    label: Payment request
+    type: application
+    shape: rounded-rectangle
+    position: { x: 50, y: 110 }
+    size: { width: 180, height: 80 }
+  - id: intent
+    label: Payment intent
+    type: service
+    shape: chevron
+    position: { x: 320, y: 110 }
+    size: { width: 200, height: 80 }
+  - id: ledger
+    label: Ledger
+    type: datastore
+    shape: database
+    position: { x: 630, y: 100 }
+    size: { width: 150, height: 100 }
+edges:
+  - source: request
+    target: intent
+    sourceAnchor: right
+    targetAnchor: left
+    label: Validate
+    route: straight
+  - source: intent
+    target: ledger
+    sourceAnchor: right
+    targetAnchor: left
+    label: Persist
+    route: orthogonal
+    start: circle
+    end: arrow
+```
+::: (request lifecycle panel)
+
+:::stack
+:::callout { kind=warning title="Idempotency is required" tone=dark colour=orange }
+Send the same idempotency key for a retry. A new key can create a separate
+payment intent.
+::: (idempotency warning)
+
+:::panel { title="Operational notes" fill=#263947 stroke=#71AEF7 text=#F3F8FC }
+### What to monitor
+
+- API error rate
+- Intent creation latency
+- Persistence failures
+
+Raw HTML such as `<strong>this</strong>` stays literal for safety.
+::: (operational notes)
+
+:::callout { kind=note title="Human-readable source" tone=dark colour=grey }
+Closing annotations such as this one make deeply nested directives easier to
+review without changing their meaning.
+::: (source note)
+::: (supporting detail stack)
+::: (asymmetric detail grid)
+::: (asymmetric supporting detail section)
   </template>
 
   <main id="rendered-document"></main>
