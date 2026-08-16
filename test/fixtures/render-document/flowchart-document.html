@@ -18,6 +18,7 @@ The storefront submits a new order to the order service, which records it in
 the order database.
 
 ```diagram
+type: flowchart
 version: 1
 id: order-processing
 canvas:
@@ -26,22 +27,22 @@ canvas:
 nodes:
   - id: storefront
     label: Storefront
-    type: application
     shape: rounded-rectangle
     position: { x: 50, y: 110 }
     size: { width: 180, height: 80 }
+    palette: { tone: light, colour: blue }
   - id: orders-api
     label: Order service
-    type: service
     shape: oval
     position: { x: 360, y: 110 }
     size: { width: 180, height: 80 }
+    palette: { tone: light, colour: green }
   - id: orders-db
     label: Orders database
-    type: datastore
     shape: database
     position: { x: 670, y: 110 }
     size: { width: 180, height: 80 }
+    palette: { tone: light, colour: purple }
 edges:
   - source: storefront
     target: orders-api

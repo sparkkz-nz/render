@@ -32,6 +32,7 @@ colourScheme: classic
 The browser sends payment requests to the checkout service.
 
 ```diagram
+type: flowchart
 version: 1
 id: checkout-flow
 canvas:
@@ -41,16 +42,16 @@ canvas:
 nodes:
   - id: browser
     label: Browser
-    type: application
     shape: rounded-rectangle
     position: { x: 60, y: 100 }
     size: { width: 180, height: 80 }
+    palette: { tone: light, colour: blue }
   - id: checkout
     label: Checkout service
-    type: service
     shape: oval
     position: { x: 460, y: 100 }
     size: { width: 180, height: 80 }
+    palette: { tone: light, colour: green }
 edges:
   - source: browser
     target: checkout
@@ -86,6 +87,32 @@ there. Do not place authored content directly inside `#rendered-document`.
 
 The document needs network access when it references a hosted runtime. Its
 source and saved edits remain inside the downloaded HTML file.
+
+## Add a sequence diagram
+
+Use a separate `sequence` model when the order of interactions matters:
+
+````markdown
+```diagram
+type: sequence
+version: 1
+id: checkout-request
+participants:
+  - id: shopper
+    label: Shopper
+    kind: actor
+  - id: checkout
+    label: Checkout service
+messages:
+  - from: shopper
+    to: checkout
+    label: Submit checkout
+```
+````
+
+Sequence diagrams have deterministic participant and message placement. Edit
+their canonical YAML in the source tray; graphical diagram editing applies only
+to flowcharts.
 
 ## Choose a runtime URL
 

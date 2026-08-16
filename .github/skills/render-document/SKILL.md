@@ -91,23 +91,26 @@ fixed widths, column spans, source reordering, or custom breakpoints.
 Close directives with `:::`. Optional text following whitespace is an ignored
 annotation for nesting readability, such as `::: (supporting stack)`.
 
-## Flowchart rules
+## Diagram rules
 
-Flowcharts use fenced `diagram` YAML. Every node must have a supported `shape`.
-Every edge must include both `sourceAnchor` and `targetAnchor`. Use only the
-values in the syntax reference, including:
+Every fenced `diagram` YAML block must declare `type: flowchart` or
+`type: sequence`. Flowchart nodes must have a supported `shape`, and every
+flowchart edge must include both `sourceAnchor` and `targetAnchor`. Use only
+the values in the syntax reference, including:
 
 - node shapes: `rounded-rectangle`, `circle`, `oval`, `database`, `diamond`,
-  `rhombus`, `flattened-hexagon`, `chevron`, and `right-chevron`;
-- node types: `application`, `service`, `datastore`, and `note`;
+  `rhombus`, `flattened-hexagon`, `chevron`, `right-chevron`, and `document`;
+- node palettes: `{ tone: light|dark, colour: pink|red|orange|yellow|green|cyan|blue|purple|grey|bw }`;
 - anchors: `top`, `right`, `bottom`, and `left`;
 - routes: `orthogonal`, `straight`, and `curved`;
 - endpoint markers: `none`, `arrow`, and `circle`.
 
 Use explicit, stable node IDs and labels that describe a reader-visible
-responsibility. Keep the diagram compact and include adjacent prose that
-explains the flow. Do not use Mermaid fences, sequence diagrams, raw HTML, or
-other syntax not documented in the syntax reference.
+responsibility. A node's shape is geometry only; choose its appearance with a
+palette or explicit style values, never a domain-specific `type`. Keep the
+diagram compact and include adjacent prose that explains the flow. Sequence
+diagrams use ordered participants and messages; do not add arbitrary positions
+or Mermaid syntax.
 
 ## Validation checklist
 
@@ -120,8 +123,9 @@ Before returning a document, verify:
 - Frontmatter, if present, is at the start and uses only supported values.
 - The Markdown uses only documented Markdown and formatting directives; grids
   contain only panels, callouts, or stacks as direct children.
-- Every diagram parses with its explicit shape and edge anchors, and uses only
-  supported palette, route, marker, and style values.
+- Every diagram declares its supported type. Every flowchart has explicit shapes
+  and edge anchors and uses only supported palette, route, marker, and style
+  values.
 - A reader can understand each diagram from its heading, labels, and nearby
   prose.
 - The finished file can be opened in a browser directly from the local file

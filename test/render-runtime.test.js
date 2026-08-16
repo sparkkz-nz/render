@@ -16,7 +16,7 @@ const context = vm.createContext({
 vm.runInContext(runtime, context, { filename: "render-runtime.js" });
 
 const {
-  nodeTypes,
+  supportedDiagramTypes,
   nodeColorPalettes,
   nodeColorSchemes,
   nodeShapes,
@@ -49,7 +49,6 @@ const {
   clampNodeSize,
   serializeDiagram,
   setNodeLabel,
-  setNodeType,
   setNodeShape,
   setNodeSubtitle,
   setNodeStyleOverride,
@@ -86,12 +85,23 @@ function readDiagramSources(source) {
   return [...source.matchAll(/^```diagram\s*\n([\s\S]*?)^```$/gm)].map((match) => match[1]);
 }
 
+function flowchartSource(source) {
+  const body = Array.isArray(source) ? source.join("\n") : String(source);
+  return `type: flowchart\n${body}`;
+}
+
+function sequenceSource(source) {
+  const body = Array.isArray(source) ? source.join("\n") : String(source);
+  return `type: sequence\n${body}`;
+}
+
 test("render authoring skill fixtures use the required shell and valid source", () => {
   const fixtureDirectory = path.resolve(__dirname, "fixtures", "render-document");
   const fixtures = [
     "simple-document.html",
     "flowchart-document.html",
-    "themed-document.html"
+    "themed-document.html",
+    "sequence-document.html"
   ];
 
   for (const fixture of fixtures) {
@@ -158,6 +168,7 @@ test("rejects invalid diagram source before source commit", () => {
       "# Payments",
       "",
       "```diagram",
+      "type: flowchart",
       "version: 1",
       "canvas:",
       "  width: 800",
@@ -165,7 +176,6 @@ test("rejects invalid diagram source before source commit", () => {
       "nodes:",
       "  - id: api",
       "    label: API",
-      "    type: service",
       "    shape: rounded-rectangle",
       "    position: { x: 100, y: 100 }",
       "    size: { width: 190, height: 80 }",
@@ -183,13 +193,13 @@ test("rejects diagrams missing a node identifier or label before source commit",
   assert.throws(
     () => validateDocumentSource([
       "```diagram",
+      "type: flowchart",
       "version: 1",
       "canvas:",
       "  width: 400",
       "  height: 200",
       "nodes:",
       "  - id: api",
-      "    type: service",
       "    shape: rounded-rectangle",
       "edges:",
       "```"
@@ -198,10 +208,51 @@ test("rejects diagrams missing a node identifier or label before source commit",
   );
 });
 
+test("requires a supported diagram type and rejects removed flowchart node.type fields", () => {
+  assert.throws(
+    () => parseDiagram([
+      "canvas:",
+      "  width: 400",
+      "  height: 200",
+      "nodes:",
+      "edges:"
+    ].join("\n")),
+    /Diagram type is required/
+  );
+
+  assert.throws(
+    () => parseDiagram([
+      "type: mindmap",
+      "canvas:",
+      "  width: 400",
+      "  height: 200",
+      "nodes:",
+      "edges:"
+    ].join("\n")),
+    /Unsupported diagram type: mindmap/
+  );
+
+  assert.throws(
+    () => parseDiagram(flowchartSource([
+      "canvas:",
+      "  width: 400",
+      "  height: 200",
+      "nodes:",
+      "  - id: api",
+      "    label: API",
+      "    type: service",
+      "    shape: rounded-rectangle",
+      "edges:"
+    ].join("\n"))),
+    /uses removed field "type"/
+  );
+});
+
 test("validates diagram fences with trailing closing-fence whitespace", () => {
   assert.throws(
     () => validateDocumentSource([
       "```diagram",
+      "type: flowchart",
       "this is not valid diagram YAML",
       "```   "
     ].join("\n")),
@@ -221,6 +272,7 @@ test("keeps rendering document content around an invalid diagram outside source 
     "# Before",
     "",
     "```diagram",
+      "type: flowchart",
     "version: 1",
     "canvas:",
     "  width: 400",
@@ -289,6 +341,7 @@ test("keeps diagram fences distinct from language-labelled code fences", () => {
     "```",
     "",
     "```diagram",
+      "type: flowchart",
     "canvas:",
     "  width: 600",
     "  height: 300",
@@ -304,6 +357,7 @@ test("keeps diagram fences distinct from language-labelled code fences", () => {
 test("shares diagram indices with diagrams nested in block quotes", () => {
   const diagram = [
     "```diagram",
+      "type: flowchart",
     "canvas:",
     "  width: 600",
     "  height: 300",
@@ -414,19 +468,18 @@ test("marks explicitly styled components so their palette takes precedence over 
 });
 
 test("diagram markup provides compact view-mode zoom and edit controls", () => {
-  const markup = renderDiagram([
+  const markup = renderDiagram(flowchartSource([
     "canvas:",
     "  width: 800",
     "  height: 500",
     "nodes:",
     "  - id: api",
-    "    type: application",
     "    shape: rounded-rectangle",
     "    label: API",
     "    position: { x: 100, y: 100 }",
     "    size: { width: 190, height: 80 }",
     "edges:"
-  ].join("\n"), 0);
+  ].join("\n")), 0);
 
   assert.match(markup, /class="docdiagram-diagram-toolbar"/);
   assert.match(markup, /class="docdiagram-icon-button docdiagram-zoom-in"/);
@@ -436,6 +489,74 @@ test("diagram markup provides compact view-mode zoom and edit controls", () => {
   assert.match(markup, /aria-label="Zoom in"/);
   assert.match(markup, /aria-label="Zoom to fit"/);
   assert.match(markup, /aria-label="Edit diagram"/);
+});
+
+test("sequence diagrams parse, round-trip, and render with lightweight edit controls", () => {
+  const source = sequenceSource([
+    "theme: dark",
+    "participants:",
+    "  - id: client",
+    "    label: Client",
+    "    kind: actor",
+    "    palette: { tone: dark, colour: blue }",
+    "    size: { width: 200, height: 56 }",
+    "  - id: server",
+    "    label: Server",
+    "    palette: { tone: dark, colour: green }",
+    "    size: { width: 200, height: 56 }",
+    "messages:",
+    "  - from: client",
+    "    to: server",
+    "    label: GET /api/data",
+    "    style: solid",
+    "  - from: server",
+    "    to: client",
+    "    label: 200 OK",
+    "    style: dashed",
+    "activations:",
+    "  - participant: server",
+    "    from: 1",
+    "    to: 2",
+    "notes:",
+    "  - at: server",
+    "    after: 1",
+    "    label: Process request",
+    "    palette: { tone: light, colour: yellow }",
+    "    size: { width: 220, height: 64 }",
+    "groups:",
+    "  - label: Authentication",
+    "    from: 1",
+    "    to: 2"
+  ].join("\n"));
+  const diagram = parseDiagram(source);
+
+  assert.equal(diagram.type, "sequence");
+  assert.equal(diagram.participants[0].kind, "actor");
+  assert.equal(diagram.messages[0].style, "solid");
+  assert.equal(diagram.messages[1].style, "dashed");
+  assert.equal(diagram.activations[0].participant, "server");
+  assert.equal(diagram.participants[1].size.width, 200);
+  assert.equal(diagram.notes[0].size.height, 64);
+  assert.equal(JSON.stringify(parseDiagram(serializeDiagram(diagram))), JSON.stringify(diagram));
+
+  const markup = renderDiagram(source, 1);
+
+  assert.match(markup, /aria-label="Sequence diagram"/);
+  assert.match(markup, /Client/);
+  assert.match(markup, /Server/);
+  assert.match(markup, /GET \/api\/data/);
+  assert.match(markup, /200 OK/);
+  assert.match(markup, /Process request/);
+  assert.match(markup, /Authentication/);
+  assert.match(markup, /docdiagram-sequence-lifeline/);
+  assert.match(markup, /docdiagram-sequence-activation/);
+  assert.match(markup, /stroke-dasharray="8 5"/);
+  assert.match(markup, /width="200" height="56"/);
+  assert.match(markup, /width="220" height="64"/);
+  assert.match(markup, /docdiagram-sequence-activation[^>]*fill="#15803D"/);
+  assert.ok(markup.indexOf("docdiagram-sequence-activation") < markup.indexOf("docdiagram-sequence-note"));
+  assert.match(markup, /docdiagram-start-editing/);
+  assert.doesNotMatch(markup, /docdiagram-create-node/);
 });
 
 test("clampZoom limits diagram zoom to supported discrete bounds", () => {
@@ -487,9 +608,7 @@ test("resolves the actual example document's dark theme", () => {
   assert.equal(document.colourScheme, "classic");
   assert.match(document.content, /^# Payments architecture/m);
   assert.match(document.content, /:::grid \{ columns=3 \}/);
-  assert.equal(readDiagramSources(document.content).length, 2);
-  assert.doesNotMatch(renderMarkdown(document.content), /docdiagram-error/);
-
+  assert.equal(readDiagramSources(document.content).length, 3);
   for (const diagramSource of readDiagramSources(document.content)) {
     assert.doesNotThrow(() => parseDiagram(diagramSource));
   }
@@ -529,7 +648,6 @@ test("creates uniquely identified default nodes at a grid-aligned available posi
     nodes: [{
       id: "new-node",
       label: "Existing",
-      type: "service",
       shape: "rounded-rectangle",
       position: { x: 200, y: 110 },
       size: { width: 190, height: 80 }
@@ -544,7 +662,6 @@ test("creates uniquely identified default nodes at a grid-aligned available posi
   assert.equal(JSON.stringify(node), JSON.stringify({
     id: "new-node-2",
     label: "New node",
-    type: "application",
     shape: "rounded-rectangle",
     position: { x: 210, y: 190 },
     size: { width: 190, height: 80 }
@@ -581,10 +698,11 @@ test("creates, reconnects, and deletes connectors without dangling endpoints", (
 
 test("cascade deletion and every lifecycle mutation preserve a serializable diagram", () => {
   const diagram = {
+    type: "flowchart",
     canvas: { width: 600, height: 300 },
     nodes: [
-      { id: "api", label: "API", type: "service", shape: "rounded-rectangle", position: { x: 20, y: 40 }, size: { width: 190, height: 80 } },
-      { id: "db", label: "DB", type: "datastore", shape: "database", position: { x: 320, y: 40 }, size: { width: 190, height: 80 } }
+      { id: "api", label: "API", shape: "rounded-rectangle", position: { x: 20, y: 40 }, size: { width: 190, height: 80 } },
+      { id: "db", label: "DB", shape: "database", position: { x: 320, y: 40 }, size: { width: 190, height: 80 } }
     ],
     edges: []
   };
@@ -599,7 +717,7 @@ test("cascade deletion and every lifecycle mutation preserve a serializable diag
 });
 
 test("parses and serializes diagram themes and style overrides", () => {
-  const source = [
+  const source = flowchartSource([
     "version: 1",
     "id: themed-flow",
     "theme: dark",
@@ -610,7 +728,6 @@ test("parses and serializes diagram themes and style overrides", () => {
     "nodes:",
     "  - id: api",
     "    label: Payments API",
-    "    type: service",
     "    shape: rounded-rectangle",
     "    position: { x: 20, y: 40 }",
     "    size: { width: 180, height: 80 }",
@@ -621,7 +738,7 @@ test("parses and serializes diagram themes and style overrides", () => {
     "    sourceAnchor: right",
     "    targetAnchor: left",
     "    style: { stroke: #ABCDEF, strokeWidth: 3 }"
-  ].join("\n");
+  ].join("\n"));
   const diagram = parseDiagram(source);
 
   assert.equal(diagram.theme, "dark");
@@ -639,7 +756,7 @@ test("rejects an unsupported diagram theme", () => {
 });
 
 test("renders themed defaults and explicit style overrides", () => {
-  const source = [
+  const source = flowchartSource([
     "theme: dark",
     "canvas:",
     "  width: 600",
@@ -647,14 +764,12 @@ test("renders themed defaults and explicit style overrides", () => {
     "nodes:",
     "  - id: api",
     "    label: Payments API",
-    "    type: service",
     "    shape: rounded-rectangle",
     "    position: { x: 20, y: 40 }",
     "    size: { width: 180, height: 80 }",
     "    style: { fill: #123456, strokeWidth: 4 }",
     "  - id: db",
     "    label: Payments DB",
-    "    type: datastore",
     "    shape: rounded-rectangle",
     "    position: { x: 300, y: 40 }",
     "    size: { width: 180, height: 80 }",
@@ -664,18 +779,18 @@ test("renders themed defaults and explicit style overrides", () => {
     "    sourceAnchor: right",
     "    targetAnchor: left",
     "    style: { stroke: #ABCDEF, strokeWidth: 3 }"
-  ].join("\n");
+  ].join("\n"));
 
   const markup = renderDiagram(source, 0);
 
   assert.match(markup, /fill="#123456"/);
-  assert.match(markup, /stroke="#66D39A" stroke-width="4"/);
+  assert.match(markup, /stroke="#71AEF7" stroke-width="4"/);
   assert.match(markup, /stroke="#ABCDEF" stroke-width="3"/);
   assert.match(markup, /fill="#F3F8FC"/);
 });
 
 test("renders edges as selectable groups with a wide hit target", () => {
-  const source = [
+  const source = flowchartSource([
     "theme: light",
     "canvas:",
     "  width: 600",
@@ -684,13 +799,11 @@ test("renders edges as selectable groups with a wide hit target", () => {
     "  - id: api",
     "    label: Payments API",
     "    shape: rounded-rectangle",
-    "    type: service",
     "    position: { x: 20, y: 40 }",
     "    size: { width: 180, height: 80 }",
     "  - id: db",
     "    label: Payments DB",
     "    shape: rounded-rectangle",
-    "    type: datastore",
     "    position: { x: 300, y: 40 }",
     "    size: { width: 180, height: 80 }",
     "edges:",
@@ -699,7 +812,7 @@ test("renders edges as selectable groups with a wide hit target", () => {
     "    sourceAnchor: right",
     "    targetAnchor: left",
     "    label: Reads and writes"
-  ].join("\n");
+  ].join("\n"));
 
   const markup = renderDiagram(source, 2);
 
@@ -708,9 +821,9 @@ test("renders edges as selectable groups with a wide hit target", () => {
   assert.match(markup, /Reads and writes/);
 });
 
-test("nodeTypes, nodeShapes, edgeAnchors, edgeRoutes, and edgeMarkerStyles expose the supported inspector option sets", () => {
-  assert.equal(JSON.stringify([...nodeTypes]), JSON.stringify(["application", "service", "datastore", "note"]));
-  assert.equal(JSON.stringify([...nodeShapes]), JSON.stringify(["rounded-rectangle", "circle", "oval", "database", "diamond", "rhombus", "flattened-hexagon", "chevron", "right-chevron"]));
+test("supportedDiagramTypes, nodeShapes, edgeAnchors, edgeRoutes, and edgeMarkerStyles expose the supported option sets", () => {
+  assert.equal(JSON.stringify([...supportedDiagramTypes]), JSON.stringify(["flowchart", "sequence"]));
+  assert.equal(JSON.stringify([...nodeShapes]), JSON.stringify(["rounded-rectangle", "circle", "oval", "database", "diamond", "rhombus", "flattened-hexagon", "chevron", "right-chevron", "document"]));
   assert.equal(JSON.stringify([...edgeAnchors]), JSON.stringify(["top", "right", "bottom", "left"]));
   assert.equal(JSON.stringify([...edgeRoutes]), JSON.stringify(["orthogonal", "straight", "curved"]));
   assert.equal(JSON.stringify([...edgeMarkerStyles]), JSON.stringify(["none", "arrow", "circle"]));
@@ -718,7 +831,6 @@ test("nodeTypes, nodeShapes, edgeAnchors, edgeRoutes, and edgeMarkerStyles expos
 
 test("node color palettes replace manual fill, stroke, and text overrides together", () => {
   const node = {
-    type: "application",
     style: { fill: "#ffffff", stroke: "#000000", strokeWidth: 3, text: "#222222" }
   };
 
@@ -831,12 +943,12 @@ test("requires supported node shapes and explicit edge anchors without retaining
 
 test("resolves effective node and edge styles from theme defaults and overrides", () => {
   const diagram = { theme: "dark", canvas: {}, nodes: [], edges: [] };
-  const node = { id: "api", label: "Payments API", type: "service" };
+  const node = { id: "api", label: "Payments API" };
   const styledNode = { ...node, style: { fill: "#123456" } };
 
-  assert.equal(getNodeEffectiveStyle(diagram, node).fill, "#164A38");
+  assert.equal(getNodeEffectiveStyle(diagram, node).fill, "#193A61");
   assert.equal(getNodeEffectiveStyle(diagram, styledNode).fill, "#123456");
-  assert.equal(getNodeEffectiveStyle(diagram, styledNode).stroke, "#66D39A");
+  assert.equal(getNodeEffectiveStyle(diagram, styledNode).stroke, "#71AEF7");
 
   const edge = { source: "api", target: "api" };
   const styledEdge = { ...edge, style: { stroke: "#ABCDEF" } };
@@ -873,7 +985,7 @@ test("setFrontmatterTheme creates a frontmatter block when none exists", () => {
 });
 
 test("node inspector helpers mutate the canonical model and round-trip through YAML", () => {
-  const source = [
+  const source = flowchartSource([
     "canvas:",
     "  width: 600",
     "  height: 300",
@@ -881,7 +993,6 @@ test("node inspector helpers mutate the canonical model and round-trip through Y
     "nodes:",
     "  - id: api",
     "    label: Payments API",
-    "    type: service",
     "    shape: rounded-rectangle",
     "    position: { x: 20, y: 40 }",
     "    size: { width: 180, height: 80 }",
@@ -890,19 +1001,17 @@ test("node inspector helpers mutate the canonical model and round-trip through Y
     "    target: api",
     "    sourceAnchor: right",
     "    targetAnchor: left"
-  ].join("\n");
+  ].join("\n"));
   const diagram = parseDiagram(source);
   const node = diagram.nodes[0];
 
   setNodeLabel(node, "  Payment Gateway  ");
-  setNodeType(node, "application");
   setNodeStyleOverride(node, "fill", "#0000ff");
   setStyleStrokeWidth(node, "3.6");
   setNodeSize(diagram, node, "width", 123);
   setNodeSize(diagram, node, "height", 58);
 
   assert.equal(node.label, "Payment Gateway");
-  assert.equal(node.type, "application");
   assert.equal(node.style.fill, "#0000ff");
   assert.equal(node.style.strokeWidth, 4);
   assert.equal(node.size.width, 120);
@@ -910,7 +1019,6 @@ test("node inspector helpers mutate the canonical model and round-trip through Y
 
   const reparsed = parseDiagram(serializeDiagram(diagram));
   assert.equal(reparsed.nodes[0].label, "Payment Gateway");
-  assert.equal(reparsed.nodes[0].type, "application");
   assert.equal(reparsed.nodes[0].style.fill, "#0000ff");
   assert.equal(reparsed.nodes[0].style.strokeWidth, 4);
   assert.equal(reparsed.nodes[0].size.width, 120);
@@ -924,7 +1032,7 @@ test("setNodeLabel keeps the previous label when the new value is blank", () => 
 });
 
 test("edge inspector helpers mutate the canonical model and round-trip through YAML", () => {
-  const source = [
+  const source = flowchartSource([
     "canvas:",
     "  width: 600",
     "  height: 300",
@@ -940,7 +1048,7 @@ test("edge inspector helpers mutate the canonical model and round-trip through Y
     "    sourceAnchor: right",
     "    targetAnchor: left",
     "    label: Retry"
-  ].join("\n");
+  ].join("\n"));
   const diagram = parseDiagram(source);
   const edge = diagram.edges[0];
 
@@ -1096,6 +1204,16 @@ test("shape-specific anchors resolve to their rendered perimeters", () => {
   assert.equal(database.anchors.bottom.y, 140);
 });
 
+
+test("document nodes render with a folded corner and reserved text bounds", () => {
+  const geometry = getNodeGeometry({ shape: "document" }, 20, 40, 200, 100);
+
+  assert.match(geometry.bodyMarkup, /M 20 40 H 202 L 220 58 V 140 H 20 Z M 202 40 V 58 H 220/);
+  assert.ok(geometry.textBounds.width < 176);
+  assert.equal(geometry.anchors.right.x, 220);
+  assert.equal(geometry.anchors.bottom.y, 140);
+});
+
 test("circle node size changes preserve a square bounding box", () => {
   const diagram = { canvas: { grid: 5 } };
   const circle = { shape: "circle", size: { width: 150, height: 150 } };
@@ -1108,14 +1226,13 @@ test("circle node size changes preserve a square bounding box", () => {
 });
 
 test("parses and serializes a node subtitle, including multiline values, with a safe roundtrip", () => {
-  const source = [
+  const source = flowchartSource([
     "canvas:",
     "  width: 600",
     "  height: 300",
     "nodes:",
     "  - id: api",
     "    label: Payments API",
-    "    type: service",
     "    shape: rounded-rectangle",
     "    subtitle: Handles card capture",
     "    position: { x: 20, y: 40 }",
@@ -1125,7 +1242,7 @@ test("parses and serializes a node subtitle, including multiline values, with a 
     "    target: api",
     "    sourceAnchor: right",
     "    targetAnchor: left"
-  ].join("\n");
+  ].join("\n"));
   const diagram = parseDiagram(source);
 
   assert.equal(diagram.nodes[0].subtitle, "Handles card capture");
@@ -1155,7 +1272,7 @@ test("setNodeSubtitle trims whitespace and allows clearing the subtitle back to 
 });
 
 test("multiline edge labels round-trip through serialization safely", () => {
-  const source = [
+  const source = flowchartSource([
     "canvas:",
     "  width: 600",
     "  height: 300",
@@ -1170,7 +1287,7 @@ test("multiline edge labels round-trip through serialization safely", () => {
     "    target: api",
     "    sourceAnchor: right",
     "    targetAnchor: left"
-  ].join("\n");
+  ].join("\n"));
   const diagram = parseDiagram(source);
   const edge = diagram.edges[0];
 
@@ -1185,7 +1302,7 @@ test("multiline edge labels round-trip through serialization safely", () => {
 });
 
 test("renders a node subtitle below the label and never renders the internal type as SVG text", () => {
-  const source = [
+  const source = flowchartSource([
     "theme: dark",
     "canvas:",
     "  width: 600",
@@ -1193,7 +1310,6 @@ test("renders a node subtitle below the label and never renders the internal typ
     "nodes:",
     "  - id: api",
     "    label: Payments API",
-    "    type: service",
     "    shape: rounded-rectangle",
     "    subtitle: Card capture and auth",
     "    position: { x: 20, y: 40 }",
@@ -1203,7 +1319,7 @@ test("renders a node subtitle below the label and never renders the internal typ
     "    target: api",
     "    sourceAnchor: right",
     "    targetAnchor: left"
-  ].join("\n");
+  ].join("\n"));
 
   const markup = renderDiagram(source, 0);
 
@@ -1215,7 +1331,7 @@ test("renders a node subtitle below the label and never renders the internal typ
 });
 
 test("renders multiline node labels and subtitles as stacked tspans", () => {
-  const source = [
+  const source = flowchartSource([
     "theme: light",
     "canvas:",
     "  width: 600",
@@ -1223,7 +1339,6 @@ test("renders multiline node labels and subtitles as stacked tspans", () => {
     "nodes:",
     "  - id: api",
     "    label: \"Payments\\nAPI\"",
-    "    type: service",
     "    shape: rounded-rectangle",
     "    subtitle: \"Card capture\\nand auth\"",
     "    position: { x: 20, y: 40 }",
@@ -1233,7 +1348,7 @@ test("renders multiline node labels and subtitles as stacked tspans", () => {
     "    target: api",
     "    sourceAnchor: right",
     "    targetAnchor: left"
-  ].join("\n");
+  ].join("\n"));
 
   const markup = renderDiagram(source, 0);
   const labelGroup = markup.match(/<text[^>]*class="docdiagram-node-label"[^>]*>[\s\S]*?<\/text>/);
@@ -1250,7 +1365,7 @@ test("renders multiline node labels and subtitles as stacked tspans", () => {
 });
 
 test("renders multiline edge labels as stacked tspans while preserving stroke/width overrides", () => {
-  const source = [
+  const source = flowchartSource([
     "theme: light",
     "canvas:",
     "  width: 600",
@@ -1276,7 +1391,7 @@ test("renders multiline edge labels as stacked tspans while preserving stroke/wi
     "    start: circle",
     "    end: arrow",
     "    style: { stroke: #ABCDEF, strokeWidth: 3 }"
-  ].join("\n");
+  ].join("\n"));
 
   const markup = renderDiagram(source, 0);
   const edgeLabelGroup = markup.match(/<text[^>]*class="docdiagram-edge-label"[^>]*>[\s\S]*?<\/text>/);
@@ -1292,7 +1407,7 @@ test("renders multiline edge labels as stacked tspans while preserving stroke/wi
 });
 
 test("inspector edge style overrides for stroke and width are reflected in the rendered markup", () => {
-  const source = [
+  const source = flowchartSource([
     "theme: light",
     "canvas:",
     "  width: 600",
@@ -1313,7 +1428,7 @@ test("inspector edge style overrides for stroke and width are reflected in the r
     "    target: db",
     "    sourceAnchor: right",
     "    targetAnchor: left"
-  ].join("\n");
+  ].join("\n"));
   const diagram = parseDiagram(source);
   const edge = diagram.edges[0];
 
@@ -1349,7 +1464,7 @@ test("node and edge inline editors share focused, accessible textarea markup wit
 });
 
 function twoNodeEdgeSource(edgeLines) {
-  return [
+  return flowchartSource([
     "theme: light",
     "canvas:",
     "  width: 600",
@@ -1371,7 +1486,7 @@ function twoNodeEdgeSource(edgeLines) {
     "    sourceAnchor: right",
     "    targetAnchor: left",
     ...edgeLines
-  ].join("\n");
+  ].join("\n"));
 }
 
 test("getEdgeMarkerStyle defaults start to none and end to arrow when start/end are omitted", () => {
@@ -1426,7 +1541,7 @@ test("renders marker-start and marker-end attributes and defs for each supported
 });
 
 test("each edge gets unique marker ids so overrides on one edge cannot leak into another edge's markers", () => {
-  const source = [
+  const source = flowchartSource([
     "theme: light",
     "canvas:",
     "  width: 900",
@@ -1462,7 +1577,7 @@ test("each edge gets unique marker ids so overrides on one edge cannot leak into
     "    start: circle",
     "    end: circle",
     "    style: { stroke: \"#00ff00\" }"
-  ].join("\n");
+  ].join("\n"));
 
   const markup = renderDiagram(source, 3);
 

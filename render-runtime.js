@@ -5,9 +5,10 @@
   const sourceElement = document.querySelector("#source");
   const outputElement = document.querySelector("#rendered-document");
   const diagramModels = [];
-  let editMode = false;
+  let editingDiagramIndex = null;
   let selectedNode = null;
   let selectedEdge = null;
+  let selectedSequenceElement = null;
   let editingNode = null;
   let editingEdge = null;
   let connectionDrag = null;
@@ -15,22 +16,27 @@
   let documentColorScheme = "classic";
   let documentFormat = "centered";
   let savedSource = "";
-  let editSessionSource = null;
+  let editSessionDiagram = null;
   let sourceEditorOpen = false;
   let sourceEditorDraft = "";
   let sourceEditorError = "";
   let sourceEditorRenderTimer = null;
   let sourceEditorResizeObserver = null;
   const diagramZooms = new Map();
+
+  function isDiagramEditing(diagramIndex) {
+    return editingDiagramIndex === diagramIndex;
+  }
+
   const minimumNodeSize = { width: 120, height: 60 };
+  const documentMinimumNodeSize = { width: 140, height: 84 };
   const defaultNode = {
-    type: "application",
     shape: "rounded-rectangle",
     label: "New node",
     width: 190,
     height: 80
   };
-  const nodeTypes = ["application", "service", "datastore", "note"];
+  const supportedDiagramTypes = ["flowchart", "sequence"];
   const nodeShapes = [
     "rounded-rectangle",
     "circle",
@@ -40,7 +46,8 @@
     "rhombus",
     "flattened-hexagon",
     "chevron",
-    "right-chevron"
+    "right-chevron",
+    "document"
   ];
   const edgeAnchors = ["top", "right", "bottom", "left"];
   const edgeRoutes = ["orthogonal", "straight", "curved"];
@@ -114,21 +121,11 @@
   const diagramThemes = {
     light: {
       edge: { stroke: "#52616B", strokeWidth: 2, text: "#3E4A54" },
-      node: {
-        application: { fill: "#EAF2FF", stroke: "#3574C7", strokeWidth: 2, text: "#17202A" },
-        service: { fill: "#E9F8F0", stroke: "#24824A", strokeWidth: 2, text: "#17202A" },
-        datastore: { fill: "#F7F1FF", stroke: "#7A4CC2", strokeWidth: 2, text: "#17202A" },
-        note: { fill: "#FFF8DF", stroke: "#9B7B00", strokeWidth: 2, text: "#17202A" }
-      }
+      node: { fill: "#EAF2FF", stroke: "#3574C7", strokeWidth: 2, text: "#17202A" }
     },
     dark: {
       edge: { stroke: "#B8C7D5", strokeWidth: 2, text: "#D9E4ED" },
-      node: {
-        application: { fill: "#193A61", stroke: "#71AEF7", strokeWidth: 2, text: "#F3F8FC" },
-        service: { fill: "#164A38", stroke: "#66D39A", strokeWidth: 2, text: "#F3F8FC" },
-        datastore: { fill: "#3D285D", stroke: "#B796FF", strokeWidth: 2, text: "#F3F8FC" },
-        note: { fill: "#594819", stroke: "#F1CC58", strokeWidth: 2, text: "#F3F8FC" }
-      }
+      node: { fill: "#193A61", stroke: "#71AEF7", strokeWidth: 2, text: "#F3F8FC" }
     }
   };
 
@@ -189,9 +186,23 @@
     return trimmed;
   }
 
+  const diagramCollectionNames = ["nodes", "edges", "participants", "messages", "activations", "notes", "groups"];
+  const flowchartNodeFields = ["id", "label", "shape", "position", "size", "style", "palette", "subtitle"];
+  const flowchartEdgeFields = ["source", "target", "sourceAnchor", "targetAnchor", "route", "label", "style", "start", "end"];
+  const flowchartNodeStyleFields = ["fill", "stroke", "strokeWidth", "text"];
+  const flowchartEdgeStyleFields = ["stroke", "strokeWidth", "text"];
+  const paletteFields = ["tone", "colour"];
+  const sequenceParticipantFields = ["id", "label", "kind", "palette", "style", "size"];
+  const sequenceParticipantKinds = ["actor"];
+  const sequenceMessageFields = ["from", "to", "label", "style"];
+  const sequenceMessageStyles = ["solid", "dashed"];
+  const sequenceActivationFields = ["participant", "from", "to"];
+  const sequenceNoteFields = ["at", "after", "label", "palette", "style", "size"];
+  const sequenceGroupFields = ["label", "from", "to"];
+
   function parseDiagram(source) {
     const lines = source.replaceAll("\r\n", "\n").split("\n");
-    const diagram = { canvas: {}, nodes: [], edges: [] };
+    const diagram = {};
     let collection = null;
     let item = null;
     let nestedObject = null;
@@ -212,11 +223,16 @@
         nestedObject = null;
 
         if (!value) {
-          if (key !== "canvas" && key !== "nodes" && key !== "edges") {
+          if (key !== "canvas" && !diagramCollectionNames.includes(key)) {
             throw new Error(`Unsupported diagram section: ${key}`);
           }
 
           collection = key;
+          if (key === "canvas") {
+            diagram.canvas = {};
+          } else {
+            diagram[key] = [];
+          }
           continue;
         }
 
@@ -225,7 +241,7 @@
         continue;
       }
 
-      if (indent === 2 && itemMatch && (collection === "nodes" || collection === "edges")) {
+      if (indent === 2 && itemMatch && diagramCollectionNames.includes(collection)) {
         const [, key, value] = itemMatch;
         item = {};
         item[key] = parseScalar(value);
@@ -261,12 +277,75 @@
       throw new Error(`Cannot parse diagram line: ${rawLine}`);
     }
 
-    validateDiagram(diagram);
+    if (!diagram.type) {
+      throw new Error(`Diagram type is required and must be one of: ${supportedDiagramTypes.join(", ")}.`);
+    }
+
+    if (!supportedDiagramTypes.includes(diagram.type)) {
+      throw new Error(`Unsupported diagram type: ${diagram.type}`);
+    }
+
+    return diagram.type === "flowchart"
+      ? parseFlowchartDiagram(diagram)
+      : parseSequenceDiagram(diagram);
+  }
+
+  function parseFlowchartDiagram(diagram) {
+    diagram.canvas = diagram.canvas || {};
+    if (!Array.isArray(diagram.nodes)) {
+      diagram.nodes = [];
+    }
+    if (!Array.isArray(diagram.edges)) {
+      diagram.edges = [];
+    }
+    validateFlowchartDiagram(diagram);
+    return diagram;
+  }
+
+  function parseSequenceDiagram(diagram) {
+    validateSequenceDiagram(diagram);
     return diagram;
   }
 
   function validateDiagram(diagram) {
+    return diagram.type === "flowchart"
+      ? validateFlowchartDiagram(diagram)
+      : validateSequenceDiagram(diagram);
+  }
+
+  function assertAllowedFields(candidate, allowedFields, description) {
+    for (const key of Object.keys(candidate || {})) {
+      if (!allowedFields.includes(key)) {
+        throw new Error(`Unsupported ${description} field: ${key}`);
+      }
+    }
+  }
+
+  function assertAllowedStyleFields(style, allowedFields, description) {
+    if (!style) {
+      return;
+    }
+
+    for (const key of Object.keys(style)) {
+      if (!allowedFields.includes(key)) {
+        throw new Error(`Unsupported ${description} style field: ${key}`);
+      }
+    }
+  }
+
+  function validateFlowchartDiagram(diagram) {
+    if (diagram.participants !== undefined || diagram.messages !== undefined ||
+      diagram.activations !== undefined || diagram.notes !== undefined || diagram.groups !== undefined) {
+      throw new Error("Flowchart diagrams do not support sequence sections.");
+    }
+
     for (const node of diagram.nodes) {
+      if ("type" in node) {
+        throw new Error(`Node "${node.id || "unknown"}" uses removed field "type".`);
+      }
+
+      assertAllowedFields(node, flowchartNodeFields, `node "${node.id || "unknown"}"`);
+
       if (!node.id || !node.label) {
         throw new Error("Every node requires an id and label.");
       }
@@ -280,6 +359,7 @@
       }
 
       if (node.palette) {
+        assertAllowedFields(node.palette, paletteFields, `palette for node "${node.id}"`);
         const palette = getNodeColorPalette(documentColorScheme, node.palette.tone, node.palette.colour);
         if (!palette) {
           throw new Error(`Unsupported node palette: ${node.palette.tone || "unknown"} ${node.palette.colour || "unknown"}`);
@@ -289,9 +369,13 @@
       if (node.style?.width !== undefined) {
         throw new Error("Node style.width is not supported; use style.strokeWidth.");
       }
+
+      assertAllowedStyleFields(node.style, flowchartNodeStyleFields, `node "${node.id}"`);
     }
 
     for (const edge of diagram.edges) {
+      assertAllowedFields(edge, flowchartEdgeFields, `edge "${edge.source || "unknown"}" -> "${edge.target || "unknown"}"`);
+
       if (!edge.sourceAnchor) {
         throw new Error(`Edge "${edge.source || "unknown"}" -> "${edge.target || "unknown"}" requires a sourceAnchor.`);
       }
@@ -312,12 +396,140 @@
         throw new Error(`Unsupported edge route: ${edge.route}`);
       }
 
+      if (edge.start !== undefined && !edgeMarkerStyles.includes(edge.start)) {
+        throw new Error(`Unsupported edge start marker: ${edge.start}`);
+      }
+
+      if (edge.end !== undefined && !edgeMarkerStyles.includes(edge.end)) {
+        throw new Error(`Unsupported edge end marker: ${edge.end}`);
+      }
+
       if (edge.style?.width !== undefined) {
         throw new Error("Edge style.width is not supported; use style.strokeWidth.");
+      }
+
+      assertAllowedStyleFields(edge.style, flowchartEdgeStyleFields, `edge "${edge.source || "unknown"}" -> "${edge.target || "unknown"}"`);
+    }
+
+    getTheme(diagram);
+  }
+
+  function validateSequenceDiagram(diagram) {
+    if (diagram.canvas !== undefined || diagram.nodes !== undefined || diagram.edges !== undefined) {
+      throw new Error("Sequence diagrams do not support flowchart sections.");
+    }
+
+    if (!Array.isArray(diagram.participants) || !Array.isArray(diagram.messages)) {
+      throw new Error("Sequence diagrams require participants and messages sections.");
+    }
+
+    if (diagram.activations !== undefined && !Array.isArray(diagram.activations)) {
+      throw new Error("Sequence diagram activations must be a list.");
+    }
+
+    if (diagram.notes !== undefined && !Array.isArray(diagram.notes)) {
+      throw new Error("Sequence diagram notes must be a list.");
+    }
+
+    if (diagram.groups !== undefined && !Array.isArray(diagram.groups)) {
+      throw new Error("Sequence diagram groups must be a list.");
+    }
+
+    const participantIds = new Set();
+    for (const participant of diagram.participants) {
+      assertAllowedFields(participant, sequenceParticipantFields, `participant "${participant.id || "unknown"}"`);
+
+      if (!participant.id || !participant.label) {
+        throw new Error("Every sequence participant requires an id and label.");
+      }
+
+      if (participant.kind !== undefined && !sequenceParticipantKinds.includes(participant.kind)) {
+        throw new Error(`Unsupported sequence participant kind: ${participant.kind}`);
+      }
+      validateSequencePresentation(participant, `participant "${participant.id}"`);
+
+      if (participantIds.has(participant.id)) {
+        throw new Error(`Duplicate sequence participant id: ${participant.id}`);
+      }
+
+      participantIds.add(participant.id);
+    }
+
+    for (const [index, message] of diagram.messages.entries()) {
+      assertAllowedFields(message, sequenceMessageFields, `message ${index}`);
+
+      if (!message.from || !message.to || !message.label) {
+        throw new Error(`Sequence message ${index} requires from, to, and label.`);
+      }
+
+      if (!participantIds.has(message.from) || !participantIds.has(message.to)) {
+        throw new Error(`Sequence message ${index} references an unknown participant.`);
+      }
+
+      if (message.style !== undefined && !sequenceMessageStyles.includes(message.style)) {
+        throw new Error(`Unsupported sequence message style: ${message.style}`);
+      }
+    }
+
+    for (const [index, activation] of (diagram.activations || []).entries()) {
+      assertAllowedFields(activation, sequenceActivationFields, `activation ${index}`);
+      if (!activation.participant || !Number.isInteger(activation.from) || !Number.isInteger(activation.to)) {
+        throw new Error(`Sequence activation ${index} requires participant and integer from and to message positions.`);
+      }
+      if (!participantIds.has(activation.participant)) {
+        throw new Error(`Sequence activation ${index} references an unknown participant.`);
+      }
+      if (activation.from < 1 || activation.to < activation.from || activation.to > diagram.messages.length) {
+        throw new Error(`Sequence activation ${index} range is out of bounds.`);
+      }
+    }
+
+    for (const [index, note] of (diagram.notes || []).entries()) {
+      assertAllowedFields(note, sequenceNoteFields, `note ${index}`);
+      if (!note.at || !Number.isInteger(note.after) || !note.label) {
+        throw new Error(`Sequence note ${index} requires at, after, and label.`);
+      }
+      validateSequencePresentation(note, `note ${index}`);
+      if (!participantIds.has(note.at)) {
+        throw new Error(`Sequence note ${index} references an unknown participant.`);
+      }
+      if (note.after < 0 || note.after > diagram.messages.length) {
+        throw new Error(`Sequence note ${index} after position is out of bounds.`);
+      }
+    }
+
+    for (const [index, group] of (diagram.groups || []).entries()) {
+      assertAllowedFields(group, sequenceGroupFields, `group ${index}`);
+      if (!group.label && group.label !== "") {
+        throw new Error(`Sequence group ${index} requires a label.`);
+      }
+      if (!Number.isInteger(group.from) || !Number.isInteger(group.to)) {
+        throw new Error(`Sequence group ${index} requires integer from and to indices.`);
+      }
+      if (group.from < 1 || group.to < group.from || group.to > diagram.messages.length) {
+        throw new Error(`Sequence group ${index} range is out of bounds.`);
       }
     }
 
     getTheme(diagram);
+  }
+
+  function validateSequencePresentation(item, description) {
+    if (item.palette) {
+      assertAllowedFields(item.palette, paletteFields, `palette for ${description}`);
+      if (!getNodeColorPalette(documentColorScheme, item.palette.tone, item.palette.colour)) {
+        throw new Error(`Unsupported ${description} palette: ${item.palette.tone || "unknown"} ${item.palette.colour || "unknown"}`);
+      }
+    }
+    assertAllowedStyleFields(item.style, flowchartNodeStyleFields, description);
+    if (item.size) {
+      assertAllowedFields(item.size, ["width", "height"], `size for ${description}`);
+      for (const key of ["width", "height"]) {
+        if (item.size[key] !== undefined && (!Number.isFinite(item.size[key]) || item.size[key] <= 0)) {
+          throw new Error(`${description} size.${key} must be a positive number.`);
+        }
+      }
+    }
   }
 
   function getTheme(diagram) {
@@ -341,11 +553,19 @@
 
   function getNodeEffectiveStyle(diagram, node) {
     const theme = getTheme(diagram);
-    const defaults = theme.node[node.type] || theme.node.application;
+    const defaults = theme.node;
     const palette = node.palette
       ? getNodeColorPalette(documentColorScheme, node.palette.tone, node.palette.colour)
       : null;
     return mergeStyle(mergeStyle(defaults, palette), node.style);
+  }
+
+  function getSequenceElementEffectiveStyle(diagram, element) {
+    const theme = getTheme(diagram);
+    const palette = element.palette
+      ? getNodeColorPalette(documentColorScheme, element.palette.tone, element.palette.colour)
+      : null;
+    return mergeStyle(mergeStyle(theme.node, palette), element.style);
   }
 
   function getEdgeEffectiveStyle(diagram, edge) {
@@ -468,7 +688,6 @@
     const node = {
       id: createUniqueNodeId(diagram.nodes),
       label: defaultNode.label,
-      type: defaultNode.type,
       shape: defaultNode.shape,
       position: getDefaultNodePosition(diagram),
       size: { width: defaultNode.width, height: defaultNode.height }
@@ -540,7 +759,6 @@
     const shape = node.shape;
     const centerX = x + nodeWidth / 2;
     const centerY = y + nodeHeight / 2;
-    const inset = Math.min(nodeWidth, nodeHeight) * 0.2;
     const textBounds = { x: x + 12, y: y + 12, width: nodeWidth - 24, height: nodeHeight - 24 };
     const anchors = {
       top: { x: centerX, y },
@@ -605,6 +823,12 @@
       const point = Math.min(nodeWidth * 0.16, nodeHeight * 0.45);
       textBounds.width -= point;
       bodyMarkup = `<polygon class="docdiagram-node-body" points="${x},${y} ${x + nodeWidth - point},${y} ${x + nodeWidth},${centerY} ${x + nodeWidth - point},${y + nodeHeight} ${x},${y + nodeHeight}"/>`;
+    } else if (shape === "document") {
+      const fold = Math.max(12, Math.min(26, Math.min(nodeWidth, nodeHeight) * 0.18));
+      textBounds.width -= fold * 0.45;
+      textBounds.y += 2;
+      textBounds.height -= 2;
+      bodyMarkup = `<path class="docdiagram-node-body" d="M ${x} ${y} H ${x + nodeWidth - fold} L ${x + nodeWidth} ${y + fold} V ${y + nodeHeight} H ${x} Z M ${x + nodeWidth - fold} ${y} V ${y + fold} H ${x + nodeWidth}"/>`;
     } else {
       bodyMarkup = `<rect class="docdiagram-node-body" x="${x}" y="${y}" width="${nodeWidth}" height="${nodeHeight}" rx="12"/>`;
     }
@@ -790,20 +1014,26 @@
     return "";
   }
 
-  function renderDiagram(source, diagramIndex) {
-    let diagram;
+  function renderDiagramToolbar(diagramIndex, editingMode = "none") {
+    const allowsEditing = editingMode !== "none";
+    const allowsNodeCreation = editingMode === "flowchart";
+    return [
+      `<div class="docdiagram-diagram-toolbar" role="toolbar" aria-label="Diagram controls">`,
+      `<button type="button" class="docdiagram-icon-button docdiagram-zoom-in" data-diagram-index="${diagramIndex}" aria-label="Zoom in" title="Zoom in">+</button>`,
+      `<button type="button" class="docdiagram-icon-button docdiagram-zoom-out" data-diagram-index="${diagramIndex}" aria-label="Zoom out" title="Zoom out">−</button>`,
+      `<button type="button" class="docdiagram-icon-button docdiagram-fit" data-diagram-index="${diagramIndex}" aria-label="Zoom to fit" title="Zoom to fit">⊡</button>`,
+      allowsEditing
+        ? isDiagramEditing(diagramIndex)
+          ? `<button type="button" class="docdiagram-icon-button docdiagram-done-editing" aria-label="Done editing" title="Done editing">✓</button><button type="button" class="docdiagram-icon-button docdiagram-cancel-editing" aria-label="Cancel editing and discard changes" title="Cancel editing and discard changes">×</button>${allowsNodeCreation ? `<button type="button" class="docdiagram-icon-button docdiagram-create-node" data-diagram-index="${diagramIndex}" aria-label="New node" title="New node">+</button>` : ""}`
+          : editingDiagramIndex === null
+            ? `<button type="button" class="docdiagram-icon-button docdiagram-start-editing" aria-label="Edit diagram" title="Edit diagram">✎</button>`
+            : ""
+        : "",
+      `</div>`
+    ].join("");
+  }
 
-    try {
-      diagram = parseDiagram(source);
-    } catch (error) {
-      return `<section class="docdiagram-error"><strong>Diagram could not be rendered.</strong><br>${escapeHtml(error.message)}</section>`;
-    }
-
-    const theme = getTheme(diagram);
-
-    diagramModels[diagramIndex] = diagram;
-    const width = Number(diagram.canvas.width) || 1000;
-    const height = Number(diagram.canvas.height) || 560;
+  function renderFlowchartDiagram(diagram, diagramIndex) {
     const nodes = new Map();
 
     for (const node of diagram.nodes) {
@@ -857,9 +1087,6 @@
       const edgeLabelBlockHeight = edgeLabelLines.length * edgeLabelLineHeight;
       const edgeLabelStartY = labelY - edgeLabelBlockHeight / 2 + edgeLabelLineHeight * 0.72;
 
-      // Every edge gets its own marker id (scoped by diagram/edge index) so per-edge stroke
-      // overrides never leak into another edge's arrowhead/circle, and only non-"none" endpoints
-      // get a marker def + marker-start/marker-end attribute at all.
       const startMarkerStyle = getEdgeMarkerStyle(edge, "start");
       const endMarkerStyle = getEdgeMarkerStyle(edge, "end");
       const startMarkerId = `docdiagram-marker-${diagramIndex}-${edgeIndex}-start`;
@@ -873,7 +1100,7 @@
         edgeMarkerDefs.push(buildEdgeMarkerDef(endMarkerId, endMarkerStyle, "end", style.stroke, strokeWidth));
       }
 
-      if (isSelected && editMode) {
+      if (isSelected && isDiagramEditing(diagramIndex)) {
         edgeEndpointMarkup.push(
           `<circle class="docdiagram-edge-endpoint" data-diagram-index="${diagramIndex}" data-edge-index="${edgeIndex}" data-endpoint="source" cx="${sourceAnchor.x}" cy="${sourceAnchor.y}" r="7"/>`,
           `<circle class="docdiagram-edge-endpoint" data-diagram-index="${diagramIndex}" data-edge-index="${edgeIndex}" data-endpoint="target" cx="${targetAnchor.x}" cy="${targetAnchor.y}" r="7"/>`
@@ -921,10 +1148,10 @@
         !isEditing && layout.subtitleLines.length
           ? renderTextBlock(layout.centerX, layout.subtitleStartY, layout.subtitleLines, layout.subtitleLineHeight, "docdiagram-node-subtitle", style.text)
           : "",
-        isSelected && editMode && !isEditing
+        isSelected && isDiagramEditing(diagramIndex) && !isEditing
           ? `<rect class="docdiagram-resize-handle" x="${x + nodeWidth - 7}" y="${y + nodeHeight - 7}" width="14" height="14" rx="3"/>`
           : "",
-        isSelected && editMode && !isEditing
+        isSelected && isDiagramEditing(diagramIndex) && !isEditing
           ? edgeAnchors.map((anchor) => {
             const point = geometry.anchors[anchor];
             return `<circle class="docdiagram-connection-port" data-anchor="${anchor}" cx="${point.x}" cy="${point.y}" r="7" aria-label="${anchor} connection port"/>`;
@@ -934,16 +1161,12 @@
       ].join("");
     }).join("");
 
+    const width = Number(diagram.canvas.width) || 1000;
+    const height = Number(diagram.canvas.height) || 560;
+
     return [
-      `<figure class="docdiagram" data-diagram-index="${diagramIndex}">`,
-      `<div class="docdiagram-diagram-toolbar" role="toolbar" aria-label="Diagram controls">`,
-      `<button type="button" class="docdiagram-icon-button docdiagram-zoom-in" data-diagram-index="${diagramIndex}" aria-label="Zoom in" title="Zoom in">+</button>`,
-      `<button type="button" class="docdiagram-icon-button docdiagram-zoom-out" data-diagram-index="${diagramIndex}" aria-label="Zoom out" title="Zoom out">−</button>`,
-      `<button type="button" class="docdiagram-icon-button docdiagram-fit" data-diagram-index="${diagramIndex}" aria-label="Zoom to fit" title="Zoom to fit">⊡</button>`,
-      editMode
-        ? `<button type="button" class="docdiagram-icon-button docdiagram-done-editing" aria-label="Done editing" title="Done editing">✓</button><button type="button" class="docdiagram-icon-button docdiagram-cancel-editing" aria-label="Cancel editing and discard changes" title="Cancel editing and discard changes">×</button><button type="button" class="docdiagram-icon-button docdiagram-create-node" data-diagram-index="${diagramIndex}" aria-label="New node" title="New node">+</button>`
-        : `<button type="button" class="docdiagram-icon-button docdiagram-start-editing" aria-label="Edit diagram" title="Edit diagram">✎</button>`,
-      `</div>`,
+      `<figure class="docdiagram" data-diagram-index="${diagramIndex}" data-diagram-type="flowchart" data-editing="${isDiagramEditing(diagramIndex)}">`,
+      renderDiagramToolbar(diagramIndex, "flowchart"),
       `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Architecture diagram" data-diagram-index="${diagramIndex}" style="width: ${diagramZooms.get(diagramIndex) || 100}%">`,
       `<defs>${edgeMarkerDefs.join("")}</defs>`,
       edgeMarkup,
@@ -955,6 +1178,199 @@
       `</svg>`,
       `</figure>`
     ].join("");
+  }
+
+  function renderSequenceDiagram(diagram, diagramIndex) {
+    const theme = getTheme(diagram);
+    const width = Number(diagram.canvas?.width) || 1000;
+    const baseHeight = Number(diagram.canvas?.height) || 560;
+    const participants = diagram.participants || [];
+    const messages = diagram.messages || [];
+    const activations = diagram.activations || [];
+    const notes = diagram.notes || [];
+    const groups = diagram.groups || [];
+    const leftMargin = 90;
+    const rightMargin = 90;
+    const headerTop = 28;
+    const participantBoxWidth = 160;
+    const participantBoxHeight = 42;
+    const actorHeaderHeight = 74;
+    const noteBaseHeight = 48;
+    const noteGap = 18;
+    const messageSpacing = 56;
+    const sequenceMarkerId = `docdiagram-sequence-arrow-${diagramIndex}`;
+    const lifelineTop = headerTop + actorHeaderHeight + 12;
+    const positions = new Map();
+    const availableWidth = Math.max(0, width - leftMargin - rightMargin);
+    const participantStep = participants.length > 1 ? availableWidth / (participants.length - 1) : 0;
+
+    participants.forEach((participant, index) => {
+      positions.set(
+        participant.id,
+        participants.length === 1
+          ? leftMargin + availableWidth / 2
+          : leftMargin + participantStep * index
+      );
+    });
+
+    const messageStartY = lifelineTop + 40;
+    const messageRows = messages.map((message, index) => ({ ...message, index, y: messageStartY + index * messageSpacing }));
+    const noteLayouts = notes.map((note) => {
+      const lines = splitTextLines(note.label || "");
+      const height = Math.max(noteBaseHeight, lines.length * 16 + 22, Number(note.size?.height) || 0);
+      const afterRow = note.after ? messageRows[note.after - 1] : null;
+      const y = (afterRow?.y || lifelineTop) + noteGap;
+      let centerX = positions.get(note.at) || width / 2;
+      let noteWidth = Math.max(160, Number(note.size?.width) || 0);
+
+      centerX = Math.min(width - noteWidth / 2 - 24, Math.max(noteWidth / 2 + 24, centerX));
+      return { ...note, lines, x: centerX - noteWidth / 2, y, width: noteWidth, height };
+    });
+
+    const groupBottoms = groups.map((group) => messageRows[group.to - 1]?.y + 34 || messageStartY);
+    const contentBottom = Math.max(
+      lifelineTop + 140,
+      noteLayouts.length ? noteLayouts[noteLayouts.length - 1].y + noteLayouts[noteLayouts.length - 1].height : 0,
+      messageRows.length ? messageRows[messageRows.length - 1].y + 44 : messageStartY,
+      ...groupBottoms
+    );
+    const height = Math.max(baseHeight, contentBottom + 56);
+    const lifelineBottom = height - 36;
+
+    const activationRects = activations.map((activation, index) => ({
+      participantId: activation.participant,
+      depth: activations
+        .slice(0, index)
+        .filter((candidate) => candidate.participant === activation.participant &&
+          candidate.from <= activation.from && candidate.to >= activation.from)
+        .length,
+      startY: (messageRows[activation.from - 1]?.y || messageStartY) - 10,
+      endY: (messageRows[activation.to - 1]?.y || messageStartY) + 18
+    }));
+
+    const participantMarkup = participants.map((participant) => {
+      const centerX = positions.get(participant.id);
+      const style = getSequenceElementEffectiveStyle(diagram, participant);
+      const headerWidth = Math.max(participantBoxWidth, Number(participant.size?.width) || 0);
+      const headerHeight = Math.max(participantBoxHeight, Number(participant.size?.height) || 0);
+      if (participant.kind === "actor") {
+        const headY = headerTop + 10;
+        const chestY = headY + 18;
+        const waistY = chestY + 18;
+        return [
+          `<g class="docdiagram-sequence-participant docdiagram-sequence-actor" data-diagram-index="${diagramIndex}" data-participant-id="${escapeHtml(participant.id)}">`,
+          `<circle cx="${centerX}" cy="${headY}" r="8" fill="none" stroke="${escapeHtml(style.stroke)}" stroke-width="${Number(style.strokeWidth) || 2}"/>`,
+          `<path d="M ${centerX} ${headY + 8} V ${waistY} M ${centerX - 14} ${chestY} H ${centerX + 14} M ${centerX} ${waistY} L ${centerX - 12} ${waistY + 18} M ${centerX} ${waistY} L ${centerX + 12} ${waistY + 18}" fill="none" stroke="${escapeHtml(style.stroke)}" stroke-width="${Number(style.strokeWidth) || 2}" stroke-linecap="round" stroke-linejoin="round"/>`,
+          `<text x="${centerX}" y="${headerTop + actorHeaderHeight - 4}" text-anchor="middle" class="docdiagram-node-label" fill="${escapeHtml(style.text)}">${escapeHtml(participant.label)}</text>`,
+          `</g>`
+        ].join("");
+      }
+
+      return [
+        `<g class="docdiagram-sequence-participant" data-diagram-index="${diagramIndex}" data-participant-id="${escapeHtml(participant.id)}">`,
+        `<rect x="${centerX - headerWidth / 2}" y="${headerTop}" width="${headerWidth}" height="${headerHeight}" rx="12" fill="${escapeHtml(style.fill)}" stroke="${escapeHtml(style.stroke)}" stroke-width="${Number(style.strokeWidth) || 2}"/>`,
+        `<text x="${centerX}" y="${headerTop + headerHeight / 2 + 6}" text-anchor="middle" class="docdiagram-node-label" fill="${escapeHtml(style.text)}">${escapeHtml(participant.label)}</text>`,
+        `</g>`
+      ].join("");
+    }).join("");
+
+    const lifelineMarkup = participants.map((participant) => {
+      const centerX = positions.get(participant.id);
+      return `<path class="docdiagram-sequence-lifeline" d="M ${centerX} ${lifelineTop} L ${centerX} ${lifelineBottom}" fill="none" stroke="${escapeHtml(theme.edge.stroke)}" stroke-width="2" stroke-dasharray="8 6"/>`;
+    }).join("");
+
+    const groupMarkup = groups.map((group) => {
+      const startY = (messageRows[group.from - 1]?.y || messageStartY) - 24;
+      const endY = (messageRows[group.to - 1]?.y || messageStartY) + 30;
+      const labelWidth = Math.min(220, Math.max(110, String(group.label).length * 8 + 28));
+      return [
+        `<g class="docdiagram-sequence-group">`,
+        `<rect x="42" y="${startY}" width="${width - 84}" height="${endY - startY}" rx="12" fill="none" stroke="${escapeHtml(theme.edge.stroke)}" stroke-width="2" stroke-dasharray="10 6" opacity="0.8"/>`,
+        `<rect x="54" y="${startY - 16}" width="${labelWidth}" height="24" rx="6" fill="${escapeHtml(theme.node.fill)}" stroke="${escapeHtml(theme.edge.stroke)}" stroke-width="1.5"/>`,
+        `<text x="${54 + labelWidth / 2}" y="${startY + 1}" text-anchor="middle" class="docdiagram-edge-label" fill="${escapeHtml(theme.edge.text)}">${escapeHtml(group.label)}</text>`,
+        `</g>`
+      ].join("");
+    }).join("");
+
+    const noteMarkup = noteLayouts.map((note, noteIndex) => {
+      const lineHeight = 16;
+      const startY = note.y + 18;
+      const style = getSequenceElementEffectiveStyle(diagram, note);
+      return [
+        `<g class="docdiagram-sequence-note" data-diagram-index="${diagramIndex}" data-note-index="${noteIndex}">`,
+        `<rect x="${note.x}" y="${note.y}" width="${note.width}" height="${note.height}" rx="10" fill="${escapeHtml(style.fill)}" stroke="${escapeHtml(style.stroke)}" stroke-width="${Number(style.strokeWidth) || 2}"/>`,
+        renderTextBlock(note.x + note.width / 2, startY, note.lines, lineHeight, "docdiagram-node-subtitle", style.text),
+        `</g>`
+      ].join("");
+    }).join("");
+
+    const activationMarkup = activationRects.map((activation) => {
+      const centerX = positions.get(activation.participantId);
+      const widthOffset = activation.depth * 7;
+      const barWidth = 12;
+      const barHeight = Math.max(20, activation.endY - activation.startY);
+      const participant = participants.find((candidate) => candidate.id === activation.participantId);
+      const style = getSequenceElementEffectiveStyle(diagram, participant);
+      return `<rect class="docdiagram-sequence-activation" x="${centerX - barWidth / 2 + widthOffset}" y="${activation.startY}" width="${barWidth}" height="${barHeight}" rx="4" fill="${escapeHtml(style.fill)}" stroke="${escapeHtml(style.stroke)}" stroke-width="${Number(style.strokeWidth) || 2}"/>`;
+    }).join("");
+
+    const messageMarkup = messageRows.map((message) => {
+      const sourceX = positions.get(message.from);
+      const targetX = positions.get(message.to);
+      const dashed = message.style === "dashed";
+      const labelLines = splitTextLines(message.label || "");
+      const labelHeight = labelLines.length * 15;
+      const labelStartY = message.y - 12 - labelHeight / 2 + 11;
+      const markerAttribute = ` marker-end="url(#${sequenceMarkerId})"`;
+
+      if (message.from === message.to) {
+        const loopWidth = 48;
+        const loopHeight = 28;
+        return [
+          `<g class="docdiagram-sequence-message" data-diagram-index="${diagramIndex}" data-message-index="${message.index}">`,
+          `<path d="M ${sourceX} ${message.y} L ${sourceX + loopWidth} ${message.y} L ${sourceX + loopWidth} ${message.y + loopHeight} L ${sourceX} ${message.y + loopHeight}" fill="none" stroke="${escapeHtml(theme.edge.stroke)}" stroke-width="2"${markerAttribute}${dashed ? ' stroke-dasharray="8 5"' : ""}/>`,
+          renderTextBlock(sourceX + loopWidth / 2, labelStartY, labelLines, 15, "docdiagram-edge-label", theme.edge.text),
+          `</g>`
+        ].join("");
+      }
+
+      return [
+        `<g class="docdiagram-sequence-message" data-diagram-index="${diagramIndex}" data-message-index="${message.index}">`,
+        `<path d="M ${sourceX} ${message.y} L ${targetX} ${message.y}" fill="none" stroke="${escapeHtml(theme.edge.stroke)}" stroke-width="2"${markerAttribute}${dashed ? ' stroke-dasharray="8 5"' : ""}/>`,
+        renderTextBlock((sourceX + targetX) / 2, labelStartY, labelLines, 15, "docdiagram-edge-label", theme.edge.text),
+        `</g>`
+      ].join("");
+    }).join("");
+
+    return [
+      `<figure class="docdiagram" data-diagram-index="${diagramIndex}" data-diagram-type="sequence" data-editing="${isDiagramEditing(diagramIndex)}">`,
+      renderDiagramToolbar(diagramIndex, "sequence"),
+      `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Sequence diagram" data-diagram-index="${diagramIndex}" style="width: ${diagramZooms.get(diagramIndex) || 100}%">`,
+      `<defs>${buildEdgeMarkerDef(sequenceMarkerId, "arrow", "end", theme.edge.stroke, 2)}</defs>`,
+      groupMarkup,
+      participantMarkup,
+      lifelineMarkup,
+      activationMarkup,
+      noteMarkup,
+      messageMarkup,
+      `</svg>`,
+      `</figure>`
+    ].join("");
+  }
+
+  function renderDiagram(source, diagramIndex) {
+    let diagram;
+
+    try {
+      diagram = parseDiagram(source);
+    } catch (error) {
+      return `<section class="docdiagram-error"><strong>Diagram could not be rendered.</strong><br>${escapeHtml(error.message)}</section>`;
+    }
+
+    diagramModels[diagramIndex] = diagram;
+    return diagram.type === "sequence"
+      ? renderSequenceDiagram(diagram, diagramIndex)
+      : renderFlowchartDiagram(diagram, diagramIndex);
   }
 
   function isSafeUrl(value, allowDataImage = false) {
@@ -1524,13 +1940,49 @@
   }
 
   function serializeDiagram(diagram) {
-    const lines = [];
+    const lines = [`type: ${formatScalar(diagram.type)}`];
 
     for (const [key, value] of Object.entries(diagram)) {
-      if (key === "canvas" || key === "nodes" || key === "edges") {
+      if (key === "type" || key === "canvas" || key === "nodes" || key === "edges" ||
+        key === "participants" || key === "messages" || key === "activations" || key === "notes" || key === "groups") {
         continue;
       }
       lines.push(`${key}: ${formatScalar(value)}`);
+    }
+
+    if (diagram.type === "sequence") {
+      lines.push("participants:");
+      for (const participant of diagram.participants || []) {
+        lines.push(...serializeItem(participant));
+      }
+
+      lines.push("messages:");
+      for (const message of diagram.messages || []) {
+        lines.push(...serializeItem(message));
+      }
+
+      if (diagram.activations !== undefined) {
+        lines.push("activations:");
+        for (const activation of diagram.activations || []) {
+          lines.push(...serializeItem(activation));
+        }
+      }
+
+      if (diagram.notes !== undefined) {
+        lines.push("notes:");
+        for (const note of diagram.notes || []) {
+          lines.push(...serializeItem(note));
+        }
+      }
+
+      if (diagram.groups !== undefined) {
+        lines.push("groups:");
+        for (const group of diagram.groups || []) {
+          lines.push(...serializeItem(group));
+        }
+      }
+
+      return lines.join("\n");
     }
 
     lines.push("canvas:");
@@ -1705,9 +2157,9 @@
     sourceEditorDraft = getSource();
     sourceEditorError = "";
     sourceEditorOpen = true;
-    if (editMode) {
-      editMode = false;
-      editSessionSource = null;
+    if (editingDiagramIndex !== null) {
+      editingDiagramIndex = null;
+      editSessionDiagram = null;
       clearEditorState();
     }
     renderDocument();
@@ -1740,6 +2192,31 @@
     );
 
     setSource(source);
+    syncOpenSourceEditor(source);
+  }
+
+  function syncOpenSourceEditor(source) {
+    if (!sourceEditorOpen) {
+      return;
+    }
+
+    sourceEditorDraft = source;
+    sourceEditorError = "";
+    const editor = document.querySelector(".docdiagram-source-editor");
+    if (!editor) {
+      return;
+    }
+
+    const selectionStart = editor.selectionStart;
+    const selectionEnd = editor.selectionEnd;
+    const scrollTop = editor.scrollTop;
+    editor.value = source;
+    editor.setSelectionRange(
+      Math.min(selectionStart, source.length),
+      Math.min(selectionEnd, source.length)
+    );
+    editor.scrollTop = scrollTop;
+    updateSourceEditorStatus();
   }
 
   function getSelectedNode() {
@@ -1760,13 +2237,49 @@
     return diagramModels[selectedEdge.diagramIndex]?.edges[selectedEdge.edgeIndex] || null;
   }
 
-  function setNodeLabel(node, label) {
-    node.label = String(label).trim() || node.label;
-    return node;
+  function getSelectedSequenceElement() {
+    if (!selectedSequenceElement) {
+      return null;
+    }
+    const diagram = diagramModels[selectedSequenceElement.diagramIndex];
+    if (!diagram || diagram.type !== "sequence") {
+      return null;
+    }
+    if (selectedSequenceElement.kind === "participant") {
+      return diagram.participants.find((participant) => participant.id === selectedSequenceElement.id) || null;
+    }
+    return diagram[`${selectedSequenceElement.kind}s`]?.[selectedSequenceElement.index] || null;
   }
 
-  function setNodeType(node, type) {
-    node.type = type;
+  function buildSequenceInspectorFields(element) {
+    const palettes = nodeColorSchemes[documentColorScheme];
+    const style = getSequenceElementEffectiveStyle(
+      diagramModels[selectedSequenceElement.diagramIndex],
+      element
+    );
+    const supportsPresentation = selectedSequenceElement.kind !== "message";
+
+    return [
+      `<label class="docdiagram-field docdiagram-field-wide">Label<textarea class="docdiagram-sequence-inspector-label docdiagram-inspector-textarea" rows="2">${escapeHtml(element.label)}</textarea></label>`,
+      selectedSequenceElement.kind === "message"
+        ? `<label class="docdiagram-field">Style<select class="docdiagram-sequence-inspector-message-style"><option value="solid"${element.style !== "dashed" ? " selected" : ""}>Solid</option><option value="dashed"${element.style === "dashed" ? " selected" : ""}>Dashed</option></select></label>`
+        : "",
+      supportsPresentation
+        ? `<label class="docdiagram-field">Tone<select class="docdiagram-sequence-inspector-tone"><option value="light"${element.palette?.tone !== "dark" ? " selected" : ""}>Light</option><option value="dark"${element.palette?.tone === "dark" ? " selected" : ""}>Dark</option></select></label>`
+        : "",
+      supportsPresentation
+        ? `<label class="docdiagram-field">Colour<select class="docdiagram-sequence-inspector-colour">${Object.entries(palettes).map(
+          ([name, palette]) => `<option value="${name}"${name === (element.palette?.colour || "blue") ? " selected" : ""}>${palette.label}</option>`
+        ).join("")}</select></label>`
+        : "",
+      supportsPresentation
+        ? `<label class="docdiagram-field">Fill<input type="color" class="docdiagram-sequence-inspector-fill" value="${escapeHtml(style.fill)}"></label><label class="docdiagram-field">Border<input type="color" class="docdiagram-sequence-inspector-stroke" value="${escapeHtml(style.stroke)}"></label><label class="docdiagram-field">Text<input type="color" class="docdiagram-sequence-inspector-text" value="${escapeHtml(style.text)}"></label><label class="docdiagram-field">Width<input type="number" min="1" class="docdiagram-sequence-inspector-width" value="${Number(element.size?.width) || ""}"></label><label class="docdiagram-field">Height<input type="number" min="1" class="docdiagram-sequence-inspector-height" value="${Number(element.size?.height) || ""}"></label>`
+        : ""
+    ].join("");
+  }
+
+  function setNodeLabel(node, label) {
+    node.label = String(label).trim() || node.label;
     return node;
   }
 
@@ -1801,9 +2314,14 @@
     return node;
   }
 
+  function getMinimumNodeDimensions(shape) {
+    return shape === "document" ? documentMinimumNodeSize : minimumNodeSize;
+  }
+
   function setNodeSize(diagram, node, dimension, rawValue) {
     const grid = getGridSize(diagram);
-    const minimum = dimension === "width" ? minimumNodeSize.width : minimumNodeSize.height;
+    const minimumDimensions = getMinimumNodeDimensions(node.shape);
+    const minimum = dimension === "width" ? minimumDimensions.width : minimumDimensions.height;
     const size = clampNodeSize(Number(rawValue) || minimum, minimum, grid);
     node.size = node.shape === "circle"
       ? { ...node.size, width: size, height: size }
@@ -1854,17 +2372,20 @@
   function createToolbar() {
     const toolbar = document.createElement("section");
     toolbar.className = "docdiagram-toolbar";
-    toolbar.dataset.editing = String(editMode);
+    toolbar.dataset.editing = String(editingDiagramIndex !== null);
     toolbar.dataset.theme = documentTheme;
     toolbar.dataset.format = documentFormat;
 
-    const node = editMode ? getSelectedNode() : null;
-    const edge = editMode && !node ? getSelectedEdge() : null;
+    const node = selectedNode && isDiagramEditing(selectedNode.diagramIndex) ? getSelectedNode() : null;
+    const edge = selectedEdge && isDiagramEditing(selectedEdge.diagramIndex) && !node ? getSelectedEdge() : null;
+    const sequenceElement = !node && !edge ? getSelectedSequenceElement() : null;
     const inspectorDiagram = node
       ? diagramModels[selectedNode.diagramIndex]
       : edge
         ? diagramModels[selectedEdge.diagramIndex]
-        : null;
+        : sequenceElement
+          ? diagramModels[selectedSequenceElement.diagramIndex]
+          : null;
 
     toolbar.innerHTML = [
       `<button type="button" class="docdiagram-menu-toggle" aria-label="Document menu" aria-expanded="false" title="Document menu">☰</button>`,
@@ -1885,7 +2406,9 @@
         ? `<div class="docdiagram-inspector" data-kind="node">${buildNodeInspectorFields(inspectorDiagram, node)}</div>`
         : edge
           ? `<div class="docdiagram-inspector" data-kind="edge">${buildEdgeInspectorFields(inspectorDiagram, edge)}</div>`
-          : ""
+          : sequenceElement
+            ? `<div class="docdiagram-inspector" data-kind="sequence">${buildSequenceInspectorFields(sequenceElement)}</div>`
+            : ""
     ].join("");
 
     const menuToggle = toolbar.querySelector(".docdiagram-menu-toggle");
@@ -1923,6 +2446,9 @@
     } else if (edge) {
       wireEdgeInspector(toolbar, selectedEdge.diagramIndex, selectedEdge.edgeIndex);
       positionInspector(selectedEdge.diagramIndex);
+    } else if (sequenceElement) {
+      wireSequenceInspector(toolbar);
+      positionInspector(selectedSequenceElement.diagramIndex);
     }
 
     function positionInspector(diagramIndex) {
@@ -1948,18 +2474,64 @@
   function clearEditorState() {
     selectedNode = null;
     selectedEdge = null;
+    selectedSequenceElement = null;
     editingNode = null;
     editingEdge = null;
   }
 
-  function exitEditing(discard) {
-    if (discard && editSessionSource !== null) {
-      setSource(editSessionSource);
-    } else if (!discard && isDirty()) {
-      globalThis.confirm("Save changes before leaving edit mode?") && downloadDocument();
+  function wireSequenceInspector(toolbar) {
+    const element = getSelectedSequenceElement();
+    if (!element) {
+      return;
     }
-    editMode = false;
-    editSessionSource = null;
+
+    const update = (mutate) => {
+      mutate();
+      persistDiagramModels();
+      renderDocument();
+    };
+    toolbar.querySelector(".docdiagram-sequence-inspector-label")?.addEventListener("change", (event) => {
+      update(() => { element.label = String(event.target.value).trim() || element.label; });
+    });
+    toolbar.querySelector(".docdiagram-sequence-inspector-message-style")?.addEventListener("change", (event) => {
+      update(() => { element.style = event.target.value; });
+    });
+    const tone = toolbar.querySelector(".docdiagram-sequence-inspector-tone");
+    const colour = toolbar.querySelector(".docdiagram-sequence-inspector-colour");
+    const setPalette = () => update(() => setNodeColorPalette(element, tone.value, colour.value));
+    tone?.addEventListener("change", setPalette);
+    colour?.addEventListener("change", setPalette);
+    for (const [selector, key] of [
+      [".docdiagram-sequence-inspector-fill", "fill"],
+      [".docdiagram-sequence-inspector-stroke", "stroke"],
+      [".docdiagram-sequence-inspector-text", "text"]
+    ]) {
+      toolbar.querySelector(selector)?.addEventListener("change", (event) => {
+        update(() => setNodeStyleOverride(element, key, event.target.value));
+      });
+    }
+    for (const [selector, key] of [
+      [".docdiagram-sequence-inspector-width", "width"],
+      [".docdiagram-sequence-inspector-height", "height"]
+    ]) {
+      toolbar.querySelector(selector)?.addEventListener("change", (event) => {
+        update(() => {
+          const value = Number(event.target.value);
+          if (Number.isFinite(value) && value > 0) {
+            element.size = { ...element.size, [key]: value };
+          }
+        });
+      });
+    }
+  }
+
+  function exitEditing(diagramIndex, discard) {
+    if (discard && editSessionDiagram !== null) {
+      diagramModels[diagramIndex] = editSessionDiagram;
+      persistDiagramModels();
+    }
+    editingDiagramIndex = null;
+    editSessionDiagram = null;
     clearEditorState();
     renderDocument();
   }
@@ -1995,17 +2567,18 @@
 
     for (const button of outputElement.querySelectorAll(".docdiagram-start-editing")) {
       button.addEventListener("click", () => {
-        editSessionSource = getSource();
-        editMode = true;
+        const diagramIndex = Number(button.closest(".docdiagram")?.dataset.diagramIndex);
+        editSessionDiagram = parseDiagram(serializeDiagram(diagramModels[diagramIndex]));
+        editingDiagramIndex = diagramIndex;
         clearEditorState();
         renderDocument();
       });
     }
     for (const button of outputElement.querySelectorAll(".docdiagram-done-editing")) {
-      button.addEventListener("click", () => exitEditing(false));
+      button.addEventListener("click", () => exitEditing(editingDiagramIndex, false));
     }
     for (const button of outputElement.querySelectorAll(".docdiagram-cancel-editing")) {
-      button.addEventListener("click", () => exitEditing(true));
+      button.addEventListener("click", () => exitEditing(editingDiagramIndex, true));
     }
     for (const button of outputElement.querySelectorAll(".docdiagram-create-node")) {
       button.addEventListener("click", () => createNewNode(Number(button.dataset.diagramIndex)));
@@ -2017,8 +2590,9 @@
     const style = getNodeEffectiveStyle(diagram, node);
     const width = Number(node.size?.width) || 190;
     const height = Number(node.size?.height) || 80;
-    const widthMinimum = grid ? Math.ceil(minimumNodeSize.width / grid) * grid : minimumNodeSize.width;
-    const heightMinimum = grid ? Math.ceil(minimumNodeSize.height / grid) * grid : minimumNodeSize.height;
+    const minimumDimensions = getMinimumNodeDimensions(node.shape);
+    const widthMinimum = grid ? Math.ceil(minimumDimensions.width / grid) * grid : minimumDimensions.width;
+    const heightMinimum = grid ? Math.ceil(minimumDimensions.height / grid) * grid : minimumDimensions.height;
     const step = grid || 1;
     const palettes = nodeColorSchemes[documentColorScheme];
     const matchingPalette = Object.entries(palettes).find(([, palette]) =>
@@ -2539,8 +3113,48 @@
     }
   }
 
+  function enableSequenceSelection() {
+    for (const svg of outputElement.querySelectorAll('.docdiagram[data-diagram-type="sequence"] svg')) {
+      svg.addEventListener("click", (event) => {
+        if (!isDiagramEditing(Number(svg.dataset.diagramIndex))) {
+          return;
+        }
+        const participant = event.target.closest(".docdiagram-sequence-participant");
+        const note = event.target.closest(".docdiagram-sequence-note");
+        const message = event.target.closest(".docdiagram-sequence-message");
+        if (participant) {
+          selectedSequenceElement = {
+            diagramIndex: Number(participant.dataset.diagramIndex),
+            kind: "participant",
+            id: participant.dataset.participantId
+          };
+        } else if (note) {
+          selectedSequenceElement = {
+            diagramIndex: Number(note.dataset.diagramIndex),
+            kind: "note",
+            index: Number(note.dataset.noteIndex)
+          };
+        } else if (message) {
+          selectedSequenceElement = {
+            diagramIndex: Number(message.dataset.diagramIndex),
+            kind: "message",
+            index: Number(message.dataset.messageIndex)
+          };
+        } else {
+          selectedSequenceElement = null;
+        }
+        selectedNode = null;
+        selectedEdge = null;
+        renderDocument();
+      });
+    }
+  }
+
   function enableEditing() {
     for (const svg of outputElement.querySelectorAll(".docdiagram svg")) {
+      if (!isDiagramEditing(Number(svg.dataset.diagramIndex))) {
+        continue;
+      }
       svg.addEventListener("click", (event) => {
         if (event.target.closest(".docdiagram-inline-editor")) {
           return;
@@ -2718,7 +3332,7 @@
     if (!outputElement.dataset.deleteShortcutBound) {
       outputElement.dataset.deleteShortcutBound = "true";
       document.addEventListener("keydown", (event) => {
-        if (!editMode || (event.key !== "Delete" && event.key !== "Backspace")) {
+        if (editingDiagramIndex === null || (event.key !== "Delete" && event.key !== "Backspace")) {
           return;
         }
         if (event.target.matches("input, textarea, select, [contenteditable]")) {
@@ -2831,8 +3445,9 @@
     createToolbar();
     createSourceEditorTray();
     enableCanvasPanning();
+    enableSequenceSelection();
 
-    if (editMode) {
+    if (editingDiagramIndex !== null) {
       enableEditing();
     }
 
@@ -3289,10 +3904,10 @@
       .docdiagram-edge-group {
         cursor: default;
       }
-      .docdiagram-toolbar[data-editing="true"] + #rendered-document .docdiagram-edge-group {
+      .docdiagram[data-editing="true"] .docdiagram-edge-group {
         cursor: pointer;
       }
-      .docdiagram-toolbar[data-editing="true"] + #rendered-document .docdiagram-edge-group:has(.docdiagram-inline-editor) {
+      .docdiagram[data-editing="true"] .docdiagram-edge-group:has(.docdiagram-inline-editor) {
         cursor: text;
       }
       .docdiagram-edge-selected .docdiagram-edge {
@@ -3334,13 +3949,13 @@
       .docdiagram-node {
         cursor: default;
       }
-      .docdiagram-toolbar[data-editing="true"] + #rendered-document .docdiagram-node {
+      .docdiagram[data-editing="true"] .docdiagram-node {
         cursor: grab;
       }
       #rendered-document .docdiagram svg {
         cursor: grab;
       }
-      .docdiagram-toolbar[data-editing="true"] + #rendered-document .docdiagram-node:has(.docdiagram-inline-editor) {
+      .docdiagram[data-editing="true"] .docdiagram-node:has(.docdiagram-inline-editor) {
         cursor: text;
       }
       .docdiagram-node-label {
@@ -3383,7 +3998,7 @@
   globalThis.DocDiagramCore = {
     diagramThemes,
     nodeColorSchemes,
-    nodeTypes,
+    supportedDiagramTypes,
     nodeColorPalettes,
     nodeShapes,
     edgeAnchors,
@@ -3415,7 +4030,6 @@
     clampNodeSize,
     serializeDiagram,
     setNodeLabel,
-    setNodeType,
     setNodeShape,
     setNodeSubtitle,
     setNodeStyleOverride,
