@@ -41,6 +41,15 @@
   const edgeRoutes = ["orthogonal", "straight", "curved"];
   const edgeMarkerStyles = ["none", "arrow", "circle"];
   const edgeMarkerDefaults = { start: "none", end: "arrow" };
+  const componentDirectiveNames = ["section", "panel", "callout", "grid", "stack"];
+  const componentColours = ["pink", "red", "orange", "yellow", "green", "cyan", "blue", "purple", "grey", "bw"];
+  const calloutKinds = ["note", "info", "warning", "success"];
+  const gridColumns = {
+    "2": "repeat(2, minmax(0, 1fr))",
+    "3": "repeat(3, minmax(0, 1fr))",
+    "2fr 1fr": "minmax(0, 2fr) minmax(0, 1fr)",
+    "1fr 2fr": "minmax(0, 1fr) minmax(0, 2fr)"
+  };
   const nodeColorSchemes = {
     classic: {
       pink: {
@@ -1033,6 +1042,91 @@
     return line.match(/^(\s*)([-+*]|\d+[.)])\s+(.+)$/);
   }
 
+  function parseDirectiveOpen(line) {
+    const match = line.match(/^:::(section|panel|callout|grid|stack)(?:\s+\{(.*)\})?\s*$/);
+    if (!match) {
+      return null;
+    }
+
+    const attributes = {};
+    const source = match[2];
+    if (source !== undefined) {
+      let index = 0;
+      const attributePattern = /\s*([a-z][\w-]*)=(?:"([^"]*)"|([^\s}]+))/gi;
+      let attributeMatch;
+      while ((attributeMatch = attributePattern.exec(source))) {
+        if (attributeMatch.index !== index || attributes[attributeMatch[1]] !== undefined) {
+          return null;
+        }
+        attributes[attributeMatch[1]] = attributeMatch[2] ?? attributeMatch[3];
+        index = attributePattern.lastIndex;
+      }
+      if (source.slice(index).trim()) {
+        return null;
+      }
+    }
+
+    return { name: match[1], attributes };
+  }
+
+  function isDirectiveClose(line) {
+    return /^:::(?:\s+.*)?$/.test(line);
+  }
+
+  function findDirectiveClose(lines, start, end) {
+    let depth = 1;
+    let fenceOpen = false;
+    for (let index = start + 1; index < end; index += 1) {
+      if (/^```/.test(lines[index])) {
+        fenceOpen = !fenceOpen;
+        continue;
+      }
+      if (fenceOpen) {
+        continue;
+      }
+      if (parseDirectiveOpen(lines[index])) {
+        depth += 1;
+      } else if (isDirectiveClose(lines[index])) {
+        depth -= 1;
+        if (!depth) {
+          return index;
+        }
+      }
+    }
+    return -1;
+  }
+
+  function isComponentColour(value) {
+    return /^#[\da-f]{3,8}$/i.test(value);
+  }
+
+  function getComponentStyle(attributes) {
+    const hasPalette = attributes.tone !== undefined || attributes.colour !== undefined;
+    if (hasPalette && (!["light", "dark"].includes(attributes.tone) || !componentColours.includes(attributes.colour))) {
+      return null;
+    }
+
+    for (const key of ["fill", "stroke", "text"]) {
+      if (attributes[key] !== undefined && !isComponentColour(attributes[key])) {
+        return null;
+      }
+    }
+
+    const palette = hasPalette
+      ? getNodeColorPalette(documentColorScheme, attributes.tone, attributes.colour)
+      : null;
+    const overrides = Object.fromEntries(
+      ["fill", "stroke", "text"]
+        .filter((key) => attributes[key] !== undefined)
+        .map((key) => [key, attributes[key]])
+    );
+    const style = mergeStyle(palette, overrides);
+    return Object.entries(style)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => `--docdiagram-component-${key}:${value}`)
+      .join(";");
+  }
+
   function renderMarkdown(source, state = { diagramIndex: 0 }) {
     const lines = source.replaceAll("\r\n", "\n").split("\n");
 
@@ -1040,7 +1134,8 @@
       const line = lines[index] || "";
       return !line.trim() || /^```/.test(line) || /^(#{1,6})\s+/.test(line) ||
         /^ {0,3}&gt;|^ {0,3}>/.test(line) || /^ {0,3}(?:[-*_]\s*){3,}$/.test(line) ||
-        Boolean(getListMatch(line)) || (index + 1 < lines.length && parseTableAlignment(lines[index + 1]));
+        /^:::/.test(line) || Boolean(getListMatch(line)) ||
+        (index + 1 < lines.length && parseTableAlignment(lines[index + 1]));
     }
 
     function renderList(start, baseIndent) {
@@ -1095,6 +1190,86 @@
       return { html: `<${tag}${attributes}>${markup}</${tag}>`, index };
     }
 
+    function renderDirective(start, end) {
+      const directive = parseDirectiveOpen(lines[start]);
+      const close = directive ? findDirectiveClose(lines, start, end) : -1;
+      if (!directive || close === -1) {
+        return null;
+      }
+
+      const { name, attributes } = directive;
+      const allowedAttributes = {
+        section: ["title", "tone", "colour", "fill", "stroke", "text"],
+        panel: ["title", "tone", "colour", "fill", "stroke", "text"],
+        callout: ["kind", "title", "tone", "colour", "fill", "stroke", "text"],
+        grid: ["columns"],
+        stack: []
+      };
+      if (Object.keys(attributes).some((key) => !allowedAttributes[name].includes(key))) {
+        return null;
+      }
+
+      if (name === "grid") {
+        const columns = gridColumns[attributes.columns];
+        if (!columns) {
+          return null;
+        }
+
+        const items = [];
+        let index = start + 1;
+        while (index < close) {
+          if (!lines[index].trim()) {
+            index += 1;
+            continue;
+          }
+          const child = parseDirectiveOpen(lines[index]);
+          if (!child || !["panel", "callout", "stack"].includes(child.name)) {
+            return null;
+          }
+          const rendered = renderDirective(index, close);
+          if (!rendered) {
+            return null;
+          }
+          items.push(`<div class="docdiagram-grid-item">${rendered.html}</div>`);
+          index = rendered.next;
+        }
+        return {
+          html: `<div class="docdiagram-grid" style="--docdiagram-grid-columns:${columns}">${items.join("")}</div>`,
+          next: close + 1
+        };
+      }
+
+      if (name === "stack") {
+        if (Object.keys(attributes).length) {
+          return null;
+        }
+        return {
+          html: `<div class="docdiagram-stack">${renderBlocks(start + 1, close)}</div>`,
+          next: close + 1
+        };
+      }
+
+      const style = getComponentStyle(attributes);
+      if (style === null || (name === "callout" && attributes.kind !== undefined && !calloutKinds.includes(attributes.kind))) {
+        return null;
+      }
+
+      const title = attributes.title ? `<div class="docdiagram-component-title">${renderInline(attributes.title)}</div>` : "";
+      const body = renderBlocks(start + 1, close);
+      if (name === "callout") {
+        const kind = attributes.kind || "info";
+        return {
+          html: `<aside class="docdiagram-component docdiagram-callout docdiagram-callout-${kind}" style="${style}" aria-label="${escapeHtml(attributes.title || kind)} callout"><div class="docdiagram-callout-kind">${escapeHtml(kind)}</div>${title}${body}</aside>`,
+          next: close + 1
+        };
+      }
+
+      return {
+        html: `<section class="docdiagram-component docdiagram-${name}"${style ? ` style="${style}"` : ""}>${title}${body}</section>`,
+        next: close + 1
+      };
+    }
+
     function renderBlocks(start = 0, end = lines.length) {
       const output = [];
       let index = start;
@@ -1102,6 +1277,18 @@
         const line = lines[index];
         if (!line.trim()) {
           index += 1;
+          continue;
+        }
+
+        if (/^:::/.test(line)) {
+          const rendered = renderDirective(index, end);
+          if (rendered) {
+            output.push(rendered.html);
+            index = rendered.next;
+          } else {
+            output.push(`<pre class="docdiagram-literal-source"><code>${escapeHtml(line)}</code></pre>`);
+            index += 1;
+          }
           continue;
         }
 
@@ -2507,6 +2694,65 @@
       #rendered-document .docdiagram-task-list-item input {
         accent-color: currentColor;
         margin: 0 .45rem 0 0;
+      }
+      #rendered-document .docdiagram-component {
+        background: var(--docdiagram-component-fill, var(--docdiagram-code-background));
+        border: 1px solid var(--docdiagram-component-stroke, var(--docdiagram-border));
+        border-radius: 8px;
+        color: var(--docdiagram-component-text, var(--docdiagram-text));
+        margin: 1rem 0;
+        padding: 1rem;
+      }
+      #rendered-document .docdiagram-section {
+        background: transparent;
+      }
+      #rendered-document .docdiagram-component-title {
+        font-size: 1.1em;
+        font-weight: 700;
+        margin-bottom: .5rem;
+      }
+      #rendered-document .docdiagram-component > :last-child {
+        margin-bottom: 0;
+      }
+      #rendered-document .docdiagram-callout {
+        border-left-width: 4px;
+      }
+      #rendered-document .docdiagram-callout-kind {
+        font-size: .78em;
+        font-weight: 700;
+        letter-spacing: .06em;
+        margin-bottom: .35rem;
+        text-transform: uppercase;
+      }
+      #rendered-document .docdiagram-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: var(--docdiagram-grid-columns);
+        margin: 1rem 0;
+      }
+      #rendered-document .docdiagram-grid-item > .docdiagram-component,
+      #rendered-document .docdiagram-grid-item > .docdiagram-stack {
+        margin: 0;
+      }
+      #rendered-document .docdiagram-grid-item > .docdiagram-component {
+        box-sizing: border-box;
+        height: 100%;
+      }
+      #rendered-document .docdiagram-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      #rendered-document .docdiagram-stack > * {
+        margin: 0;
+      }
+      #rendered-document .docdiagram-literal-source {
+        margin: 1rem 0;
+      }
+      @media (max-width: 700px) {
+        #rendered-document .docdiagram-grid {
+          grid-template-columns: 1fr;
+        }
       }
       #rendered-document[data-theme="light"],
       .docdiagram-toolbar[data-theme="light"] {

@@ -64,6 +64,33 @@ development channel in an enduring document. A local relative runtime is valid
 only when the document and runtime are deliberately distributed together. Never
 put a machine-specific `file:///...` URL in a shareable document.
 
+## Formatting extensions
+
+Use formatting directives only as specified in the syntax reference. They begin
+in column 1, wrap ordinary supported Markdown, and can nest:
+
+```markdown
+:::panel { title="Summary" tone=light colour=blue }
+Readable **Markdown** content.
+::: (summary panel)
+```
+
+Use `section` for semantic grouping, `panel` for a bordered visual container,
+and `callout` for a labelled `note`, `info`, `warning`, or `success` message.
+Use both `tone` (`light` or `dark`) and `colour` when selecting a palette; the
+palette names are the same as diagram palettes. `fill`, `stroke`, and `text`
+accept only documented hexadecimal overrides and take precedence over a
+palette.
+
+Use `grid` only for the documented `columns` presets: `2`, `3`, `"2fr 1fr"`,
+or `"1fr 2fr"`. A grid's direct children must be `panel`, `callout`, or
+`stack`; use `stack` to place vertically arranged components in one grid cell.
+Grids collapse to one column on narrow screens. Do not use arbitrary CSS,
+fixed widths, column spans, source reordering, or custom breakpoints.
+
+Close directives with `:::`. Optional text following whitespace is an ignored
+annotation for nesting readability, such as `::: (supporting stack)`.
+
 ## Flowchart rules
 
 Flowcharts use fenced `diagram` YAML. Every node must have a supported `shape`.
@@ -79,9 +106,8 @@ values in the syntax reference, including:
 
 Use explicit, stable node IDs and labels that describe a reader-visible
 responsibility. Keep the diagram compact and include adjacent prose that
-explains the flow. Do not use Mermaid fences, sequence diagrams, panels,
-callouts, tables, raw HTML, or other roadmap features that are not currently
-supported.
+explains the flow. Do not use Mermaid fences, sequence diagrams, raw HTML, or
+other syntax not documented in the syntax reference.
 
 ## Validation checklist
 
@@ -92,8 +118,8 @@ Before returning a document, verify:
 - The template contains canonical Markdown and the rendered container is empty.
 - The script URL matches the document's intended lifetime.
 - Frontmatter, if present, is at the start and uses only supported values.
-- The Markdown uses only headings, paragraphs, unordered lists, ordinary code
-  fences, and `diagram` fences.
+- The Markdown uses only documented Markdown and formatting directives; grids
+  contain only panels, callouts, or stacks as direct children.
 - Every diagram parses with its explicit shape and edge anchors, and uses only
   supported palette, route, marker, and style values.
 - A reader can understand each diagram from its heading, labels, and nearby

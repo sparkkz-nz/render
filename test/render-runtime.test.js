@@ -206,6 +206,75 @@ test("shares diagram indices with diagrams nested in block quotes", () => {
   assert.deepEqual([...new Set(indices)], ["0", "1", "2"]);
 });
 
+test("renders nested formatting components and responsive grid layouts", () => {
+  const markup = renderMarkdown([
+    ':::grid { columns="2fr 1fr" }',
+    ':::panel { title="Primary" tone=light colour=blue }',
+    "Primary **Markdown** content.",
+    "::: (panel)",
+    ":::stack",
+    ':::callout { kind=warning title="Review required" tone=dark colour=yellow }',
+    "Confirm the _operational_ assumptions.",
+    "::: (callout)",
+    ':::panel { title="Supporting detail" fill=#ffffff stroke=#111827 text=#17202a }',
+    "Supporting content.",
+    ":::",
+    "::: (stack)",
+    "::: (grid)"
+  ].join("\n"));
+
+  assert.match(markup, /class="docdiagram-grid" style="--docdiagram-grid-columns:minmax\(0, 2fr\) minmax\(0, 1fr\)"/);
+  assert.match(markup, /class="docdiagram-component docdiagram-panel" style="--docdiagram-component-fill:#BFDBFE;--docdiagram-component-stroke:#1D4ED8;--docdiagram-component-text:#1E3A8A"/);
+  assert.match(markup, /class="docdiagram-stack"/);
+  assert.match(markup, /<aside class="docdiagram-component docdiagram-callout docdiagram-callout-warning".*aria-label="Review required callout">/);
+  assert.match(markup, /<div class="docdiagram-callout-kind">warning<\/div>/);
+  assert.match(markup, /Primary <strong>Markdown<\/strong> content\./);
+  assert.match(markup, /Confirm the <em>operational<\/em> assumptions\./);
+  assert.match(markup, /--docdiagram-component-fill:#ffffff;--docdiagram-component-stroke:#111827;--docdiagram-component-text:#17202a/);
+});
+
+test("renders the documented formatting extension fixture", () => {
+  const source = fs.readFileSync(
+    path.resolve(__dirname, "fixtures", "markdown", "formatting-extensions.md"),
+    "utf8"
+  );
+  const document = resolveDocument(source);
+  const markup = renderMarkdown(document.content);
+
+  assert.match(markup, /class="docdiagram-grid".*repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(markup, /class="docdiagram-component docdiagram-callout docdiagram-callout-success"/);
+  assert.match(markup, /class="docdiagram-grid".*minmax\(0, 2fr\) minmax\(0, 1fr\)/);
+  assert.match(markup, /class="docdiagram-stack"/);
+});
+
+test("keeps malformed and unsupported formatting directives readable", () => {
+  const markup = renderMarkdown([
+    ":::panel { title=Unclosed }",
+    "This remains readable.",
+    "",
+    ':::grid { columns=4 }',
+    ":::panel",
+    "Content",
+    ":::"
+  ].join("\n"));
+
+  assert.match(markup, /<pre class="docdiagram-literal-source"><code>:::panel \{ title=Unclosed \}<\/code><\/pre>/);
+  assert.match(markup, /This remains readable\./);
+  assert.match(markup, /<pre class="docdiagram-literal-source"><code>:::grid \{ columns=4 \}<\/code><\/pre>/);
+});
+
+test("does not treat directive-looking fenced code as nested components", () => {
+  const markup = renderMarkdown([
+    ":::panel",
+    "```markdown",
+    ":::panel",
+    "```",
+    ":::"
+  ].join("\n"));
+
+  assert.match(markup, /<section class="docdiagram-component docdiagram-panel"><pre><code class="language-markdown">:::panel<\/code><\/pre><\/section>/);
+});
+
 test("diagram markup provides compact view-mode zoom and edit controls", () => {
   const markup = renderDiagram([
     "canvas:",
@@ -277,8 +346,15 @@ test("resolves the actual example document's dark theme", () => {
   const document = resolveDocument(source);
 
   assert.equal(document.theme, "dark");
+  assert.equal(document.colourScheme, "classic");
   assert.match(document.content, /^# Payments architecture/m);
-  assert.doesNotMatch(document.content, /^---$/m);
+  assert.match(document.content, /:::grid \{ columns=3 \}/);
+  assert.equal(readDiagramSources(document.content).length, 2);
+  assert.doesNotMatch(renderMarkdown(document.content), /docdiagram-error/);
+
+  for (const diagramSource of readDiagramSources(document.content)) {
+    assert.doesNotThrow(() => parseDiagram(diagramSource));
+  }
 });
 
 test("rejects an unsupported document theme", () => {

@@ -76,6 +76,106 @@ render as code.
 The alignment separator row is required. Escape a literal pipe inside a cell
 with a backslash.
 
+## Formatting extensions
+
+render adds a small, nested directive syntax for structured presentation without
+raw HTML wrappers. Directive bodies contain ordinary supported Markdown,
+including diagrams. The source remains readable when viewed without the
+runtime.
+
+```markdown
+:::panel { title="Payment lifecycle" tone=light colour=blue }
+This panel contains **ordinary Markdown**.
+::: (payment lifecycle panel)
+```
+
+Open directives must begin in column 1 and use one of `section`, `panel`,
+`callout`, `grid`, or `stack`. An opening directive has the form
+`:::name { key=value }`; braces are required when attributes are present.
+Attribute values are bare non-space values or double-quoted strings.
+
+Close a directive with `:::` in column 1. Any text after whitespace is an
+ignored closing annotation, so `::: (panel)` and `::: End panel` close exactly
+like `:::`. Annotations are for human readability only and are not checked
+against the opening directive name.
+
+Directives nest. Invalid attributes, unknown directive names, unclosed
+directives, and layout content that does not follow the rules below remain
+visible source rather than being silently dropped or reinterpreted.
+
+### Sections, panels, and callouts
+
+`section` semantically groups related content. `panel` is a bordered,
+padded visual container. Both may use:
+
+| Attribute | Values / behaviour |
+| --- | --- |
+| `title` | Optional visible title. |
+| `tone` and `colour` | Supply both or neither. `tone` is `light` or `dark`; `colour` is one of `pink`, `red`, `orange`, `yellow`, `green`, `cyan`, `blue`, `purple`, `grey`, or `bw`. |
+| `fill`, `stroke`, `text` | Optional `#RGB`, `#RGBA`, `#RRGGBB`, or `#RRGGBBAA` overrides. These take precedence over a selected palette. |
+
+Palette values use the document's `colourScheme`, including the same tone and
+colour names used by diagrams. Without a palette or overrides, components
+inherit the document theme. Selecting a palette establishes the scheme's
+standard shades; explicit `fill`, `stroke`, and `text` values override those
+individual shades.
+
+`callout` is a specialised panel for a prominent message. It accepts the
+attributes above plus optional `kind`: `note`, `info`, `warning`, or `success`
+(`info` is the default). Callouts render a visible kind label and an accessible
+label, so their meaning never relies on colour alone.
+
+### Responsive grids and stacks
+
+`grid` arranges direct child panels, callouts, or stacks in columns on larger
+screens, and collapses to one column in source order on narrow screens. Its
+required `columns` attribute supports only these intentional presets:
+
+| Value | Layout |
+| --- | --- |
+| `2` | Two equal columns. |
+| `3` | Three equal columns. |
+| `"2fr 1fr"` | Two-thirds / one-third columns. |
+| `"1fr 2fr"` | One-third / two-thirds columns. |
+
+`fr` is a CSS Grid fractional unit: `2fr 1fr` divides available width into
+three shares, assigning two to the first column and one to the second after
+grid gaps are accounted for.
+
+`stack` has no attributes and groups blocks vertically in one grid cell. Use it
+for an asymmetric layout with a wide primary panel beside stacked supporting
+content:
+
+````markdown
+:::grid { columns="2fr 1fr" }
+:::panel { title="Architecture" tone=light colour=blue }
+The primary explanation and diagram go here.
+
+```diagram
+canvas:
+  width: 600
+  height: 300
+nodes: []
+edges: []
+```
+::: (architecture panel)
+
+:::stack
+:::panel { title="Decision" tone=light colour=yellow }
+Keep canonical source readable and editable.
+::: (decision panel)
+
+:::callout { kind=warning title="Review" tone=light colour=orange }
+Confirm assumptions before publishing.
+::: (review callout)
+::: (supporting stack)
+::: (two-thirds / one-third grid)
+````
+
+Do not put ordinary Markdown directly inside a grid: wrap it in a panel,
+callout, or stack. Arbitrary CSS grids, fixed widths, column spans, visual
+reordering, and custom breakpoints are intentionally unsupported.
+
 ## Diagram fences
 
 Use a `diagram` fenced block containing the flowchart YAML model:

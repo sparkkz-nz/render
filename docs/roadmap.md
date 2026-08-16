@@ -161,6 +161,10 @@ presentation elements.
    - panels / sections;
    - callouts such as note, information, warning, and success;
    - grouped or titled content;
+   - constrained responsive grids (equal two- and three-column, and
+     two-thirds / one-third presets) with vertical stacks as a grid cell.
+     Defer arbitrary grid templates, fixed widths, spans, visual reordering,
+     and custom breakpoints.
    - optional compact summary or key-value blocks where justified by real
      documents.
 3. Reuse the existing diagram tone-and-colour model for component styling. The
@@ -182,6 +186,7 @@ presentation elements.
 
 - Extension source remains understandable when rendered as plain Markdown.
 - Panels use the same semantic palette as diagrams and work in both themes.
+- Grids collapse to one column in source order on narrow screens.
 - The extension syntax is fully specified in the user reference and generated
   correctly by the agent skill.
 
