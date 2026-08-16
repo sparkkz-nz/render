@@ -96,7 +96,7 @@ export function renderFlowchartDiagram(
     const labelX = edgePath.midpoint.x;
     const labelY = edgePath.midpoint.y - 10;
 
-    const style = getEdgeEffectiveStyle(diagram, edge);
+    const style = getEdgeEffectiveStyle(diagram, edge, state.documentTheme);
     const isSelected = selectedEdge?.diagramIndex === diagramIndex && selectedEdge.edgeIndex === edgeIndex;
     const isEditing = isSelected && editingEdge?.diagramIndex === diagramIndex && editingEdge.edgeIndex === edgeIndex;
     const strokeWidth = (Number(style.strokeWidth) || 2) + (isSelected ? 2 : 0);
@@ -149,7 +149,12 @@ export function renderFlowchartDiagram(
     const y = Number(node.position?.y) || 0;
     const nodeWidth = Number(node.size?.width) || 190;
     const nodeHeight = Number(node.size?.height) || 80;
-    const style = getNodeEffectiveStyle(diagram, node);
+    const style = getNodeEffectiveStyle(
+      diagram,
+      node,
+      state.documentTheme,
+      state.documentColorScheme
+    );
     const isSelected = selectedNode?.diagramIndex === diagramIndex && selectedNode.nodeId === node.id;
     const isEditing = isSelected && editingNode?.diagramIndex === diagramIndex && editingNode.nodeId === node.id;
     const strokeWidth = (Number(style.strokeWidth) || 2) + (isSelected ? 2 : 0);

@@ -28,6 +28,8 @@ export interface ConnectionDrag {
 }
 
 export interface DiagramRenderState {
+  documentTheme: string;
+  documentColorScheme: string;
   editingDiagramIndex: number | null;
   selectedNode: NodeSelection | null;
   selectedEdge: EdgeSelection | null;

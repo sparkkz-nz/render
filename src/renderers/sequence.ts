@@ -13,7 +13,7 @@ export function renderSequenceDiagram(
   state: DiagramRenderState,
   renderToolbar: DiagramToolbarRenderer
 ): string {
-  const theme = getTheme(diagram);
+  const theme = getTheme(diagram, state.documentTheme);
   const width = Number((diagram as { canvas?: { width?: number } }).canvas?.width) || 1000;
   const baseHeight = Number((diagram as { canvas?: { height?: number } }).canvas?.height) || 560;
   const participants = diagram.participants || [];
@@ -86,7 +86,12 @@ export function renderSequenceDiagram(
 
   const participantMarkup = participants.map((participant) => {
     const centerX = positions.get(participant.id) || 0;
-    const style = getSequenceElementEffectiveStyle(diagram, participant);
+    const style = getSequenceElementEffectiveStyle(
+      diagram,
+      participant,
+      state.documentTheme,
+      state.documentColorScheme
+    );
     const headerWidth = Math.max(participantBoxWidth, Number(participant.size?.width) || 0);
     const headerHeight = Math.max(participantBoxHeight, Number(participant.size?.height) || 0);
     if (participant.kind === "actor") {
@@ -131,7 +136,12 @@ export function renderSequenceDiagram(
   const noteMarkup = noteLayouts.map((note, noteIndex) => {
     const lineHeight = 16;
     const startY = note.y + 18;
-    const style = getSequenceElementEffectiveStyle(diagram, note);
+    const style = getSequenceElementEffectiveStyle(
+      diagram,
+      note,
+      state.documentTheme,
+      state.documentColorScheme
+    );
     return [
       `<g class="docdiagram-sequence-note" data-diagram-index="${diagramIndex}" data-note-index="${noteIndex}">`,
       `<rect x="${note.x}" y="${note.y}" width="${note.width}" height="${note.height}" rx="10" fill="${escapeHtml(style.fill || "")}" stroke="${escapeHtml(style.stroke || "")}" stroke-width="${Number(style.strokeWidth) || 2}"/>`,
@@ -146,7 +156,14 @@ export function renderSequenceDiagram(
     const barWidth = 12;
     const barHeight = Math.max(20, activation.endY - activation.startY);
     const participant = participants.find((candidate) => candidate.id === activation.participantId);
-    const style = participant ? getSequenceElementEffectiveStyle(diagram, participant) : theme.node;
+    const style = participant
+      ? getSequenceElementEffectiveStyle(
+        diagram,
+        participant,
+        state.documentTheme,
+        state.documentColorScheme
+      )
+      : theme.node;
     return `<rect class="docdiagram-sequence-activation" x="${centerX - barWidth / 2 + widthOffset}" y="${activation.startY}" width="${barWidth}" height="${barHeight}" rx="4" fill="${escapeHtml(style.fill || "")}" stroke="${escapeHtml(style.stroke || "")}" stroke-width="${Number(style.strokeWidth) || 2}"/>`;
   }).join("");
 

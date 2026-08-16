@@ -137,7 +137,11 @@ export class BrowserRuntime {
   public renderDiagram(source: string, diagramIndex: number): string {
     return renderDiagramSource(source, diagramIndex, {
       colourScheme: this.state.documentColorScheme,
-      state: this.state,
+      state: {
+        ...this.state,
+        documentTheme: this.state.documentTheme,
+        documentColorScheme: this.state.documentColorScheme
+      },
       onDiagram: (index, diagram) => {
         this.state.diagramModels[index] = diagram;
       }
@@ -321,7 +325,7 @@ export class BrowserRuntime {
       edgeAnchors,
       edgeRoutes,
       edgeMarkerStyles,
-      getTheme,
+      getTheme: (diagram: { theme?: string }) => getTheme(diagram, this.state.documentTheme),
       getGridSize,
       expandCanvasForNode,
       createUniqueNodeId,
@@ -331,8 +335,17 @@ export class BrowserRuntime {
       reconnectConnector,
       deleteConnector,
       deleteNode,
-      getNodeEffectiveStyle,
-      getEdgeEffectiveStyle,
+      getNodeEffectiveStyle: (diagram: { theme?: string }, node: FlowchartNode) => getNodeEffectiveStyle(
+        diagram,
+        node,
+        this.state.documentTheme,
+        this.state.documentColorScheme
+      ),
+      getEdgeEffectiveStyle: (diagram: { theme?: string }, edge: FlowchartEdge) => getEdgeEffectiveStyle(
+        diagram,
+        edge,
+        this.state.documentTheme
+      ),
       getEdgeMarkerStyle,
       getEdgeMarkerDimensions,
       parseDiagram: (source: string) => parseDiagram(source, this.state.documentColorScheme),
