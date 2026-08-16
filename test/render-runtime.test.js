@@ -41,6 +41,9 @@ const {
   parseDocumentFrontmatter,
   resolveDocument,
   setFrontmatterTheme,
+  isSafeUrl,
+  renderInline,
+  renderMarkdown,
   renderDiagram,
   snapToGrid,
   clampNodeSize,
@@ -115,6 +118,92 @@ test("extracts document frontmatter without treating it as Markdown content", ()
 
   assert.equal(document.frontmatter.theme, "dark");
   assert.equal(document.content, "\n# Payments");
+});
+
+test("renders the documented CommonMark and GFM compatibility baseline semantically", () => {
+  const source = fs.readFileSync(
+    path.resolve(__dirname, "fixtures", "markdown", "compatibility-baseline.md"),
+    "utf8"
+  );
+  const markup = renderMarkdown(source);
+
+  assert.match(markup, /<ol><li>Define the public contract\.<ul><li>Include the API edge case\.<\/li><\/ul><\/li><li>Publish the implementation\.<\/li><\/ol>/);
+  assert.match(markup, /<blockquote><p><strong>Important:<\/strong> keep existing document source portable\.<\/p><\/blockquote>/);
+  assert.match(markup, /<hr>/);
+  assert.match(markup, /<em>emphasis<\/em>, <strong>strong text<\/strong>, <del>removed text<\/del>, and <code>inline code<\/code>/);
+  assert.match(markup, /<pre><code class="language-javascript">const enabled = true;<\/code><\/pre>/);
+  assert.match(markup, /<table><thead><tr><th style="text-align:left">Name<\/th><th style="text-align:center">State<\/th><th style="text-align:right">Detail<\/th>/);
+  assert.match(markup, /<td style="text-align:left">API\|edge<\/td>/);
+  assert.match(markup, /<li class="docdiagram-task-list-item"><input type="checkbox" disabled checked> Complete the migration<\/li>/);
+  assert.match(markup, /<li class="docdiagram-task-list-item"><input type="checkbox" disabled> Publish the release notes<\/li>/);
+});
+
+test("renders only safe links and images while keeping unsafe URLs readable", () => {
+  const markup = renderMarkdown([
+    "[Safe](https://example.com/docs)",
+    "",
+    "[Unsafe](javascript:alert(1))",
+    "",
+    "![Logo](images/logo.png)",
+    "",
+    "![Unsafe image](data:text/html;base64,PHNjcmlwdD4=)",
+    "",
+    "<script>alert('literal')</script>"
+  ].join("\n"));
+
+  assert.match(markup, /<a href="https:\/\/example\.com\/docs">Safe<\/a>/);
+  assert.doesNotMatch(markup, /href="javascript:/);
+  assert.match(markup, /\[Unsafe\]\(javascript:alert\(1\)\)/);
+  assert.match(markup, /<img src="images\/logo\.png" alt="Logo">/);
+  assert.doesNotMatch(markup, /src="data:text\/html/);
+  assert.match(markup, /&lt;script&gt;alert\(&#39;literal&#39;\)&lt;\/script&gt;/);
+  assert.equal(isSafeUrl("mailto:author@example.com"), true);
+  assert.equal(isSafeUrl("javascript:alert(1)"), false);
+  assert.equal(isSafeUrl("//untrusted.example/path"), false);
+  assert.equal(isSafeUrl("\\\\untrusted.example\\path"), false);
+  assert.equal(renderInline("`<literal>`"), "<code>&lt;literal&gt;</code>");
+});
+
+test("keeps diagram fences distinct from language-labelled code fences", () => {
+  const markup = renderMarkdown([
+    "```text",
+    "diagram",
+    "```",
+    "",
+    "```diagram",
+    "canvas:",
+    "  width: 600",
+    "  height: 300",
+    "nodes:",
+    "edges:",
+    "```"
+  ].join("\n"));
+
+  assert.match(markup, /<pre><code class="language-text">diagram<\/code><\/pre>/);
+  assert.match(markup, /<figure class="docdiagram"/);
+});
+
+test("shares diagram indices with diagrams nested in block quotes", () => {
+  const diagram = [
+    "```diagram",
+    "canvas:",
+    "  width: 600",
+    "  height: 300",
+    "nodes:",
+    "edges:",
+    "```"
+  ];
+  const source = [
+    ...diagram,
+    "",
+    ...diagram.map((line) => `> ${line}`),
+    "",
+    ...diagram
+  ].join("\n");
+  const indices = [...renderMarkdown(source).matchAll(/data-diagram-index="(\d+)"/g)]
+    .map((match) => match[1]);
+
+  assert.deepEqual([...new Set(indices)], ["0", "1", "2"]);
 });
 
 test("diagram markup provides compact view-mode zoom and edit controls", () => {

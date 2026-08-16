@@ -946,86 +946,246 @@
     ].join("");
   }
 
-  function renderMarkdown(source) {
+  function isSafeUrl(value, allowDataImage = false) {
+    const normalized = String(value).trim();
+    if (normalized.startsWith("//") || normalized.startsWith("\\")) {
+      return false;
+    }
+
+    if (!normalized || normalized.startsWith("#") ||
+      normalized.startsWith("/") ||
+      normalized.startsWith("./") || normalized.startsWith("../") || normalized.startsWith("?")) {
+      return true;
+    }
+
+    if (allowDataImage && /^data:image\/(?:gif|jpeg|png|webp);base64,/i.test(normalized)) {
+      return true;
+    }
+
+    const scheme = normalized.match(/^([a-z][a-z\d+.-]*):/i);
+    return !scheme || ["http", "https", "mailto"].includes(scheme[1].toLowerCase());
+  }
+
+  function renderInline(source) {
+    const codeTokens = [];
+    let value = String(source).replace(/`([^`]+)`/g, (_, code) => {
+      const token = `\u0000${codeTokens.length}\u0000`;
+      codeTokens.push(`<code>${escapeHtml(code)}</code>`);
+      return token;
+    });
+
+    value = escapeHtml(value);
+    value = value.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+&quot;[^&]*&quot;)?\)/g, (_, alt, url) => {
+      const decodedUrl = url.replaceAll("&amp;", "&");
+      return isSafeUrl(decodedUrl, true)
+        ? `<img src="${escapeHtml(decodedUrl)}" alt="${alt}">`
+        : `![${alt}](${escapeHtml(url)})`;
+    });
+    value = value.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+&quot;[^&]*&quot;)?\)/g, (_, label, url) => {
+      const decodedUrl = url.replaceAll("&amp;", "&");
+      return isSafeUrl(decodedUrl)
+        ? `<a href="${escapeHtml(decodedUrl)}">${label}</a>`
+        : `[${label}](${escapeHtml(url)})`;
+    });
+    value = value
+      .replace(/(\*\*|__)(?=\S)([\s\S]*?\S)\1/g, "<strong>$2</strong>")
+      .replace(/~~(?=\S)([\s\S]*?\S)~~/g, "<del>$1</del>")
+      .replace(/(?<!\*)\*(?=\S)([\s\S]*?\S)\*(?!\*)/g, "<em>$1</em>")
+      .replace(/(?<!_)_(?=\S)([\s\S]*?\S)_(?!_)/g, "<em>$1</em>");
+
+    return value.replace(/\u0000(\d+)\u0000/g, (_, index) => codeTokens[Number(index)]);
+  }
+
+  function splitTableRow(line) {
+    const cells = [];
+    let cell = "";
+    let escaped = false;
+    const source = line.trim().replace(/^\||\|$/g, "");
+
+    for (const character of source) {
+      if (escaped) {
+        cell += character;
+        escaped = false;
+      } else if (character === "\\") {
+        escaped = true;
+      } else if (character === "|") {
+        cells.push(cell.trim());
+        cell = "";
+      } else {
+        cell += character;
+      }
+    }
+    cells.push(cell.trim());
+    return cells;
+  }
+
+  function parseTableAlignment(line) {
+    const cells = splitTableRow(line);
+    if (!cells.length || !cells.every((cell) => /^:?-{3,}:?$/.test(cell))) {
+      return null;
+    }
+    return cells.map((cell) => cell.startsWith(":") && cell.endsWith(":")
+      ? "center"
+      : cell.startsWith(":") ? "left" : cell.endsWith(":") ? "right" : "");
+  }
+
+  function getListMatch(line) {
+    return line.match(/^(\s*)([-+*]|\d+[.)])\s+(.+)$/);
+  }
+
+  function renderMarkdown(source, state = { diagramIndex: 0 }) {
     const lines = source.replaceAll("\r\n", "\n").split("\n");
-    const output = [];
-    let paragraph = [];
-    let listItems = [];
-    let codeBlock = null;
-    let diagramIndex = 0;
 
-    function flushParagraph() {
-      if (paragraph.length) {
-        output.push(`<p>${escapeHtml(paragraph.join(" "))}</p>`);
-        paragraph = [];
-      }
+    function isBlockStart(index) {
+      const line = lines[index] || "";
+      return !line.trim() || /^```/.test(line) || /^(#{1,6})\s+/.test(line) ||
+        /^ {0,3}&gt;|^ {0,3}>/.test(line) || /^ {0,3}(?:[-*_]\s*){3,}$/.test(line) ||
+        Boolean(getListMatch(line)) || (index + 1 < lines.length && parseTableAlignment(lines[index + 1]));
     }
 
-    function flushList() {
-      if (listItems.length) {
-        output.push(`<ul>${listItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`);
-        listItems = [];
-      }
-    }
+    function renderList(start, baseIndent) {
+      const first = getListMatch(lines[start]);
+      const ordered = /^\d/.test(first[2]);
+      const items = [];
+      let index = start;
+      const startValue = ordered ? Number.parseInt(first[2], 10) : null;
 
-    for (const line of lines) {
-      const fenceMatch = line.match(/^```([\w-]*)\s*$/);
-
-      if (fenceMatch) {
-        flushParagraph();
-        flushList();
-
-        if (codeBlock) {
-          if (codeBlock.language === "diagram") {
-            output.push(renderDiagram(codeBlock.lines.join("\n"), diagramIndex));
-            diagramIndex += 1;
-          } else {
-            output.push(`<pre><code>${escapeHtml(codeBlock.lines.join("\n"))}</code></pre>`);
-          }
-          codeBlock = null;
-        } else {
-          codeBlock = { language: fenceMatch[1], lines: [] };
+      while (index < lines.length) {
+        const match = getListMatch(lines[index]);
+        if (!match || match[1].length !== baseIndent || /^\d/.test(match[2]) !== ordered) {
+          break;
         }
-        continue;
+
+        const item = { content: [match[3]], children: [] };
+        index += 1;
+        while (index < lines.length) {
+          const nested = getListMatch(lines[index]);
+          if (nested && nested[1].length > baseIndent) {
+            const rendered = renderList(index, nested[1].length);
+            item.children.push(rendered.html);
+            index = rendered.index;
+            continue;
+          }
+          if (!lines[index].trim()) {
+            index += 1;
+            if (index >= lines.length || !getListMatch(lines[index]) || getListMatch(lines[index])[1].length <= baseIndent) {
+              break;
+            }
+            continue;
+          }
+          if (/^\s+/.test(lines[index]) && !getListMatch(lines[index])) {
+            item.content.push(lines[index].trim());
+            index += 1;
+            continue;
+          }
+          break;
+        }
+        items.push(item);
       }
 
-      if (codeBlock) {
-        codeBlock.lines.push(line);
-        continue;
-      }
-
-      if (!line.trim()) {
-        flushParagraph();
-        flushList();
-        continue;
-      }
-
-      const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
-      if (headingMatch) {
-        flushParagraph();
-        flushList();
-        const level = headingMatch[1].length;
-        output.push(`<h${level}>${escapeHtml(headingMatch[2])}</h${level}>`);
-        continue;
-      }
-
-      const listMatch = line.match(/^-\s+(.+)$/);
-      if (listMatch) {
-        flushParagraph();
-        listItems.push(listMatch[1]);
-        continue;
-      }
-
-      paragraph.push(line.trim());
+      const tag = ordered ? "ol" : "ul";
+      const attributes = ordered && startValue !== 1 ? ` start="${startValue}"` : "";
+      const markup = items.map((item) => {
+        const task = !ordered && item.content.length === 1 && item.content[0].match(/^\[([ xX])\]\s+(.*)$/);
+        const content = task
+          ? `<input type="checkbox" disabled${task[1].toLowerCase() === "x" ? " checked" : ""}> ${renderInline(task[2])}`
+          : renderInline(item.content.join(" "));
+        return `<li${task ? ' class="docdiagram-task-list-item"' : ""}>${content}${item.children.join("")}</li>`;
+      }).join("");
+      return { html: `<${tag}${attributes}>${markup}</${tag}>`, index };
     }
 
-    if (codeBlock) {
-      output.push(`<section class="docdiagram-error"><strong>Unclosed code block.</strong></section>`);
+    function renderBlocks(start = 0, end = lines.length) {
+      const output = [];
+      let index = start;
+      while (index < end) {
+        const line = lines[index];
+        if (!line.trim()) {
+          index += 1;
+          continue;
+        }
+
+        const fence = line.match(/^```([\w-]*)\s*$/);
+        if (fence) {
+          const closing = lines.slice(index + 1, end).findIndex((candidate) => /^```\s*$/.test(candidate));
+          if (closing === -1) {
+            output.push(`<section class="docdiagram-error"><strong>Unclosed code block.</strong></section>`);
+            break;
+          }
+          const closeIndex = index + closing + 1;
+          const content = lines.slice(index + 1, closeIndex).join("\n");
+          if (fence[1] === "diagram") {
+            output.push(renderDiagram(content, state.diagramIndex));
+            state.diagramIndex += 1;
+          } else {
+            const className = fence[1] ? ` class="language-${escapeHtml(fence[1])}"` : "";
+            output.push(`<pre><code${className}>${escapeHtml(content)}</code></pre>`);
+          }
+          index = closeIndex + 1;
+          continue;
+        }
+
+        const heading = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
+        if (heading) {
+          output.push(`<h${heading[1].length}>${renderInline(heading[2])}</h${heading[1].length}>`);
+          index += 1;
+          continue;
+        }
+
+        if (/^ {0,3}(?:[-*_]\s*){3,}$/.test(line)) {
+          output.push("<hr>");
+          index += 1;
+          continue;
+        }
+
+        if (/^ {0,3}>/.test(line)) {
+          const quoteLines = [];
+          while (index < end && /^ {0,3}>/.test(lines[index])) {
+            quoteLines.push(lines[index].replace(/^ {0,3}> ?/, ""));
+            index += 1;
+          }
+          output.push(`<blockquote>${renderMarkdown(quoteLines.join("\n"), state)}</blockquote>`);
+          continue;
+        }
+
+        const list = getListMatch(line);
+        if (list) {
+          const rendered = renderList(index, list[1].length);
+          output.push(rendered.html);
+          index = rendered.index;
+          continue;
+        }
+
+        const alignment = index + 1 < end ? parseTableAlignment(lines[index + 1]) : null;
+        if (alignment) {
+          const header = splitTableRow(line);
+          const rows = [];
+          index += 2;
+          while (index < end && lines[index].includes("|") && lines[index].trim()) {
+            rows.push(splitTableRow(lines[index]));
+            index += 1;
+          }
+          const renderCells = (tag, cells) => cells.map((cell, cellIndex) =>
+            `<${tag}${alignment[cellIndex] ? ` style="text-align:${alignment[cellIndex]}"` : ""}>${renderInline(cell || "")}</${tag}>`
+          ).join("");
+          output.push(`<table><thead><tr>${renderCells("th", header)}</tr></thead><tbody>${rows.map((row) =>
+            `<tr>${renderCells("td", row)}</tr>`
+          ).join("")}</tbody></table>`);
+          continue;
+        }
+
+        const paragraph = [line.trim()];
+        index += 1;
+        while (index < end && !isBlockStart(index)) {
+          paragraph.push(lines[index].trim());
+          index += 1;
+        }
+        output.push(`<p>${renderInline(paragraph.join(" "))}</p>`);
+      }
+      return output.join("");
     }
 
-    flushParagraph();
-    flushList();
-    return output.join("");
+    return renderBlocks();
   }
 
   function parseDocumentFrontmatter(source) {
@@ -2299,6 +2459,55 @@
         overflow: auto;
         padding: 1rem;
       }
+      #rendered-document :not(pre) > code {
+        background: var(--docdiagram-code-background);
+        border-radius: 4px;
+        font-size: .9em;
+        padding: .12em .3em;
+      }
+      #rendered-document blockquote {
+        border-left: 4px solid var(--docdiagram-border);
+        color: var(--docdiagram-muted);
+        margin-left: 0;
+        padding-left: 1rem;
+      }
+      #rendered-document hr {
+        border: 0;
+        border-top: 1px solid var(--docdiagram-border);
+        margin: 2rem 0;
+      }
+      #rendered-document a {
+        color: inherit;
+        text-decoration-thickness: .1em;
+        text-underline-offset: .15em;
+      }
+      #rendered-document img {
+        height: auto;
+        max-width: 100%;
+      }
+      #rendered-document table {
+        border-collapse: collapse;
+        display: block;
+        max-width: 100%;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+      #rendered-document th,
+      #rendered-document td {
+        border: 1px solid var(--docdiagram-border);
+        padding: .55rem .75rem;
+      }
+      #rendered-document th {
+        background: var(--docdiagram-code-background);
+        font-weight: 600;
+      }
+      #rendered-document .docdiagram-task-list-item {
+        list-style: none;
+      }
+      #rendered-document .docdiagram-task-list-item input {
+        accent-color: currentColor;
+        margin: 0 .45rem 0 0;
+      }
       #rendered-document[data-theme="light"],
       .docdiagram-toolbar[data-theme="light"] {
         --docdiagram-background: #ffffff;
@@ -2617,6 +2826,9 @@
     parseDocumentFrontmatter,
     resolveDocument,
     setFrontmatterTheme,
+    isSafeUrl,
+    renderInline,
+    renderMarkdown,
     renderDiagram,
     snapToGrid,
     clampNodeSize,

@@ -9,6 +9,13 @@ build tool.
 render is a viewer for agent-generated documentation with targeted editing for
 human corrections. It is not a general-purpose document authoring application.
 
+Documents accept a CommonMark-style baseline: headings, nested lists, quotes,
+thematic breaks, inline formatting, links, language-labelled code fences, and
+tables. They also support GFM-style strikethrough and task lists. The
+[syntax reference](docs/reference.md#markdown-compatibility) defines the exact
+compatibility and safety rules, including literal raw HTML and permitted
+link/image URLs.
+
 ## Start here
 
 Create an HTML file containing a `template#source`, a
