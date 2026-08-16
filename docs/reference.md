@@ -223,7 +223,7 @@ numeric `canvas.grid` enables snapping while moving or resizing; omit it or use
 ### Nodes
 
 Every node requires `shape`. In practice, use `id`, `label`, `position`, and
-`size` as well:
+`size` as well. Nodes may contain child nodes at any depth:
 
 ```yaml
 - id: payments-api
@@ -234,6 +234,12 @@ Every node requires `shape`. In practice, use `id`, `label`, `position`, and
   size: { width: 220, height: 100 }
   palette: { tone: light, colour: blue }
   style: { stroke: "#1D4ED8", strokeWidth: 3, fill: "#DBEAFE", text: "#17202A" }
+  children:
+    - id: idempotency-store
+      label: Idempotency store
+      shape: database
+      position: { x: 20, y: 120 }
+      size: { width: 160, height: 80 }
 ```
 
 | Field | Values / behaviour |
@@ -242,14 +248,19 @@ Every node requires `shape`. In practice, use `id`, `label`, `position`, and
 | `label` | Node text. Newlines are supported with `\n` inside a double-quoted scalar, for example `label: "Payments\nAPI"`. |
 | `subtitle` | Optional text below the label; use the same double-quoted `\n` form for multiple lines. |
 | `shape` | **Required.** `rounded-rectangle`, `circle`, `oval`, `database`, `diamond`, `rhombus`, `flattened-hexagon`, `chevron`, `right-chevron`, or `document`. The `document` shape is a sheet of paper with a folded top-right corner. |
-| `position` | `{ x: number, y: number }` top-left canvas position. |
+| `position` | `{ x: number, y: number }` top-left canvas position for top-level nodes, or top-left position relative to its parent for children. |
 | `size` | `{ width: number, height: number }`. Nodes have a minimum size; circles remain square. |
 | `palette` | Optional `{ tone, colour }`; selects the node's standard colours and clears explicit node colour overrides. |
 | `style` | Optional overrides: `fill`, `stroke`, `text`, and `strokeWidth`. `style.width` is rejected. |
+| `children` | Optional list of child nodes. Any shape can contain children, nesting has no depth limit, and child positions are relative to their parent. |
 
 Palette `tone` is `light` or `dark`. Palette `colour` is `pink`, `red`,
 `orange`, `yellow`, `green`, `cyan`, `blue`, `purple`, `grey`, or `bw`. The
 currently supported colour scheme is `classic`.
+
+Node IDs are unique across the whole diagram, including descendants. Edges can
+connect to a parent or any child node. A child can visually extend beyond its
+parent; its relationship is independent of its shape bounds.
 
 ### Edges
 

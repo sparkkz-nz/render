@@ -11,6 +11,7 @@ import {
   minimumNodeSize
 } from "./schema";
 import { clampNodeSize, getGridSize, getNodeColorPalette, snapToGrid } from "./styles";
+import { findFlowchartNode, flattenFlowchartNodes, getFlowchartNodeBounds } from "./hierarchy";
 
 function getNodeBounds(node: FlowchartNode): { x: number; y: number; width: number; height: number } {
   return {
@@ -24,24 +25,32 @@ function getNodeBounds(node: FlowchartNode): { x: number; y: number; width: numb
 export function expandCanvasForNode(diagram: FlowchartDiagram, node: FlowchartNode, padding = 40): FlowchartDiagram {
   const width = Number(diagram.canvas?.width) || 1000;
   const height = Number(diagram.canvas?.height) || 560;
-  const nodes = diagram.nodes.includes(node) ? diagram.nodes : [...diagram.nodes, node];
-  const bounds = nodes.map(getNodeBounds);
+  const knownNodes = new Set(flattenFlowchartNodes(diagram).map((entry) => entry.node));
+  const nodes = [...knownNodes];
+  if (!nodes.includes(node)) {
+    nodes.push(node);
+  }
+  const boundsFor = (candidate: FlowchartNode) => knownNodes.has(candidate)
+    ? getFlowchartNodeBounds(diagram, candidate)
+    : getNodeBounds(candidate);
+  const bounds = nodes.map(boundsFor);
   const minimumX = Math.min(0, ...bounds.map((candidate) => candidate.x));
   const minimumY = Math.min(0, ...bounds.map((candidate) => candidate.y));
   const shiftX = minimumX < 0 ? padding - minimumX : 0;
   const shiftY = minimumY < 0 ? padding - minimumY : 0;
 
   if (shiftX || shiftY) {
-    for (const candidate of diagram.nodes) {
-      candidate.position = {
-        ...candidate.position,
-        x: (Number(candidate.position?.x) || 0) + shiftX,
-        y: (Number(candidate.position?.y) || 0) + shiftY
+    for (const candidate of flattenFlowchartNodes(diagram).filter((entry) => entry.parent === null)) {
+      const node = candidate.node;
+      node.position = {
+        ...node.position,
+        x: (Number(node.position?.x) || 0) + shiftX,
+        y: (Number(node.position?.y) || 0) + shiftY
       };
     }
   }
 
-  const expandedBounds = nodes.map(getNodeBounds);
+  const expandedBounds = nodes.map(boundsFor);
   diagram.canvas = {
     ...diagram.canvas,
     width: Math.max(width + shiftX, ...expandedBounds.map((candidate) => candidate.x + candidate.width + padding)),
@@ -58,7 +67,8 @@ function rectanglesOverlap(first: { x: number; y: number; width: number; height:
 }
 
 export function createUniqueNodeId(nodes: FlowchartNode[], base = "new-node"): string {
-  const ids = new Set(nodes.map((node) => node.id));
+  const collectIds = (candidates: FlowchartNode[]): string[] => candidates.flatMap((node) => [node.id, ...collectIds(node.children || [])]);
+  const ids = new Set(collectIds(nodes));
   if (!ids.has(base)) {
     return base;
   }
@@ -91,7 +101,7 @@ export function getDefaultNodePosition(diagram: FlowchartDiagram): Position {
         candidate.x + defaultNode.width > width || candidate.y + defaultNode.height > height) {
         continue;
       }
-      if (!diagram.nodes.some((node) => rectanglesOverlap(
+      if (!flattenFlowchartNodes(diagram).some(({ node }) => rectanglesOverlap(
         { ...candidate, width: defaultNode.width, height: defaultNode.height },
         getNodeBounds(node)
       ))) {
@@ -153,13 +163,16 @@ export function deleteConnector(diagram: FlowchartDiagram, edgeIndex: number): F
 }
 
 export function deleteNode(diagram: FlowchartDiagram, nodeId: string): { node: string | null; deletedEdges: FlowchartEdge[] } {
-  const nodeIndex = diagram.nodes.findIndex((node) => node.id === nodeId);
-  if (nodeIndex === -1) {
+  const entry = findFlowchartNode(diagram, nodeId);
+  if (!entry) {
     return { node: null, deletedEdges: [] };
   }
-  const deletedEdges = diagram.edges.filter((edge) => edge.source === nodeId || edge.target === nodeId);
-  diagram.nodes.splice(nodeIndex, 1);
-  diagram.edges = diagram.edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId);
+  const deletedNodeIds = new Set([entry.node, ...(entry.node.children || [])].flatMap(function collect(node): FlowchartNode[] {
+    return [node, ...(node.children || []).flatMap(collect)];
+  }).map((node) => node.id));
+  const deletedEdges = diagram.edges.filter((edge) => deletedNodeIds.has(edge.source) || deletedNodeIds.has(edge.target));
+  entry.siblings.splice(entry.siblings.indexOf(entry.node), 1);
+  diagram.edges = diagram.edges.filter((edge) => !deletedNodeIds.has(edge.source) && !deletedNodeIds.has(edge.target));
   return { node: nodeId, deletedEdges };
 }
 

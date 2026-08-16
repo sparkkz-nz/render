@@ -26,6 +26,9 @@ const {
   getTheme,
   getGridSize,
   expandCanvasForNode,
+  flattenFlowchartNodes,
+  getFlowchartNodeBounds,
+  reparentFlowchartNode,
   createUniqueNodeId,
   getDefaultNodePosition,
   createNode,
@@ -489,6 +492,135 @@ test("diagram markup provides compact view-mode zoom and edit controls", () => {
   assert.match(markup, /aria-label="Zoom in"/);
   assert.match(markup, /aria-label="Zoom to fit"/);
   assert.match(markup, /aria-label="Edit diagram"/);
+});
+
+test("flowchart nodes support arbitrary nesting with relative coordinates and edge endpoints", () => {
+  const source = flowchartSource([
+    "canvas:",
+    "  width: 800",
+    "  height: 500",
+    "nodes:",
+    "  - id: platform",
+    "    label: Platform",
+    "    shape: rounded-rectangle",
+    "    position: { x: 100, y: 80 }",
+    "    size: { width: 400, height: 300 }",
+    "    children:",
+    "      - id: service",
+    "        label: Service",
+    "        shape: oval",
+    "        position: { x: 40, y: 50 }",
+    "        size: { width: 200, height: 140 }",
+    "        children:",
+    "          - id: store",
+    "            label: Store",
+    "            shape: database",
+    "            position: { x: 30, y: 40 }",
+    "            size: { width: 120, height: 80 }",
+    "  - id: client",
+    "    label: Client",
+    "    shape: rounded-rectangle",
+    "    position: { x: 600, y: 180 }",
+    "    size: { width: 120, height: 60 }",
+    "edges:",
+    "  - source: platform",
+    "    target: store",
+    "    sourceAnchor: right",
+    "    targetAnchor: left",
+    "  - source: store",
+    "    target: client",
+    "    sourceAnchor: right",
+    "    targetAnchor: left"
+  ].join("\n"));
+  const diagram = parseDiagram(source);
+  const entries = flattenFlowchartNodes(diagram);
+
+  assert.equal(entries.length, 4);
+  assert.equal(
+    JSON.stringify(getFlowchartNodeBounds(diagram, entries.find((entry) => entry.node.id === "store").node)),
+    JSON.stringify({ x: 170, y: 170, width: 120, height: 80 })
+  );
+  assert.equal(JSON.stringify(parseDiagram(serializeDiagram(diagram))), JSON.stringify(diagram));
+
+  const markup = renderDiagram(source, 0);
+  assert.match(markup, /data-node-id="platform"/);
+  assert.match(markup, /data-node-id="store"/);
+  assert.match(markup, /data-node-id="client"/);
+});
+
+test("drag reparenting uses center containment and preserves absolute position", () => {
+  const diagram = parseDiagram(flowchartSource([
+    "canvas:",
+    "  width: 800",
+    "  height: 500",
+    "nodes:",
+    "  - id: first-parent",
+    "    label: First parent",
+    "    shape: rounded-rectangle",
+    "    position: { x: 100, y: 100 }",
+    "    size: { width: 240, height: 180 }",
+    "  - id: second-parent",
+    "    label: Second parent",
+    "    shape: rounded-rectangle",
+    "    position: { x: 400, y: 100 }",
+    "    size: { width: 240, height: 180 }",
+    "  - id: child",
+    "    label: Child",
+    "    shape: oval",
+    "    position: { x: 420, y: 140 }",
+    "    size: { width: 180, height: 80 }",
+    "edges:"
+  ].join("\n")));
+
+  const child = flattenFlowchartNodes(diagram).find((entry) => entry.node.id === "child").node;
+  const before = getFlowchartNodeBounds(diagram, child);
+  reparentFlowchartNode(diagram, "child");
+  const after = getFlowchartNodeBounds(diagram, child);
+
+  assert.deepEqual(after, before);
+  assert.equal(diagram.nodes.find((node) => node.id === "second-parent").children[0].id, "child");
+
+  child.position = { x: 300, y: 300 };
+  reparentFlowchartNode(diagram, "child");
+  assert.ok(diagram.nodes.some((node) => node.id === "child"));
+});
+
+test("deleting a final child omits empty children and preserves a parseable diagram", () => {
+  const diagram = parseDiagram(flowchartSource([
+    "canvas:",
+    "  width: 400",
+    "  height: 240",
+    "nodes:",
+    "  - id: parent",
+    "    label: Parent",
+    "    shape: rounded-rectangle",
+    "    children:",
+    "      - id: child",
+    "        label: Child",
+    "        shape: oval",
+    "edges:"
+  ].join("\n")));
+
+  deleteNode(diagram, "child");
+  const serialized = serializeDiagram(diagram);
+
+  assert.doesNotMatch(serialized, /children:/);
+  assert.doesNotThrow(() => parseDiagram(serialized));
+});
+
+test("rejects unsupported top-level diagram sections", () => {
+  assert.throws(
+    () => parseDiagram(flowchartSource([
+      "canvas:",
+      "  width: 400",
+      "  height: 240",
+      "bogusSection:",
+      "  value: unexpected",
+      "nodes:",
+      "edges:"
+    ].join("\n"))),
+    /Unsupported diagram section: bogusSection/
+  );
 });
 
 test("sequence diagrams parse, round-trip, and render with lightweight edit controls", () => {

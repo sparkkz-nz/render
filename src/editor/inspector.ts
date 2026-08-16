@@ -12,6 +12,7 @@ import {
   type SequenceParticipant
 } from "../core/diagrams/schema";
 import { escapeHtml } from "../core/diagrams/parser";
+import { findFlowchartNode } from "../core/diagrams/hierarchy";
 import {
   setEdgeAnchor,
   setEdgeLabel,
@@ -169,7 +170,7 @@ export function wireNodeInspector(host: InspectorHost, container: ParentNode, di
     if (!diagram || diagram.type !== "flowchart") {
       return;
     }
-    const node = diagram.nodes.find((candidate) => candidate.id === nodeId);
+    const node = findFlowchartNode(diagram, nodeId)?.node;
     if (!node) {
       return;
     }

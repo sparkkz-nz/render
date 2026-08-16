@@ -7,6 +7,7 @@ import {
   type FlowchartNode
 } from "../core/diagrams/schema";
 import { escapeHtml } from "../core/diagrams/parser";
+import { flattenFlowchartNodes } from "../core/diagrams/hierarchy";
 import { getNodeEffectiveStyle, getEdgeEffectiveStyle, getEdgeMarkerStyle } from "../core/diagrams/styles";
 import { splitTextLines, renderTextBlock, getNodeGeometry, computeNodeTextLayout, renderNodeBody, buildEdgePath, buildEdgeMarkerDef } from "../core/diagrams/geometry";
 import type { DiagramRenderState, DiagramToolbarRenderer } from "./types";
@@ -55,35 +56,34 @@ export function renderFlowchartDiagram(
 ): string {
   const { selectedNode, selectedEdge, editingNode, editingEdge, connectionDrag, diagramZooms } = state;
   const isDiagramEditing = state.editingDiagramIndex === diagramIndex;
-  const nodes = new Map<string, FlowchartNode>();
-
-  for (const node of diagram.nodes) {
-    nodes.set(node.id, node);
-  }
+  const nodeEntries = flattenFlowchartNodes(diagram);
+  const nodes = new Map(nodeEntries.map((entry) => [entry.node.id, entry]));
 
   const edgeLabelLineHeight = 16;
   const edgeMarkerDefs: string[] = [];
   const edgeEndpointMarkup: string[] = [];
 
   const edgeMarkup = diagram.edges.map((edge, edgeIndex) => {
-    const sourceNode = nodes.get(edge.source);
-    const targetNode = nodes.get(edge.target);
+    const sourceEntry = nodes.get(edge.source);
+    const targetEntry = nodes.get(edge.target);
 
-    if (!sourceNode || !targetNode) {
+    if (!sourceEntry || !targetEntry) {
       return "";
     }
+    const sourceNode = sourceEntry.node;
+    const targetNode = targetEntry.node;
 
     const sourceGeometry = getNodeGeometry(
       sourceNode,
-      Number(sourceNode.position?.x) || 0,
-      Number(sourceNode.position?.y) || 0,
+      sourceEntry.position.x,
+      sourceEntry.position.y,
       Number(sourceNode.size?.width) || 190,
       Number(sourceNode.size?.height) || 80
     );
     const targetGeometry = getNodeGeometry(
       targetNode,
-      Number(targetNode.position?.x) || 0,
-      Number(targetNode.position?.y) || 0,
+      targetEntry.position.x,
+      targetEntry.position.y,
       Number(targetNode.size?.width) || 190,
       Number(targetNode.size?.height) || 80
     );
@@ -144,9 +144,9 @@ export function renderFlowchartDiagram(
     ].join("");
   }).join("");
 
-  const nodeMarkup = [...nodes.values()].map((node) => {
-    const x = Number(node.position?.x) || 0;
-    const y = Number(node.position?.y) || 0;
+  const nodeMarkup = nodeEntries.map(({ node, position }) => {
+    const x = position.x;
+    const y = position.y;
     const nodeWidth = Number(node.size?.width) || 190;
     const nodeHeight = Number(node.size?.height) || 80;
     const style = getNodeEffectiveStyle(
