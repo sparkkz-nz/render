@@ -191,11 +191,11 @@ export function renderFlowchartDiagram(
     renderToolbar(diagramIndex, "flowchart", state),
     `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Architecture diagram" data-diagram-index="${diagramIndex}" style="width: ${diagramZooms.get(diagramIndex) || 100}%">`,
     `<defs>${edgeMarkerDefs.join("")}</defs>`,
+    nodeMarkup,
     edgeMarkup,
     connectionDrag?.diagramIndex === diagramIndex
       ? `<path class="docdiagram-connection-preview${connectionDrag.invalid ? " docdiagram-connection-invalid" : ""}" d="${buildEdgePath(connectionDrag.start, connectionDrag.current, connectionDrag.sourceAnchor, connectionDrag.targetAnchor || connectionDrag.sourceAnchor, "straight").path}"/>`
       : "",
-    nodeMarkup,
     edgeEndpointMarkup.join(""),
     `</svg>`,
     `</figure>`

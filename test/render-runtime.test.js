@@ -951,6 +951,10 @@ test("renders edges as selectable groups with a wide hit target", () => {
   assert.match(markup, /<g class="docdiagram-edge-group" data-diagram-index="2" data-edge-index="0">/);
   assert.match(markup, /<path class="docdiagram-edge-hit"[^>]*stroke="transparent"/);
   assert.match(markup, /Reads and writes/);
+  assert.ok(
+    markup.indexOf('data-node-id="db"') < markup.indexOf('class="docdiagram-edge-group"'),
+    "connector markup follows node markup so connectors render above shapes"
+  );
 });
 
 test("supportedDiagramTypes, nodeShapes, edgeAnchors, edgeRoutes, and edgeMarkerStyles expose the supported option sets", () => {
