@@ -31,8 +31,13 @@ jobs:
         with:
           node-version: 22
 
-      - name: Test runtime
-        run: node --test test/render-runtime.test.js
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check and test runtime
+        run: |
+          npm run check
+          npm test
 
       - name: Build Pages site
         shell: bash
@@ -40,9 +45,21 @@ jobs:
           set -euo pipefail
 
           site_dir="$RUNNER_TEMP/pages-site"
+          runtime_source="$RUNNER_TEMP/render-runtime-source.js"
           git fetch --no-tags origin main:refs/remotes/origin/main
           mkdir -p "$site_dir/dev" "$site_dir/releases"
+          build_skryb_runtime() {
+            local revision="$1"
+            local destination="$2"
+            git show "$revision:render-runtime.js" > "$runtime_source"
+            RENDER_RUNTIME_ENTRY="$runtime_source" node scripts/build.mjs
+            cp dist/skryb-runtime.js "$destination"
+          }
+
+          # Preserve the legacy runtime for existing portable documents while
+          # publishing the new Skryb runtime alongside it.
           git show "origin/main:render-runtime.js" > "$site_dir/render-runtime.js"
+          build_skryb_runtime "origin/main" "$site_dir/skryb-runtime.js"
           git show "origin/main:hello.html" > "$site_dir/hello.html"
           git show "origin/main:hello-runtime.js" > "$site_dir/hello-runtime.js"
           git show "origin/main:pages/index.html" > "$site_dir/index.html"
@@ -53,12 +70,14 @@ jobs:
             dev_revision="origin/main"
           fi
           git show "$dev_revision:render-runtime.js" > "$site_dir/dev/render-runtime.js"
+          build_skryb_runtime "$dev_revision" "$site_dir/dev/skryb-runtime.js"
 
           while IFS= read -r tag; do
             [ -n "$tag" ] || continue
             release_dir="$site_dir/releases/$tag"
             mkdir -p "$release_dir"
             git show "$tag:render-runtime.js" > "$release_dir/render-runtime.js"
+            build_skryb_runtime "$tag" "$release_dir/skryb-runtime.js"
           done < <(git tag --list "v*" --sort=version:refname)
 
       - name: Configure GitHub Pages

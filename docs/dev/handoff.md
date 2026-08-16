@@ -1,153 +1,113 @@
-# Handoff notes
+# Skryb refactor handoff
 
-## Current proof of concept
+## Current state
 
-The proof of concept now supports:
+The application is still functionally the existing browser-resident document
+renderer: a portable HTML document embeds canonical Markdown and diagram source
+in `template#source`, while a browser runtime renders it into
+`#rendered-document`, supports editing, and saves a complete copy.
 
-- a browser-openable HTML document containing Markdown in
-  `<template id="source">`;
-- a small custom Markdown renderer for headings, paragraphs, lists, ordinary
-  code blocks, and `diagram` code blocks;
-- a restricted YAML diagram syntax with explicit canvas, nodes, edges,
-  positions, dimensions, required node shapes, and required connector
-  source/target anchors;
-- polished SVG flow diagrams with semantic application, service, datastore,
-  and note styles;
-- an internal-only node `type`: it still drives theme colours and is editable
-  in the inspector, but it is never rendered as SVG text;
-- an optional free-text node `subtitle`, rendered below the label (styled with
-  the theme's `subtitleText` colour) and editable only in the properties
-  inspector;
-- multiline support for node labels, node subtitles, and edge labels: the
-  inspector uses `<textarea>` controls, and the SVG renderer stacks each
-  value's lines as centred `<tspan>`s (`splitTextLines`/`renderTextBlock`/
-  `computeNodeTextLayout`) so multi-line content remains vertically centred
-  and evenly spaced within the node or along the edge;
-- view/edit modes;
-- node selection, label editing, and drag positioning;
-- in-place, multiline label editing for both nodes and edges: first click
-  selects, second click opens a focused `foreignObject`/`<textarea>` editor
-  (`aria-label` documents the shortcuts); Enter inserts a newline, Ctrl/Cmd+
-  Enter commits, Escape cancels and discards the edit, and blur commits —
-  none of this interferes with node dragging, resizing, or edge/node
-  selection;
-- selected-node bottom-right resize handles with minimum dimensions;
-- edge selection in edit mode, with a wide invisible hit target and a clear
-  selected-edge highlight, without disturbing node drag/resize/label
-  interactions;
-- opt-in `canvas.grid` snapping for move and resize edits;
-- independent edge endpoint marker selectors: edge `start`/`end` fields each
-  accept `none`, `arrow`, or `circle` (defaulting to backwards-compatible
-  `start: none` / `end: arrow` when omitted). Every edge renders its own
-  uniquely-scoped `<marker>` defs (`docdiagram-marker-<diagram>-<edge>-start`/
-  `-end`) with `markerUnits="userSpaceOnUse"` so marker size stays fixed
-  regardless of the edge's stroke width, and each marker's fill/stroke always
-  resolves from that edge's effective line `stroke` (never the label `text`
-  colour), so overrides never bleed between edges. `marker-start`/`marker-end`
-  attributes (and their `<marker>` defs) are only emitted for non-`none`
-  endpoints. Arrow markers use `orient="auto-start-reverse"` at the start so
-  they point the right way regardless of which end they're on;
-- built-in `light` and `dark` themes selected in Markdown YAML frontmatter,
-  consistently styling the surrounding page (`html`/`body`), prose, controls,
-  and diagrams; a diagram may override the document theme, with optional
-  per-node and per-edge style overrides — including the shared `stroke` and
-  `strokeWidth` properties, which render and persist correctly;
-- a toolbar theme selector that rewrites the `theme` YAML frontmatter field
-  directly (preserving any other frontmatter keys/comments) and rerenders;
-- a compact toolbar properties inspector that follows the selected node or
-  edge: node label/subtitle/type/fill/border/border width/text colour/width/height
-  (clamped to the minimum size and grid), and edge
-  label/route/start/end/stroke/label colour/stroke width — `Start` and `End`
-  selects expose the three marker styles; every inspector edit persists to
-  the canonical YAML through the existing serializer;
-- source serialization after edits, including safe multiline round-tripping:
-  any label/subtitle containing `\n` is JSON-quoted by the existing
-  serializer (`formatScalar`'s unquoted-safe regex already rejects newlines),
-  so line breaks always survive a parse → serialize → parse cycle;
-- **Save a copy**, which downloads an updated HTML document.
+The TypeScript/build foundation is complete. The implementation has not yet
+been split into modules: [render-runtime.js](../../render-runtime.js) remains
+the 4,100-line legacy source while the refactor proceeds incrementally.
 
-The main sample is [example.html](../../example.html), driven by
-[render-runtime.js](../../render-runtime.js). It demonstrates required
-node shapes, explicit non-default connector anchors, the `curved` route, a
-node subtitle, multiline labels, an edge `style.strokeWidth` override, and
-non-default edge endpoint markers.
+## Completed in this slice
 
-## Bug fix: edge stroke width not visibly updating
+- Added TypeScript configuration and an esbuild build:
+  - [package.json](../../package.json)
+  - [tsconfig.json](../../tsconfig.json)
+  - [src/index.ts](../../src/index.ts)
+  - [scripts/build.mjs](../../scripts/build.mjs)
+- The standard build creates the browser-compatible, minified
+  `dist/skryb-runtime.js` IIFE. It remains usable as a classic deferred script,
+  including from documents opened through `file://`.
+- Existing Node integration tests now run against the built artifact rather
+  than directly evaluating the source runtime.
+- The Pages workflow runs dependency installation, TypeScript checking, tests,
+  and the build before publishing.
+- Pages preserves every existing `render-runtime.js` URL and publishes the new
+  artifact alongside it:
 
-Inspector changes to an edge's `style.stroke` and `style.strokeWidth` were always
-computed and serialized correctly, but never rendered: the injected
-stylesheet's `.docdiagram-edge` rule hard-coded `stroke` and `stroke-width`,
-and CSS declarations always beat SVG presentation attributes in the cascade,
-regardless of selector specificity. The fix removes those hard-coded
-declarations (and the now-redundant `marker-end`) from `.docdiagram-edge`, so
-each edge's inline `stroke="…"`/`stroke-width="…"` attributes (already
-correctly computed by `getEdgeEffectiveStyle`) take effect. Verified visually
-in a real browser: changing stroke/width in the inspector now immediately
-recolors/rethickens the selected edge, and the change survives a rerender.
+  | Channel | Legacy runtime | Skryb runtime |
+  | --- | --- | --- |
+  | Latest | `render-runtime.js` | `skryb-runtime.js` |
+  | Development | `dev/render-runtime.js` | `dev/skryb-runtime.js` |
+  | Release | `releases/<tag>/render-runtime.js` | `releases/<tag>/skryb-runtime.js` |
 
-## Development runtime
+- [README.md](../../README.md) and
+  [ts-refactor-plan.md](../../ts-refactor-plan.md) describe the Skryb runtime
+  URLs and the modularization target.
+- [claude.md](../../claude.md) contains local GitHub REST API pull-request
+  instructions. It is intentionally excluded by [.gitignore](../../.gitignore)
+  and must not be committed.
 
-[example.html](../../example.html) currently references the runtime through this
-machine-specific absolute file URL:
+## Commands
 
-```text
-file:///Users/stuart.parkinson/hacks/render/render-runtime.js
+```sh
+npm ci
+npm run check
+npm test
 ```
 
-This means saved development copies can be opened from another local folder on
-this machine. It is not portable to another machine. Before sharing documents,
-replace it with an immutable public runtime URL as described in
-[devnotes.md](devnotes.md).
+`npm test` builds `dist/skryb-runtime.js` and runs
+[test/render-runtime.test.js](../../test/render-runtime.test.js) against it.
+
+For Pages, the same builder can bundle a selected legacy source file:
+
+```sh
+RENDER_RUNTIME_ENTRY=render-runtime.js npm run build
+```
+
+This preserves the compatibility source while still producing
+`dist/skryb-runtime.js`. The build removes the obsolete generated
+`dist/render-runtime.js` first, so only the active generated artifact remains.
 
 ## Validation completed
 
-- `node --check render-runtime.js`
-- `node --test test/render-runtime.test.js` — 59 tests covering helpers,
-  frontmatter persistence, node/edge YAML round-trip, the new `subtitle`
-  field (including multiline round-trip), multiline node label/subtitle/edge
-  label rendering as stacked `<tspan>`s, absence of `node.type` as SVG text,
-  node and edge `stroke`/`strokeWidth` overrides reflected in rendered markup,
-  required node-shape and edge-anchor schema validation, supported curved
-  routes, a regression
-  guard asserting the `.docdiagram-edge` CSS rule no longer hard-codes
-  `stroke`/`stroke-width`, and edge endpoint markers: `start`/`end` defaults,
-  markup for each of `none`/`arrow`/`circle`, unique per-edge marker ids
-  (with no cross-edge stroke bleed), `markerUnits="userSpaceOnUse"` staying
-  independent of stroke-width, marker colour resolving from the edge stroke
-  rather than the label text colour, and YAML parse/serialize/mutator
-  round-trips (including normalization of unsupported marker values)
-- `git diff --check`
-- Headless Chrome rendering through `file://`
-- Browser round trip: select node, edit label, drag node, save HTML, and
-  reopen the saved copy with the edit preserved
-- Loading an HTML file from `/tmp` through the absolute local runtime URL
-- Manual browser pass for this slice (Chrome via `file://` on the updated
-  `example.html`): confirmed node subtitle displays below the label with no
-  visible `type` text; edited a node's multiline label and subtitle via the
-  inspector textareas and saw both stack correctly; edited an edge's stroke
-  colour and stroke width via the inspector and saw the rendered edge visibly
-  recolor/thicken (confirming the CSS fix); selected an edge, clicked it
-  again to open the in-place multiline editor, confirmed Enter inserts a
-  newline, Ctrl+Enter commits, and Escape discards an in-progress edit
-  without leaking it (including through the editor's forced blur on
-  rerender); confirmed node dragging and the resize handle still work
-  unchanged with the new subtitle/multiline layout in place
+The following passed after the build foundation and Skryb runtime changes:
 
-This slice's inspector/theme-selector/edge-selection UI was implemented and
-covered by the Node test suite above and the manual browser pass; hamburger/
-offline-menu work remains explicitly deferred (see below).
+```sh
+npm run check
+npm run build
+node --test --test-reporter=dot test/render-runtime.test.js
+RENDER_RUNTIME_ENTRY=render-runtime.js npm run build
+node --test --test-reporter=dot test/render-runtime.test.js
+```
+
+Both build paths passed all 79 tests. The minified Skryb artifact was 85,641
+bytes at handoff.
 
 ## Next recommended work
 
-Implement the dependency-ordered editor-polish slices in
-[editor-polish-plan.md](editor-polish-plan.md):
+Follow the staged architecture in [ts-refactor-plan.md](../../ts-refactor-plan.md).
+Do not rewrite the runtime wholesale. Preserve the built-artifact integration
+test continuously and extract one test-covered responsibility at a time.
 
-1. render and edit the requested shape palette;
-2. render side-aware straight, orthogonal, and curved connectors;
-3. create, reconnect, and delete nodes and connectors;
-4. replace the permanent inspector with compact menu/popover editor chrome and
-   add zoom/scroll refinement.
+Recommended order:
 
-Defer **Save offline version** until there is a deterministic packaging step
-that can embed a pinned runtime release. The requirement and design constraint
-are recorded in [plan.md](plan.md).
+1. Add strict TypeScript domain types for documents, frontmatter, flowcharts,
+   sequences, nodes, edges, palettes, and style overrides.
+2. Extract pure diagram modules: schema constants, parsing/validation,
+   serialization, mutations, themes/palettes, and geometry/routing.
+3. Move their existing test cases into focused module tests while retaining the
+   artifact-level test.
+4. Extract Markdown, flowchart, and sequence rendering.
+5. Extract editing controllers, source editor, persistence/export, and finally
+   bootstrap into [src/index.ts](../../src/index.ts).
+6. Only after the modular entry point replaces the legacy import should
+   [render-runtime.js](../../render-runtime.js) be retired or converted into a
+   compatibility artifact.
+
+## Constraints to preserve
+
+- The Markdown-plus-diagram source inside `template#source` is authoritative.
+  The DOM/SVG and in-memory models are derived state.
+- Keep one classic-script bundle. Do not require ESM loading, code splitting,
+  a server, or a UI framework.
+- Preserve the existing document format and legacy runtime URLs.
+- Keep `DocDiagramCore` as a narrow, deliberate test boundary rather than
+  exposing editor state as a public API.
+- Future Mermaid import must be isolated from canonical diagram parsing; no
+  third-party renderer/editor representation becomes persisted source.
+- A future offline export should embed a tested, pinned runtime bundle, not
+  attempt to fetch a local script at save time.
