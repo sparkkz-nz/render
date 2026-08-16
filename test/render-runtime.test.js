@@ -5,7 +5,7 @@ const test = require("node:test");
 const vm = require("node:vm");
 
 const runtime = fs.readFileSync(
-  path.resolve(__dirname, "..", "render-runtime.js"),
+  path.resolve(__dirname, "..", "dist", "skryb-runtime.js"),
   "utf8"
 );
 const context = vm.createContext({
@@ -13,7 +13,7 @@ const context = vm.createContext({
   globalThis: {}
 });
 
-vm.runInContext(runtime, context, { filename: "render-runtime.js" });
+vm.runInContext(runtime, context, { filename: "dist/skryb-runtime.js" });
 
 const {
   supportedDiagramTypes,
