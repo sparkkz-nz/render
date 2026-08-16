@@ -31,6 +31,7 @@ import {
   setNodeLabel,
   setNodeShape,
   setNodeSubtitle,
+  setNodeTextAlignment,
   setNodeStyleOverride,
   setNodeColorPalette,
   setNodeSize,
@@ -306,6 +307,13 @@ export class BrowserRuntime {
       if (toolbar && event.target instanceof Node && !toolbar.contains(event.target)) {
         this.closeDocumentMenu();
       }
+      if (!(event.target instanceof Element) || event.target.closest(
+        ".docdiagram-toolbar, .docdiagram-node, .docdiagram-edge-group, .docdiagram-connection-port, .docdiagram-edge-endpoint, .docdiagram-inline-editor, .docdiagram-sequence-participant, .docdiagram-sequence-note, .docdiagram-sequence-message"
+      ) || (!this.state.selectedNode && !this.state.selectedEdge && !this.state.selectedSequenceElement)) {
+        return;
+      }
+      clearEditorState(this.state);
+      this.renderDocument();
     });
     this.outputElement.addEventListener("dblclick", (event) => {
       if (event.target instanceof Element && event.target.closest("button, input, textarea, select, [contenteditable]")) {
@@ -366,6 +374,7 @@ export class BrowserRuntime {
       setNodeLabel,
       setNodeShape,
       setNodeSubtitle,
+      setNodeTextAlignment,
       setNodeStyleOverride,
       setNodeColorPalette,
       setNodeSize,

@@ -191,6 +191,16 @@ export function setNodeSubtitle(node: FlowchartNode, subtitle: string): Flowchar
   return node;
 }
 
+export function setNodeTextAlignment(node: FlowchartNode, dimension: "textAAlign" | "textHAlign", alignment: string): FlowchartNode {
+  if (dimension === "textAAlign" && (alignment === "top" || alignment === "center")) {
+    node.textAAlign = alignment;
+  }
+  if (dimension === "textHAlign" && (alignment === "left" || alignment === "center" || alignment === "right")) {
+    node.textHAlign = alignment;
+  }
+  return node;
+}
+
 export function setNodeStyleOverride<T extends { style?: FlowchartNode["style"] }>(node: T, key: string, value: unknown): T {
   node.style = { ...node.style, [key]: value } as FlowchartNode["style"];
   return node;
