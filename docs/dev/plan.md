@@ -48,7 +48,7 @@ content and references a rendering runtime through a script element.
 During development, use a relative script URL:
 
 ```html
-<script src="./render-runtime.js" defer></script>
+<script src="https://sparkkz-nz.github.io/render/latest/skryb-runtime.js" defer></script>
 ```
 
 For distribution, use an immutable versioned runtime URL hosted from
@@ -56,7 +56,7 @@ For distribution, use an immutable versioned runtime URL hosted from
 
 ```html
 <script
-  src="https://sparkkz-nz.github.io/render/releases/v1.0.0/render-runtime.js"
+  src="https://sparkkz-nz.github.io/render/releases/v1.0.0/skryb-runtime.js"
   defer>
 </script>
 ```
@@ -74,8 +74,10 @@ example:
 # Payments architecture
 
 ```diagram
+type: flowchart
 version: 1
 id: payments-flow
+canvas: {}
 nodes: []
 edges: []
 ```

@@ -7,7 +7,7 @@ description: Create valid, portable render HTML documents with canonical Markdow
 
 Use this skill when creating or updating a render document. A render document is
 a portable HTML file that embeds canonical Markdown in `template#source` and
-renders it through the hosted `render-runtime.js` browser runtime.
+renders it through the hosted `skryb-runtime.js` browser runtime.
 
 The complete, versioned authoring contract is the repository's
 [syntax reference](../../../docs/reference.md). Treat it as the source of truth:
@@ -34,7 +34,7 @@ or diagram types that the reference does not document.
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Document title</title>
   <script
-    src="https://sparkkz-nz.github.io/render/render-runtime.js"
+    src="https://sparkkz-nz.github.io/render/latest/skryb-runtime.js"
     defer>
   </script>
 </head>
@@ -55,9 +55,9 @@ Use one of these script sources:
 
 | Document purpose | Script source |
 | --- | --- |
-| Normal local or shared use | `https://sparkkz-nz.github.io/render/render-runtime.js` |
-| Short-lived pre-merge testing only | `https://sparkkz-nz.github.io/render/dev/render-runtime.js` |
-| Published or distributed document | `https://sparkkz-nz.github.io/render/releases/<tag>/render-runtime.js` |
+| Normal local or shared use | `https://sparkkz-nz.github.io/render/latest/skryb-runtime.js` |
+| Short-lived pre-merge testing only | `https://sparkkz-nz.github.io/render/dev/skryb-runtime.js` |
+| Published or distributed document | `https://sparkkz-nz.github.io/render/releases/<tag>/skryb-runtime.js` |
 
 Use a real released tag, such as `v1.2.0`, in a pinned URL. Never use the shared
 development channel in an enduring document. A local relative runtime is valid
@@ -137,6 +137,7 @@ The checked fixtures demonstrate valid documents:
 
 - [Simple document](../../../test/fixtures/render-document/simple-document.html)
 - [Flowchart document](../../../test/fixtures/render-document/flowchart-document.html)
+- [Sequence document](../../../test/fixtures/render-document/sequence-document.html)
 - [Themed document](../../../test/fixtures/render-document/themed-document.html)
 
 Do not create examples for future Markdown extensions until their syntax and

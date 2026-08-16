@@ -29,7 +29,7 @@ Create an HTML file containing a `template#source`, a
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hello skryb</title>
   <script
-    src="https://sparkkz-nz.github.io/render/skryb-runtime.js"
+    src="https://sparkkz-nz.github.io/render/latest/skryb-runtime.js"
     defer>
   </script>
 </head>
@@ -53,7 +53,7 @@ current document contract.
 
 ```html
 <!-- Latest runtime from main: suitable for normal use and local experiments. -->
-<script src="https://sparkkz-nz.github.io/render/skryb-runtime.js" defer></script>
+<script src="https://sparkkz-nz.github.io/render/latest/skryb-runtime.js" defer></script>
 
 <!-- Immutable release snapshot: use for documents you publish or distribute. -->
 <script src="https://sparkkz-nz.github.io/render/releases/v1.2.0/skryb-runtime.js" defer></script>
@@ -84,9 +84,9 @@ will embed a pinned runtime in the saved document.
 
 ## Development
 
-[example.html](example.html) is the comprehensive local fixture. It uses a
-machine-specific development runtime URL, so replace that URL before sharing a
-copy. Install development dependencies and run the runtime tests with:
+[example.html](example.html) is the comprehensive local fixture and uses the
+shareable latest runtime URL. Install development dependencies and run the
+runtime tests with:
 
 ```sh
 npm ci

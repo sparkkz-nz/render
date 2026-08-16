@@ -5,7 +5,8 @@
 render turns a portable HTML document containing Markdown, frontmatter, and
 diagram source into readable documentation with interactive SVG diagrams. The
 HTML file retains its source, so it can be reopened, edited, and saved without a
-server or build tool. The hosted [render-runtime.js](../render-runtime.js)
+server or build tool. The hosted
+[`skryb-runtime.js`](https://sparkkz-nz.github.io/render/latest/skryb-runtime.js)
 provides a stable browser runtime.
 
 render is primarily a viewer for agent-generated HTML documentation, with

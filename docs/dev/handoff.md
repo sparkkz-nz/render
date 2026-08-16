@@ -25,14 +25,13 @@ the 4,100-line legacy source while the refactor proceeds incrementally.
   than directly evaluating the source runtime.
 - The Pages workflow runs dependency installation, TypeScript checking, tests,
   and the build before publishing.
-- Pages preserves every existing `render-runtime.js` URL and publishes the new
-  artifact alongside it:
+  - Pages publishes one Skryb runtime artifact per channel:
 
-  | Channel | Legacy runtime | Skryb runtime |
-  | --- | --- | --- |
-  | Latest | `render-runtime.js` | `skryb-runtime.js` |
-  | Development | `dev/render-runtime.js` | `dev/skryb-runtime.js` |
-  | Release | `releases/<tag>/render-runtime.js` | `releases/<tag>/skryb-runtime.js` |
+  | Channel | Skryb runtime |
+  | --- | --- |
+  | Latest | `latest/skryb-runtime.js` |
+  | Development | `dev/skryb-runtime.js` |
+  | Release | `releases/<tag>/skryb-runtime.js` |
 
 - [README.md](../../README.md) and
   [ts-refactor-plan.md](../../ts-refactor-plan.md) describe the Skryb runtime
@@ -52,15 +51,8 @@ npm test
 `npm test` builds `dist/skryb-runtime.js` and runs
 [test/render-runtime.test.js](../../test/render-runtime.test.js) against it.
 
-For Pages, the same builder can bundle a selected legacy source file:
-
-```sh
-RENDER_RUNTIME_ENTRY=render-runtime.js npm run build
-```
-
-This preserves the compatibility source while still producing
-`dist/skryb-runtime.js`. The build removes the obsolete generated
-`dist/render-runtime.js` first, so only the active generated artifact remains.
+Pages builds the checked-out TypeScript source once and publishes the generated
+`dist/skryb-runtime.js` artifact to the appropriate channel.
 
 ## Validation completed
 
@@ -70,12 +62,9 @@ The following passed after the build foundation and Skryb runtime changes:
 npm run check
 npm run build
 node --test --test-reporter=dot test/render-runtime.test.js
-RENDER_RUNTIME_ENTRY=render-runtime.js npm run build
-node --test --test-reporter=dot test/render-runtime.test.js
 ```
 
-Both build paths passed all 79 tests. The minified Skryb artifact was 85,641
-bytes at handoff.
+The minified Skryb artifact was 85,641 bytes at handoff.
 
 ## Next recommended work
 
@@ -94,9 +83,6 @@ Recommended order:
 4. Extract Markdown, flowchart, and sequence rendering.
 5. Extract editing controllers, source editor, persistence/export, and finally
    bootstrap into [src/index.ts](../../src/index.ts).
-6. Only after the modular entry point replaces the legacy import should
-   [render-runtime.js](../../render-runtime.js) be retired or converted into a
-   compatibility artifact.
 
 ## Constraints to preserve
 
@@ -104,7 +90,7 @@ Recommended order:
   The DOM/SVG and in-memory models are derived state.
 - Keep one classic-script bundle. Do not require ESM loading, code splitting,
   a server, or a UI framework.
-- Preserve the existing document format and legacy runtime URLs.
+- Preserve the existing document format and the Skryb runtime channel URLs.
 - Keep `DocDiagramCore` as a narrow, deliberate test boundary rather than
   exposing editor state as a public API.
 - Future Mermaid import must be isolated from canonical diagram parsing; no

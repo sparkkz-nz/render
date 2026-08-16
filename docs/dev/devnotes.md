@@ -2,35 +2,32 @@
 
 ## Runtime loading workflow
 
-During development, keep the document and its runtime together and load the
-runtime by relative path:
+For normal use, load the current main runtime from the latest channel:
 
 ```html
-<script src="./render-runtime.js" defer></script>
+<script src="https://sparkkz-nz.github.io/render/latest/skryb-runtime.js" defer></script>
 ```
 
-This allows the HTML document to be opened locally without a network
-dependency.
+Use the shared development channel only for short-lived branch verification.
 
-When a development document needs to be saved or copied outside the runtime
-folder, use this machine-specific absolute file URL instead:
+For a short-lived development preview, use the dev channel:
 
 ```html
 <script
-  src="file:///Users/stuart.parkinson/hacks/render/render-runtime.js"
+  src="https://sparkkz-nz.github.io/render/dev/skryb-runtime.js"
   defer>
 </script>
 ```
 
-This is a development convenience only: it works only on a machine where that
-exact path exists. Distributed documents must use the published runtime URL.
+The dev channel is overwritten by the most recently pushed non-main branch and
+must not be used by distributed documents.
 
 For a shareable document, publish the final runtime to the `sparkkz-makes`
 GitHub Pages site and use its absolute URL:
 
 ```html
 <script
-  src="https://sparkkz-nz.github.io/render/releases/v1.0.0/render-runtime.js"
+  src="https://sparkkz-nz.github.io/render/releases/v1.0.0/skryb-runtime.js"
   defer>
 </script>
 ```
@@ -42,9 +39,9 @@ the runtime version with which they were tested.
 Examples:
 
 ```text
-releases/v0.1.0/render-runtime.js
-releases/v0.2.0/render-runtime.js
-releases/v1.0.0/render-runtime.js
+releases/v0.1.0/skryb-runtime.js
+releases/v0.2.0/skryb-runtime.js
+releases/v1.0.0/skryb-runtime.js
 ```
 
 ## Offline export
