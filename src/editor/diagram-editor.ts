@@ -463,6 +463,9 @@ export class DiagramEditor {
     const style = getNodeEffectiveStyle(diagram, node);
     const geometry = getNodeGeometry(node, x, y, width, height);
     const layout = computeNodeTextLayout(geometry.textBounds, node);
+    for (const detail of group.querySelectorAll(".docdiagram-node-detail")) {
+      detail.remove();
+    }
     nodeBody.outerHTML = renderNodeBody(geometry, style, Number(style.strokeWidth) || 2);
     for (const text of [label, subtitle]) {
       if (!text) {
@@ -470,6 +473,7 @@ export class DiagramEditor {
       }
       text.setAttribute("x", String(layout.centerX));
       text.setAttribute("y", String(text === label ? layout.labelStartY : layout.subtitleStartY));
+      text.setAttribute("text-anchor", layout.textAnchor);
       for (const tspan of text.querySelectorAll("tspan")) {
         tspan.setAttribute("x", String(layout.centerX));
       }

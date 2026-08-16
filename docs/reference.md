@@ -245,6 +245,8 @@ control placement and geometry. Nodes may contain child nodes at any depth:
 | `id` | **Required.** Stable identifier used by edges. |
 | `label` | **Required.** Node text. Newlines are supported with `\n` inside a double-quoted scalar, for example `label: "Payments\nAPI"`. |
 | `subtitle` | Optional text below the label; use the same double-quoted `\n` form for multiple lines. |
+| `textVAlign` | Optional vertical text-stack alignment: `top` or `center` (default). |
+| `textHAlign` | Optional horizontal text-stack alignment: `left`, `center` (default), or `right`. |
 | `shape` | **Required.** `rounded-rectangle`, `circle`, `oval`, `database`, `diamond`, `rhombus`, `flattened-hexagon`, `chevron`, `right-chevron`, or `document`. The `document` shape is a sheet of paper with a folded top-right corner. |
 | `position` | `{ x: number, y: number }` top-left canvas position for top-level nodes, or top-left position relative to its parent for children. |
 | `size` | `{ width: number, height: number }`. Nodes have a minimum size; circles remain square. |

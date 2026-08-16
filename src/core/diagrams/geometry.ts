@@ -13,7 +13,8 @@ export function renderTextBlock(
   lines: string[],
   lineHeight: number,
   className: string,
-  fill: string
+  fill: string,
+  textAnchor: "start" | "middle" | "end" = "middle"
 ): string {
   if (!lines.length) {
     return "";
@@ -24,7 +25,7 @@ export function renderTextBlock(
     return `<tspan x="${centerX}"${positionAttribute}>${escapeHtml(line) || " "}</tspan>`;
   }).join("");
 
-  return `<text x="${centerX}" y="${startY}" text-anchor="middle" class="${className}" fill="${escapeHtml(fill)}">${tspans}</text>`;
+  return `<text x="${centerX}" y="${startY}" text-anchor="${textAnchor}" class="${className}" fill="${escapeHtml(fill)}">${tspans}</text>`;
 }
 
 export function getNodeGeometry(
@@ -68,7 +69,7 @@ export function getNodeGeometry(
     const cap = Math.min(nodeHeight * 0.22, 18);
     textBounds.y += cap / 2;
     textBounds.height -= cap;
-    bodyMarkup = `<path class="docdiagram-node-body" d="M ${x} ${y + cap} C ${x} ${y - cap / 3} ${x + nodeWidth} ${y - cap / 3} ${x + nodeWidth} ${y + cap} V ${y + nodeHeight - cap} C ${x + nodeWidth} ${y + nodeHeight + cap / 3} ${x} ${y + nodeHeight + cap / 3} ${x} ${y + nodeHeight - cap} Z M ${x} ${y + cap} C ${x} ${y + cap * 2.3} ${x + nodeWidth} ${y + cap * 2.3} ${x + nodeWidth} ${y + cap}"/>`;
+    bodyMarkup = `<path class="docdiagram-node-body" d="M ${x} ${y + cap} C ${x} ${y - cap / 3} ${x + nodeWidth} ${y - cap / 3} ${x + nodeWidth} ${y + cap} V ${y + nodeHeight - cap} C ${x + nodeWidth} ${y + nodeHeight + cap / 3} ${x} ${y + nodeHeight + cap / 3} ${x} ${y + nodeHeight - cap} Z"/><path class="docdiagram-node-detail" d="M ${x} ${y + cap} C ${x} ${y + cap * 2.3} ${x + nodeWidth} ${y + cap * 2.3} ${x + nodeWidth} ${y + cap}" fill="none"/>`;
   } else if (shape === "diamond") {
     textBounds.x += nodeWidth * 0.25;
     textBounds.y += nodeHeight * 0.25;
@@ -122,6 +123,7 @@ export function computeNodeTextLayout(
   legacyNode?: FlowchartNode
 ): {
   centerX: number;
+  textAnchor: "start" | "middle" | "end";
   labelLines: string[];
   subtitleLines: string[];
   labelLineHeight: number;
@@ -148,12 +150,21 @@ export function computeNodeTextLayout(
   const labelBlockHeight = labelLines.length * labelLineHeight;
   const subtitleBlockHeight = subtitleLines.length * subtitleLineHeight;
   const totalBlockHeight = labelBlockHeight + subtitleGap + subtitleBlockHeight;
-  const centerX = resolvedBounds.x + resolvedBounds.width / 2;
+  const textHAlign = resolvedNode.textHAlign || "center";
+  const centerX = textHAlign === "left"
+    ? resolvedBounds.x
+    : textHAlign === "right"
+      ? resolvedBounds.x + resolvedBounds.width
+      : resolvedBounds.x + resolvedBounds.width / 2;
+  const textAnchor = textHAlign === "left" ? "start" : textHAlign === "right" ? "end" : "middle";
   const centerY = resolvedBounds.y + resolvedBounds.height / 2;
-  const blockTop = centerY - totalBlockHeight / 2;
+  const blockTop = resolvedNode.textVAlign === "top"
+    ? resolvedBounds.y
+    : centerY - totalBlockHeight / 2;
 
   return {
     centerX,
+    textAnchor,
     labelLines,
     subtitleLines,
     labelLineHeight,
@@ -167,6 +178,9 @@ export function renderNodeBody(geometry: { bodyMarkup: string }, style: NodeStyl
   return geometry.bodyMarkup.replace(
     "/>",
     ` fill="${escapeHtml(style.fill || "")}" stroke="${escapeHtml(style.stroke || "")}" stroke-width="${strokeWidth}"/>`
+  ).replace(
+    'class="docdiagram-node-detail"',
+    `class="docdiagram-node-detail" stroke="${escapeHtml(style.stroke || "")}" stroke-width="${strokeWidth}"`
   );
 }
 

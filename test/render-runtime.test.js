@@ -548,6 +548,43 @@ test("flowchart nodes support arbitrary nesting with relative coordinates and ed
   assert.match(markup, /data-node-id="client"/);
 });
 
+test("flowchart node text stack alignment parses, renders, and round-trips", () => {
+  const source = flowchartSource([
+    "canvas:",
+    "  width: 400",
+    "  height: 240",
+    "nodes:",
+    "  - id: api",
+    "    label: Payments API",
+    "    subtitle: Owns intents",
+    "    shape: rounded-rectangle",
+    "    position: { x: 40, y: 50 }",
+    "    size: { width: 200, height: 120 }",
+    "    textVAlign: top",
+    "    textHAlign: left",
+    "edges:"
+  ].join("\n"));
+  const diagram = parseDiagram(source);
+  const markup = renderDiagram(source, 0);
+
+  assert.equal(diagram.nodes[0].textVAlign, "top");
+  assert.equal(diagram.nodes[0].textHAlign, "left");
+  assert.match(markup, /<text x="52" y="76\.4" text-anchor="start" class="docdiagram-node-label"/);
+  assert.equal(JSON.stringify(parseDiagram(serializeDiagram(diagram))), JSON.stringify(diagram));
+  assert.throws(
+    () => parseDiagram(source.replace("textHAlign: left", "textHAlign: justify")),
+    /Unsupported node textHAlign/
+  );
+});
+
+test("database geometry separates the filled body from its top seam", () => {
+  const geometry = getNodeGeometry({ shape: "database" }, 10, 20, 180, 100);
+  const body = renderNodeBody(geometry, { fill: "#123456", stroke: "#abcdef" }, 2);
+
+  assert.match(body, /class="docdiagram-node-body"[^>]*fill="#123456"[^>]*stroke="#abcdef"/);
+  assert.match(body, /class="docdiagram-node-detail"[^>]*stroke="#abcdef"[^>]*fill="none"/);
+});
+
 test("drag reparenting uses center containment and preserves absolute position", () => {
   const diagram = parseDiagram(flowchartSource([
     "canvas:",

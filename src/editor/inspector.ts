@@ -26,6 +26,7 @@ import {
   setNodeSize,
   setNodeStyleOverride,
   setNodeSubtitle,
+  setNodeTextAlignment,
   setStyleStrokeWidth
 } from "../core/diagrams/mutations";
 import { getEdgeEffectiveStyle, getGridSize, getNodeEffectiveStyle, getSequenceElementEffectiveStyle } from "../core/diagrams/styles";
@@ -84,6 +85,8 @@ export function buildNodeInspectorFields(
     `<label class="docdiagram-field">Border<input type="color" class="docdiagram-inspector-stroke" value="${escapeHtml(style.stroke || "")}"></label>`,
     `<label class="docdiagram-field">Border width<input type="number" class="docdiagram-inspector-stroke-width" value="${Number(style.strokeWidth) || 2}" min="1" step="1"></label>`,
     `<label class="docdiagram-field">Text<input type="color" class="docdiagram-inspector-text" value="${escapeHtml(style.text || "")}"></label>`,
+    `<label class="docdiagram-field">Vertical text<select class="docdiagram-inspector-text-v-align"><option value="top"${node.textVAlign === "top" ? " selected" : ""}>Top</option><option value="center"${node.textVAlign !== "top" ? " selected" : ""}>Center</option></select></label>`,
+    `<label class="docdiagram-field">Horizontal text<select class="docdiagram-inspector-text-h-align"><option value="left"${node.textHAlign === "left" ? " selected" : ""}>Left</option><option value="center"${node.textHAlign !== "left" && node.textHAlign !== "right" ? " selected" : ""}>Center</option><option value="right"${node.textHAlign === "right" ? " selected" : ""}>Right</option></select></label>`,
     `<label class="docdiagram-field">Width<input type="number" class="docdiagram-inspector-width" value="${width}" min="${widthMinimum}" step="${step}"></label>`,
     `<label class="docdiagram-field">Height<input type="number" class="docdiagram-inspector-height" value="${height}" min="${heightMinimum}" step="${step}"></label>`
   ].join("");
@@ -192,6 +195,8 @@ export function wireNodeInspector(host: InspectorHost, container: ParentNode, di
   change(container, ".docdiagram-inspector-fill", (value) => withNode((_, node) => setNodeStyleOverride(node, "fill", value)));
   change(container, ".docdiagram-inspector-stroke", (value) => withNode((_, node) => setNodeStyleOverride(node, "stroke", value)));
   change(container, ".docdiagram-inspector-text", (value) => withNode((_, node) => setNodeStyleOverride(node, "text", value)));
+  change(container, ".docdiagram-inspector-text-v-align", (value) => withNode((_, node) => setNodeTextAlignment(node, "textVAlign", value)));
+  change(container, ".docdiagram-inspector-text-h-align", (value) => withNode((_, node) => setNodeTextAlignment(node, "textHAlign", value)));
   change(container, ".docdiagram-inspector-stroke-width", (value) => withNode((_, node) => setStyleStrokeWidth(node, value)));
   change(container, ".docdiagram-inspector-width", (value) => withNode((diagram, node) => setNodeSize(diagram, node, "width", value)));
   change(container, ".docdiagram-inspector-height", (value) => withNode((diagram, node) => setNodeSize(diagram, node, "height", value)));
