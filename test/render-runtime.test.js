@@ -116,7 +116,7 @@ test("render authoring skill fixtures use the required shell and valid source", 
     assert.match(html, /<html lang="en">/, `${fixture} declares its language`);
     assert.match(html, /<meta charset="utf-8">/, `${fixture} declares UTF-8`);
     assert.match(html, /<meta name="viewport"/, `${fixture} has a viewport`);
-    assert.match(html, /<script src="https:\/\/sparkkz-nz\.github\.io\/render(?:\/releases\/v1\.2\.0)?\/render-runtime\.js" defer><\/script>/, `${fixture} uses a hosted runtime`);
+    assert.match(html, /<script src="https:\/\/sparkkz-nz\.github\.io\/render\/(?:latest|releases\/v1\.2\.0)\/skryb-runtime\.js" defer><\/script>/, `${fixture} uses a hosted runtime`);
     assert.match(html, /<main id="rendered-document"><\/main>/, `${fixture} has an empty render target`);
 
     const document = resolveDocument(source);

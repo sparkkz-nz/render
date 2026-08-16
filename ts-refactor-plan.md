@@ -8,7 +8,7 @@ codebase while continuing to publish one minified, browser-ready
 the current contract:
 
 ```html
-<script src="https://sparkkz-nz.github.io/render/skryb-runtime.js" defer></script>
+<script src="https://sparkkz-nz.github.io/render/latest/skryb-runtime.js" defer></script>
 ```
 
 The source document remains canonical. It contains Markdown, frontmatter, and
@@ -25,8 +25,7 @@ Use TypeScript source and esbuild to create a single minified IIFE bundle.
 - An IIFE bundle runs as a classic script and therefore works in documents
   opened from `file://` as well as hosted documents.
 - The deployed filename and URL are `skryb-runtime.js`.
-- The existing `render-runtime.js` artifact remains published unchanged for
-  backward compatibility with existing documents.
+- The Skryb runtime is the only published browser artifact.
 - No UI framework is required. The runtime's direct DOM/SVG interactions remain
   appropriate for the product.
 

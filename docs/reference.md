@@ -2,16 +2,14 @@
 
 This reference describes the source format accepted by the current
 [Skryb runtime](../dist/skryb-runtime.js). Source is embedded in an HTML document
-and remains canonical after diagram edits. The legacy `render-runtime.js`
-artifact remains available for backwards compatibility; new documents should use
-`skryb-runtime.js`.
+and remains canonical after diagram edits.
 
 ## HTML document shell
 
 A render document requires:
 
 ```html
-<script src="https://sparkkz-nz.github.io/render/skryb-runtime.js" defer></script>
+<script src="https://sparkkz-nz.github.io/render/latest/skryb-runtime.js" defer></script>
 <template id="source" type="text/markdown">
 # Document title
 </template>
@@ -210,7 +208,7 @@ object fields use six spaces. Blank lines and `#` comments are allowed.
 | `version` | No | A document-defined diagram version, commonly `1`. |
 | `id` | No | A document-defined diagram identifier. |
 | `theme` | No | `light` or `dark`; overrides document `theme`. |
-| `canvas` | Yes | Canvas mapping containing `width`, `height`, and optional `grid`. |
+| `canvas` | No | Canvas mapping containing `width`, `height`, and optional `grid`. Omitted canvases default to `1000` by `560`. |
 | `nodes` | Flowchart | List of flowchart nodes. |
 | `edges` | Flowchart | List of flowchart connectors. |
 | `participants` | Sequence | Ordered sequence participants. |
@@ -222,8 +220,8 @@ numeric `canvas.grid` enables snapping while moving or resizing; omit it or use
 
 ### Nodes
 
-Every node requires `shape`. In practice, use `id`, `label`, `position`, and
-`size` as well. Nodes may contain child nodes at any depth:
+Every node requires `id`, `label`, and `shape`. Use `position` and `size` to
+control placement and geometry. Nodes may contain child nodes at any depth:
 
 ```yaml
 - id: payments-api
@@ -244,8 +242,8 @@ Every node requires `shape`. In practice, use `id`, `label`, `position`, and
 
 | Field | Values / behaviour |
 | --- | --- |
-| `id` | Stable identifier used by edges. |
-| `label` | Node text. Newlines are supported with `\n` inside a double-quoted scalar, for example `label: "Payments\nAPI"`. |
+| `id` | **Required.** Stable identifier used by edges. |
+| `label` | **Required.** Node text. Newlines are supported with `\n` inside a double-quoted scalar, for example `label: "Payments\nAPI"`. |
 | `subtitle` | Optional text below the label; use the same double-quoted `\n` form for multiple lines. |
 | `shape` | **Required.** `rounded-rectangle`, `circle`, `oval`, `database`, `diamond`, `rhombus`, `flattened-hexagon`, `chevron`, `right-chevron`, or `document`. The `document` shape is a sheet of paper with a folded top-right corner. |
 | `position` | `{ x: number, y: number }` top-left canvas position for top-level nodes, or top-left position relative to its parent for children. |
@@ -384,10 +382,10 @@ content to source; source text does not attempt to infer a rendered location.
 
 ## Runtime channels and limitations
 
-Use `skryb-runtime.js` from `main` for normal use, `/dev/` only for
-short-lived branch testing, and `/releases/<tag>/` for immutable published
-documents. The legacy `render-runtime.js` remains available only for existing
-documents. See [getting started](getting-started.md) for URLs and examples.
+Use `/latest/skryb-runtime.js` for normal use, `/dev/skryb-runtime.js` only for
+short-lived branch testing, and `/releases/<tag>/skryb-runtime.js` for immutable
+published documents. See [getting started](getting-started.md) for URLs and
+examples.
 
 Current limitations include the intentionally small Markdown subset, flowcharts
 and sequence diagrams, no Mermaid import, and no offline runtime embedding.

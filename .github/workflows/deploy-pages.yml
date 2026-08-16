@@ -4,12 +4,13 @@ on:
   push:
     branches:
       - "**"
+      - "!gh-pages"
     tags:
       - "v*"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -41,44 +42,46 @@ jobs:
 
       - name: Build Pages site
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
           site_dir="$RUNNER_TEMP/pages-site"
-          runtime_source="$RUNNER_TEMP/render-runtime-source.js"
-          git fetch --no-tags origin main:refs/remotes/origin/main
-          mkdir -p "$site_dir/dev" "$site_dir/releases"
-          build_skryb_runtime() {
-            local revision="$1"
-            local destination="$2"
-            git show "$revision:render-runtime.js" > "$runtime_source"
-            RENDER_RUNTIME_ENTRY="$runtime_source" node scripts/build.mjs
-            cp dist/skryb-runtime.js "$destination"
-          }
-
-          # Preserve the legacy runtime for existing portable documents while
-          # publishing the new Skryb runtime alongside it.
-          git show "origin/main:render-runtime.js" > "$site_dir/render-runtime.js"
-          build_skryb_runtime "origin/main" "$site_dir/skryb-runtime.js"
-          git show "origin/main:hello.html" > "$site_dir/hello.html"
-          git show "origin/main:hello-runtime.js" > "$site_dir/hello-runtime.js"
-          git show "origin/main:pages/index.html" > "$site_dir/index.html"
-
-          if [ "$GITHUB_REF_TYPE" = "branch" ]; then
-            dev_revision="$GITHUB_SHA"
+          site_remote="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git ls-remote --exit-code --heads origin gh-pages; then
+            git clone --depth 1 --branch gh-pages "$site_remote" "$site_dir"
           else
-            dev_revision="origin/main"
+            git init "$site_dir"
+            (
+              cd "$site_dir"
+              git checkout --orphan gh-pages
+              git remote add origin "$site_remote"
+            )
           fi
-          git show "$dev_revision:render-runtime.js" > "$site_dir/dev/render-runtime.js"
-          build_skryb_runtime "$dev_revision" "$site_dir/dev/skryb-runtime.js"
 
-          while IFS= read -r tag; do
-            [ -n "$tag" ] || continue
-            release_dir="$site_dir/releases/$tag"
-            mkdir -p "$release_dir"
-            git show "$tag:render-runtime.js" > "$release_dir/render-runtime.js"
-            build_skryb_runtime "$tag" "$release_dir/skryb-runtime.js"
-          done < <(git tag --list "v*" --sort=version:refname)
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            destination="$site_dir/releases/$GITHUB_REF_NAME"
+          elif [ "$GITHUB_REF_NAME" = "main" ]; then
+            destination="$site_dir/latest"
+          else
+            destination="$site_dir/dev"
+          fi
+          mkdir -p "$destination"
+          cp dist/skryb-runtime.js "$destination/skryb-runtime.js"
+          cp pages/index.html "$site_dir/index.html"
+
+          (
+            cd "$site_dir"
+            git add .
+            if ! git diff --cached --quiet; then
+              git config user.name github-actions[bot]
+              git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+              git commit -m "Publish ${GITHUB_REF_TYPE} ${GITHUB_REF_NAME}"
+              git push origin HEAD:gh-pages
+            fi
+            rm -rf .git
+          )
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
