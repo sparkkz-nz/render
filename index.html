@@ -96,10 +96,22 @@
     .comparison { display: grid; gap: 22px; grid-template-columns: 1fr 1fr; margin-top: 42px; }
     .comparison .card { min-height: 210px; } .comparison code { background: var(--code); border-radius: 5px; color: #bfdbfe; display: block; font: .75rem/1.65 ui-monospace, monospace; padding: 15px; }
     .cta { padding: 115px 0; text-align: center; } .cta .section-heading { margin: auto; } .cta .actions { justify-content: center; }
+    .gallery { padding-bottom: 112px; padding-top: 0; }
+    .gallery-grid { display: grid; gap: 22px; grid-template-columns: 1.4fr 1fr; margin-top: 42px; }
+    .showcase {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 13px; overflow: hidden;
+    }
+    .showcase-wide { grid-row: span 2; }
+    .showcase img { display: block; height: 100%; object-fit: cover; object-position: top; width: 100%; }
+    .showcase-wide img { max-height: 490px; }
+    .showcase-copy { padding: 19px 21px 21px; }
+    .showcase-copy h3 { font-size: 1rem; margin: 0 0 5px; }
+    .showcase-copy p { color: var(--muted); font-size: .85rem; margin: 0; }
     footer { border-top: 1px solid var(--border); color: var(--muted); font-size: .8rem; padding: 28px 0; }
     @media (max-width: 800px) {
       .nav { display: none; } .hero { padding-top: 54px; } .hero-grid, .comparison { grid-template-columns: 1fr; }
-      .preview { transform: none; } .steps, .proof-grid { grid-template-columns: 1fr; } .editor { grid-template-columns: 1fr; } .source { display: none; }
+      .preview { transform: none; } .steps, .proof-grid, .gallery-grid { grid-template-columns: 1fr; } .editor { grid-template-columns: 1fr; } .source { display: none; }
+      .showcase-wide { grid-row: auto; }
     }
   </style>
 </head>
@@ -206,6 +218,28 @@ messages:
       <div class="actions">
         <a class="button primary" href="./docs/quickstart.html">Open the quickstart</a>
         <a class="button secondary" href="./docs/reference.html">Browse the schema</a>
+      </div>
+    </section>
+
+    <section class="shell gallery">
+      <div class="section-heading">
+        <div class="eyebrow">Made to be used</div>
+        <h2>Beautiful to read. Practical to refine.</h2>
+        <p>Skryb starts with structured source but does not stop there. Documents can present rich technical context, expose their canonical source, and let people refine diagrams directly in the browser.</p>
+      </div>
+      <div class="gallery-grid">
+        <article class="showcase showcase-wide">
+          <img src="./assets/secure-doc-flow.png" alt="A rendered Skryb document showing a secure ingestion workflow, callouts, and an editable flowchart">
+          <div class="showcase-copy"><h3>Reader-ready technical context</h3><p>Combine prose, callouts, and diagrams in one portable document that gives a system its surrounding explanation.</p></div>
+        </article>
+        <article class="showcase">
+          <img src="./assets/source-edit.png" alt="The Skryb source editor open beneath a rendered sequence diagram">
+          <div class="showcase-copy"><h3>Canonical source, always close</h3><p>Open the source tray to inspect or edit the Markdown and YAML that defines the document.</p></div>
+        </article>
+        <article class="showcase">
+          <img src="./assets/edit-flowchart.png" alt="The Skryb diagram inspector adjusting a selected flowchart node">
+          <div class="showcase-copy"><h3>Refine diagrams in place</h3><p>Select, drag, resize, and restyle supported flowchart elements without a separate diagramming tool.</p></div>
+        </article>
       </div>
     </section>
   </main>
