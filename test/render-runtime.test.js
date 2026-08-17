@@ -154,6 +154,16 @@ test("published documentation uses the required shell and valid source", () => {
   }
 });
 
+test("published reference renders Markdown and YAML source blocks", () => {
+  const source = readTemplateSource(path.resolve(__dirname, "..", "pages", "docs", "reference.html"));
+  const markup = renderMarkdown(resolveDocument(source).content);
+
+  assert.match(markup, /<pre><code class="language-markdown">/);
+  assert.match(markup, /<pre><code class="language-yaml">/);
+  assert.match(markup, /type: flowchart/);
+  assert.match(markup, /type: sequence/);
+});
+
 test("extracts document frontmatter without treating it as Markdown content", () => {
   const document = parseDocumentFrontmatter("\n---\ntheme: dark\n---\n\n# Payments");
 
