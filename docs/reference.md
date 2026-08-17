@@ -336,7 +336,7 @@ groups:
 
 | Field | Required | Description |
 | --- | --- | --- |
-| `participants` | Yes | Ordered entries with unique `id`, visible `label`, optional `kind: actor`, and optional `palette`, `style`, or `size`. Participant presentation also styles its activation bars. |
+| `participants` | Yes | Ordered entries with unique `id`, visible `label`, optional `kind: actor`, and optional `palette`, `style`, or `size`. Participant labels support newlines in a double-quoted scalar. Participant presentation also styles its activation bars. |
 | `messages` | Yes | Ordered entries with existing `from` and `to` participant IDs, visible `label`, and optional `style: solid` or `dashed`. |
 | `activations` | No | Entries with `participant` and inclusive one-based `from`/`to` message positions. |
 | `notes` | No | Entries with `at` participant ID, `after` message position, visible `label`, and optional `palette`, `style`, or `size`. Notes render above activation bars. |

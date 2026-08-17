@@ -27,7 +27,13 @@ export function renderSequenceDiagram(
   const participantBoxWidth = Number(diagram.canvas?.participantSize?.width) || 180;
   const participantBoxHeight = Number(diagram.canvas?.participantSize?.height) || 42;
   const participantSpacing = Number(diagram.canvas?.participantSpacing) || 220;
-  const actorHeaderHeight = 74;
+  const participantLabelLineHeight = 16;
+  const actorHeaderHeight = 74 + Math.max(
+    0,
+    ...participants
+      .filter((participant) => participant.kind === "actor")
+      .map((participant) => splitTextLines(participant.label || "").length - 1)
+  ) * participantLabelLineHeight;
   const noteBaseHeight = 48;
   const noteGap = 18;
   const messageSpacing = 56;
@@ -93,6 +99,7 @@ export function renderSequenceDiagram(
 
   const participantMarkup = participants.map((participant) => {
     const centerX = positions.get(participant.id) || 0;
+    const labelLines = splitTextLines(participant.label || "");
     const style = getSequenceElementEffectiveStyle(
       diagram,
       participant,
@@ -109,7 +116,14 @@ export function renderSequenceDiagram(
         `<g class="docdiagram-sequence-participant docdiagram-sequence-actor" data-diagram-index="${diagramIndex}" data-participant-id="${escapeHtml(participant.id)}">`,
         `<circle cx="${centerX}" cy="${headY}" r="8" fill="none" stroke="${escapeHtml(style.stroke || "")}" stroke-width="${Number(style.strokeWidth) || 2}"/>`,
         `<path d="M ${centerX} ${headY + 8} V ${waistY} M ${centerX - 14} ${chestY} H ${centerX + 14} M ${centerX} ${waistY} L ${centerX - 12} ${waistY + 18} M ${centerX} ${waistY} L ${centerX + 12} ${waistY + 18}" fill="none" stroke="${escapeHtml(style.stroke || "")}" stroke-width="${Number(style.strokeWidth) || 2}" stroke-linecap="round" stroke-linejoin="round"/>`,
-        `<text x="${centerX}" y="${headerTop + actorHeaderHeight - 4}" text-anchor="middle" class="docdiagram-node-label" fill="${escapeHtml(style.text || "")}">${escapeHtml(participant.label || "")}</text>`,
+        renderTextBlock(
+          centerX,
+          headerTop + actorHeaderHeight - 4 - (labelLines.length - 1) * participantLabelLineHeight,
+          labelLines,
+          participantLabelLineHeight,
+          "docdiagram-node-label",
+          style.text || ""
+        ),
         `</g>`
       ].join("");
     }
@@ -117,7 +131,14 @@ export function renderSequenceDiagram(
     return [
       `<g class="docdiagram-sequence-participant" data-diagram-index="${diagramIndex}" data-participant-id="${escapeHtml(participant.id)}">`,
       `<rect x="${centerX - headerWidth / 2}" y="${headerTop}" width="${headerWidth}" height="${headerHeight}" rx="12" fill="${escapeHtml(style.fill || "")}" stroke="${escapeHtml(style.stroke || "")}" stroke-width="${Number(style.strokeWidth) || 2}"/>`,
-      `<text x="${centerX}" y="${headerTop + headerHeight / 2 + 6}" text-anchor="middle" class="docdiagram-node-label" fill="${escapeHtml(style.text || "")}">${escapeHtml(participant.label || "")}</text>`,
+      renderTextBlock(
+        centerX,
+        headerTop + headerHeight / 2 + 6 - (labelLines.length - 1) * participantLabelLineHeight / 2,
+        labelLines,
+        participantLabelLineHeight,
+        "docdiagram-node-label",
+        style.text || ""
+      ),
       `</g>`
     ].join("");
   }).join("");
