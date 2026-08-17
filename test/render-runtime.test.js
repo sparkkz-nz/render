@@ -833,6 +833,10 @@ test("diagram viewports can be vertically resized", () => {
   assert.match(runtime, /\.docdiagram \{[\s\S]*resize: vertical/);
 });
 
+test("callouts use a prominent left accent border", () => {
+  assert.match(runtime, /\.docdiagram-callout \{\s*border-left-width: 8px;/);
+});
+
 test("expanding a canvas keeps a moved node and padding inside its bounds", () => {
   const diagram = {
     canvas: { width: 800, height: 500 },

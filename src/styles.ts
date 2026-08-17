@@ -130,7 +130,7 @@ export function injectStyles(): void {
       color: inherit;
     }
     #rendered-document .docdiagram-callout {
-      border-left-width: 4px;
+      border-left-width: 8px;
     }
     #rendered-document .docdiagram-callout-kind {
       font-size: .78em;
