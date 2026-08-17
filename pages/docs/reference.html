@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skryb reference</title>
+  <script src="https://sparkkz-nz.github.io/skryb/latest/skryb-runtime.js" defer></script>
+</head>
+<body>
+  <template id="source" type="text/markdown">
+---
+theme: light
+colourScheme: classic
+---
+
+# Skryb reference
+
+This is a concise reference for the portable Skryb document format. Start with
+the [quickstart](quickstart.html) for a working example.
+
+## Document shell
+
+Every document has an HTML shell with a `template#source` containing canonical
+Markdown and an empty `main#rendered-document` for generated content. Load the
+Skryb runtime with a deferred script. Do not author content directly in the
+rendered container.
+
+Optional document frontmatter appears at the start of the source:
+
+```yaml
+---
+theme: light
+colourScheme: classic
+---
+```
+
+`theme` is `light` or `dark`; the supported `colourScheme` is `classic`.
+
+## Markdown and formatting
+
+Use headings, paragraphs, lists, links, block quotes, fenced code blocks, and
+tables. Formatting directives create semantic layout components:
+
+:::panel { title="Panel" tone=light colour=cyan }
+Panels group related Markdown.
+:::
+
+:::callout { title="Editing safely" tone=light colour=yellow }
+Invalid source stays in the editor while the last valid rendered document
+remains visible. Saving always uses the latest valid source.
+:::
+
+Use `section`, `panel`, `callout`, `stack`, and `grid` directives only with
+their documented attributes. Grids accept `2`, `3`, `2fr 1fr`, or `1fr 2fr`
+columns and contain panels, callouts, or stacks directly.
+
+## Flowchart diagrams
+
+Flowcharts need `type: flowchart`, a `canvas`, nodes with stable `id`, `label`,
+and `shape`, plus edges with explicit endpoint anchors.
+
+```diagram
+type: flowchart
+version: 1
+id: service-map
+canvas:
+  width: 760
+  height: 340
+  grid: 5
+nodes:
+  - id: web
+    label: Web app
+    shape: rounded-rectangle
+    position: { x: 60, y: 130 }
+    size: { width: 180, height: 80 }
+    palette: { tone: light, colour: blue }
+  - id: service
+    label: Service
+    shape: oval
+    position: { x: 290, y: 130 }
+    size: { width: 180, height: 80 }
+    palette: { tone: light, colour: green }
+  - id: store
+    label: Orders store
+    shape: database
+    position: { x: 520, y: 120 }
+    size: { width: 180, height: 100 }
+    palette: { tone: light, colour: purple }
+edges:
+  - source: web
+    target: service
+    sourceAnchor: right
+    targetAnchor: left
+    label: Submit order
+    route: straight
+    end: arrow
+  - source: service
+    target: store
+    sourceAnchor: right
+    targetAnchor: left
+    label: Persist order
+    route: straight
+    end: arrow
+```
+
+Supported shapes are `rounded-rectangle`, `circle`, `oval`, `database`,
+`diamond`, `rhombus`, `flattened-hexagon`, `chevron`, `right-chevron`, and
+`document`. Nodes can use `position`, `size`, `palette`, `style`, `subtitle`,
+and nested `children`.
+
+Edges use `source`, `target`, `sourceAnchor`, `targetAnchor`, optional `label`,
+optional `route` (`orthogonal`, `straight`, or `curved`), and optional `start`
+or `end` markers (`none`, `arrow`, or `circle`).
+
+## Sequence diagrams
+
+Sequences use `type: sequence`, ordered `participants`, and ordered `messages`.
+Participants have unique `id` and visible `label`; messages name existing
+`from` and `to` participants and have a visible `label`.
+
+```diagram
+type: sequence
+version: 1
+id: fulfilment-request
+participants:
+  - id: customer
+    label: Customer
+    kind: actor
+  - id: shop
+    label: Shop
+  - id: fulfilment
+    label: Fulfilment
+messages:
+  - from: customer
+    to: shop
+    label: Submit order
+  - from: shop
+    to: fulfilment
+    label: Reserve stock
+  - from: fulfilment
+    to: shop
+    label: Stock reserved
+    style: dashed
+  - from: shop
+    to: customer
+    label: Confirmation
+    style: dashed
+```
+
+Optional `activations` span inclusive one-based message positions. Optional
+`notes` attach visible text after a message, and optional `groups` frame a range
+of messages. Participant and note presentation supports `palette`, `style`,
+and positive `size.width` or `size.height` overrides.
+
+## Save and share
+
+**Save a copy** downloads a complete HTML document with the latest valid source.
+Use a pinned release runtime URL for documents you distribute unchanged; use the
+latest hosted runtime for documents that should track the current Skryb release.
+  </template>
+  <main id="rendered-document"></main>
+</body>
+</html>
