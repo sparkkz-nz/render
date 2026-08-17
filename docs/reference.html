@@ -82,6 +82,12 @@ columns and contain panels, callouts, or stacks directly.
 | `grid` | Required `columns`: `2`, `3`, `"2fr 1fr"`, or `"1fr 2fr"`; direct children are panels, callouts, or stacks. |
 | `stack` | No attributes; vertically groups content in a grid cell. |
 
+```markdown
+:::panel { title="Summary" tone=light colour=blue }
+Use ordinary **Markdown** inside a component.
+:::
+```
+
 ## Flowchart diagrams
 
 Flowcharts need `type: flowchart`, a `canvas`, nodes with stable `id`, `label`,
@@ -95,6 +101,38 @@ and `shape`, plus edges with explicit endpoint anchors.
 | `canvas` | No | Flowchart: `width`, `height`, optional positive `grid`. Sequence: `width`, `height`, `participantSpacing`, and `participantSize`. |
 | `nodes`, `edges` | Flowchart | Ordered node and connector lists. |
 | `participants`, `messages` | Sequence | Ordered participant and message lists. |
+
+### Flowchart YAML
+
+This code block shows the canonical source. Use a `diagram` fence in an authored
+document to render it.
+
+```yaml
+type: flowchart
+version: 1
+id: service-map
+canvas:
+  width: 760
+  height: 340
+  grid: 5
+nodes:
+  - id: web
+    label: Web app
+    shape: rounded-rectangle
+    position: { x: 60, y: 130 }
+    size: { width: 180, height: 80 }
+    palette: { tone: light, colour: blue }
+edges:
+  - source: web
+    target: service
+    sourceAnchor: right
+    targetAnchor: left
+    label: Submit order
+    route: straight
+    end: arrow
+```
+
+### Rendered flowchart example
 
 ```diagram
 type: flowchart
@@ -167,6 +205,33 @@ and nested `children`.
 Sequences use `type: sequence`, ordered `participants`, and ordered `messages`.
 Participants have unique `id` and visible `label`; messages name existing
 `from` and `to` participants and have a visible `label`.
+
+### Sequence YAML
+
+```yaml
+type: sequence
+version: 1
+id: fulfilment-request
+canvas:
+  participantSpacing: 220
+  participantSize: { width: 180, height: 42 }
+participants:
+  - id: customer
+    label: Customer
+    kind: actor
+  - id: shop
+    label: Shop
+messages:
+  - from: customer
+    to: shop
+    label: Submit order
+  - from: shop
+    to: customer
+    label: Confirmation
+    style: dashed
+```
+
+### Rendered sequence example
 
 ```diagram
 type: sequence
