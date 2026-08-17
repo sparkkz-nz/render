@@ -9,7 +9,7 @@ and remains canonical after diagram edits.
 A render document requires:
 
 ```html
-<script src="https://sparkkz-nz.github.io/render/latest/skryb-runtime.js" defer></script>
+<script src="https://sparkkz-nz.github.io/skryb/latest/skryb-runtime.js" defer></script>
 <template id="source" type="text/markdown">
 # Document title
 </template>
