@@ -176,6 +176,9 @@ test("Pages home promotes the published guides", () => {
   assert.match(home, /src="\.\/assets\/secure-doc-flow\.png"/);
   assert.match(home, /src="\.\/assets\/source-edit\.png"/);
   assert.match(home, /src="\.\/assets\/edit-flowchart\.png"/);
+  assert.match(home, /src="\.\/assets\/sequence\.png"/);
+  assert.match(home, /data-carousel-previous/);
+  assert.match(home, /data-carousel-next/);
   assert.match(deployment, /cp pages\/index\.html "\$site_dir\/index\.html"/);
   assert.match(deployment, /cp -R pages\/assets "\$site_dir\/assets"/);
   assert.match(deployment, /cp pages\/docs\/quickstart\.html "\$site_dir\/docs\/index\.html"/);

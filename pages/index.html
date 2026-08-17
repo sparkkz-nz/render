@@ -97,21 +97,32 @@
     .comparison .card { min-height: 210px; } .comparison code { background: var(--code); border-radius: 5px; color: #bfdbfe; display: block; font: .75rem/1.65 ui-monospace, monospace; padding: 15px; }
     .cta { padding: 115px 0; text-align: center; } .cta .section-heading { margin: auto; } .cta .actions { justify-content: center; }
     .gallery { padding-bottom: 112px; padding-top: 0; }
-    .gallery-grid { display: grid; gap: 22px; grid-template-columns: 1.35fr .9fr; margin-top: 42px; }
-    .gallery-side { display: grid; gap: 22px; }
-    .showcase {
-      background: var(--surface); border: 1px solid var(--border); border-radius: 13px; overflow: hidden;
+    .carousel { margin-top: 42px; outline: none; }
+    .carousel-viewport { background: var(--surface); border: 1px solid var(--border); border-radius: 13px; overflow: hidden; }
+    .carousel-slide { display: none; }
+    .carousel-slide[data-active="true"] { display: block; }
+    .carousel-image {
+      align-items: center; background: #0b1528; display: flex; justify-content: center;
+      min-height: 440px; padding: 22px;
     }
-    .showcase img { background: #0b1528; display: block; object-fit: contain; object-position: center; width: 100%; }
-    .showcase-wide img { aspect-ratio: 1.36; }
-    .gallery-side .showcase img { height: 218px; }
+    .carousel-image img { display: block; max-height: 540px; max-width: 100%; object-fit: contain; }
     .showcase-copy { padding: 19px 21px 21px; }
     .showcase-copy h3 { font-size: 1rem; margin: 0 0 5px; }
     .showcase-copy p { color: var(--muted); font-size: .85rem; margin: 0; }
+    .carousel-controls { align-items: center; display: flex; gap: 12px; justify-content: center; margin-top: 17px; }
+    .carousel-button {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 7px; color: var(--ink);
+      cursor: pointer; font: inherit; font-size: .85rem; padding: 8px 12px;
+    }
+    .carousel-button:hover, .carousel-button:focus-visible { border-color: var(--blue); }
+    .carousel-dots { display: flex; gap: 7px; }
+    .carousel-dot { background: #3b4b67; border: 0; border-radius: 50%; cursor: pointer; height: 9px; padding: 0; width: 9px; }
+    .carousel-dot[aria-current="true"] { background: var(--blue); }
     footer { border-top: 1px solid var(--border); color: var(--muted); font-size: .8rem; padding: 28px 0; }
     @media (max-width: 800px) {
       .nav { display: none; } .hero { padding-top: 54px; } .hero-grid, .comparison { grid-template-columns: 1fr; }
-      .preview { transform: none; } .steps, .proof-grid, .gallery-grid { grid-template-columns: 1fr; } .editor { grid-template-columns: 1fr; } .source { display: none; }
+      .preview { transform: none; } .steps, .proof-grid { grid-template-columns: 1fr; } .editor { grid-template-columns: 1fr; } .source { display: none; }
+      .carousel-image { min-height: 260px; padding: 12px; } .carousel-image img { max-height: 420px; }
     }
   </style>
 </head>
@@ -227,25 +238,59 @@ messages:
         <h2>Beautiful to read. Practical to refine.</h2>
         <p>Skryb starts with structured source but does not stop there. Documents can present rich technical context, expose their canonical source, and let people refine diagrams directly in the browser.</p>
       </div>
-      <div class="gallery-grid">
-        <article class="showcase showcase-wide">
-          <img src="./assets/secure-doc-flow.png" alt="A rendered Skryb document showing a secure ingestion workflow, callouts, and an editable flowchart">
-          <div class="showcase-copy"><h3>Reader-ready technical context</h3><p>Combine prose, callouts, and diagrams in one portable document that gives a system its surrounding explanation.</p></div>
-        </article>
-        <div class="gallery-side">
-          <article class="showcase">
-            <img src="./assets/source-edit.png" alt="The Skryb source editor open beneath a rendered sequence diagram">
+      <div class="carousel" aria-label="Skryb feature screenshots" tabindex="0">
+        <div class="carousel-viewport">
+          <article class="carousel-slide" data-active="true">
+            <div class="carousel-image"><img src="./assets/secure-doc-flow.png" alt="A rendered Skryb document showing a secure ingestion workflow, callouts, and an editable flowchart"></div>
+            <div class="showcase-copy"><h3>Reader-ready technical context</h3><p>Combine prose, callouts, and diagrams in one portable document that gives a system its surrounding explanation.</p></div>
+          </article>
+          <article class="carousel-slide" data-active="false">
+            <div class="carousel-image"><img src="./assets/source-edit.png" alt="The Skryb source editor open beneath a rendered sequence diagram"></div>
             <div class="showcase-copy"><h3>Canonical source, always close</h3><p>Open the source tray to inspect or edit the Markdown and YAML that defines the document.</p></div>
           </article>
-          <article class="showcase">
-            <img src="./assets/edit-flowchart.png" alt="The Skryb diagram inspector adjusting a selected flowchart node">
+          <article class="carousel-slide" data-active="false">
+            <div class="carousel-image"><img src="./assets/edit-flowchart.png" alt="The Skryb diagram inspector adjusting a selected flowchart node"></div>
             <div class="showcase-copy"><h3>Refine diagrams in place</h3><p>Select, drag, resize, and restyle supported flowchart elements without a separate diagramming tool.</p></div>
           </article>
+          <article class="carousel-slide" data-active="false">
+            <div class="carousel-image"><img src="./assets/sequence.png" alt="A rendered Skryb sequence diagram with styled callouts and participants"></div>
+            <div class="showcase-copy"><h3>Sequence diagrams with intent</h3><p>Express ordered interactions as canonical YAML and render a rich, deterministic view with no external diagram service.</p></div>
+          </article>
+        </div>
+        <div class="carousel-controls">
+          <button class="carousel-button" type="button" data-carousel-previous>Previous</button>
+          <div class="carousel-dots" aria-label="Choose screenshot">
+            <button class="carousel-dot" type="button" aria-label="Show reader-ready document" aria-current="true"></button>
+            <button class="carousel-dot" type="button" aria-label="Show source editor" aria-current="false"></button>
+            <button class="carousel-dot" type="button" aria-label="Show diagram inspector" aria-current="false"></button>
+            <button class="carousel-dot" type="button" aria-label="Show sequence diagram" aria-current="false"></button>
+          </div>
+          <button class="carousel-button" type="button" data-carousel-next>Next</button>
         </div>
       </div>
     </section>
   </main>
 
   <footer><div class="shell">Skryb &middot; Portable HTML documents for agents and humans</div></footer>
+  <script>
+    const carousel = document.querySelector(".carousel");
+    const slides = [...carousel.querySelectorAll(".carousel-slide")];
+    const dots = [...carousel.querySelectorAll(".carousel-dot")];
+    let activeSlide = 0;
+    const showSlide = (index) => {
+      activeSlide = (index + slides.length) % slides.length;
+      slides.forEach((slide, slideIndex) => {
+        slide.dataset.active = String(slideIndex === activeSlide);
+        dots[slideIndex].setAttribute("aria-current", String(slideIndex === activeSlide));
+      });
+    };
+    carousel.querySelector("[data-carousel-previous]").addEventListener("click", () => showSlide(activeSlide - 1));
+    carousel.querySelector("[data-carousel-next]").addEventListener("click", () => showSlide(activeSlide + 1));
+    dots.forEach((dot, index) => dot.addEventListener("click", () => showSlide(index)));
+    carousel.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") showSlide(activeSlide - 1);
+      if (event.key === "ArrowRight") showSlide(activeSlide + 1);
+    });
+  </script>
 </body>
 </html>
