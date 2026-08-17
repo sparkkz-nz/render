@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skryb quickstart</title>
+  <script src="https://sparkkz-nz.github.io/skryb/latest/skryb-runtime.js" defer></script>
+</head>
+<body>
+  <template id="source" type="text/markdown">
+---
+theme: light
+colourScheme: classic
+---
+
+# Skryb quickstart
+
+Skryb makes portable, editable technical documents from an ordinary HTML file.
+The document source stays in the file as Markdown; the browser runtime renders
+it and can save an updated copy.
+
+:::callout { title="What you need" tone=light colour=blue }
+A modern browser and this one HTML file. A hosted runtime needs network access;
+your document source and saved edits always remain inside the HTML file.
+:::
+
+## Create your first document
+
+1. Start from a Skryb HTML shell with a `template#source` and an empty
+   `main#rendered-document`.
+2. Put your canonical Markdown and diagram YAML inside the source template.
+3. Open the file in a browser, including through a local `file://` URL.
+4. Use **Edit source** to change Markdown or diagram YAML, then **Save a copy**
+   to download the updated portable document.
+
+This simple flowchart is stored as YAML in the document source. Its prose and
+labels explain that a browser sends a request to an API, which stores a result.
+
+```diagram
+type: flowchart
+version: 1
+id: first-flowchart
+canvas:
+  width: 720
+  height: 300
+nodes:
+  - id: browser
+    label: Browser
+    shape: rounded-rectangle
+    position: { x: 60, y: 110 }
+    size: { width: 180, height: 80 }
+    palette: { tone: light, colour: blue }
+  - id: api
+    label: Orders API
+    shape: oval
+    position: { x: 450, y: 110 }
+    size: { width: 180, height: 80 }
+    palette: { tone: light, colour: green }
+edges:
+  - source: browser
+    target: api
+    sourceAnchor: right
+    targetAnchor: left
+    label: POST /orders
+    route: straight
+    end: arrow
+```
+
+## Add a sequence
+
+Use a sequence diagram when the order of interactions matters. Participants are
+listed from left to right and messages from top to bottom.
+
+```diagram
+type: sequence
+version: 1
+id: order-request
+participants:
+  - id: shopper
+    label: Shopper
+    kind: actor
+  - id: orders
+    label: Orders API
+    palette: { tone: light, colour: green }
+messages:
+  - from: shopper
+    to: orders
+    label: Place order
+  - from: orders
+    to: shopper
+    label: Order accepted
+    style: dashed
+```
+
+## Keep going
+
+- Use the diagram toolbar to edit flowchart node and connector presentation.
+- Use **Edit source** for all sequence diagram changes.
+- Read the [Skryb reference](reference.html) for the supported document,
+  formatting, flowchart, and sequence fields.
+  </template>
+  <main id="rendered-document"></main>
+</body>
+</html>

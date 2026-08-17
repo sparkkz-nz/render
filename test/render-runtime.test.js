@@ -128,6 +128,32 @@ test("render authoring skill fixtures use the required shell and valid source", 
   }
 });
 
+test("published documentation uses the required shell and valid source", () => {
+  const documentationFiles = [
+    path.resolve(__dirname, "..", "pages", "docs", "quickstart.html"),
+    path.resolve(__dirname, "..", "pages", "docs", "reference.html")
+  ];
+
+  for (const filePath of documentationFiles) {
+    const html = fs.readFileSync(filePath, "utf8");
+    const source = readTemplateSource(filePath);
+
+    assert.match(html, /^<!doctype html>/i, `${filePath} has a document doctype`);
+    assert.match(html, /<html lang="en">/, `${filePath} declares its language`);
+    assert.match(html, /<meta charset="utf-8">/, `${filePath} declares UTF-8`);
+    assert.match(html, /<meta name="viewport"/, `${filePath} has a viewport`);
+    assert.match(html, /<script src="https:\/\/sparkkz-nz\.github\.io\/skryb\/latest\/skryb-runtime\.js" defer><\/script>/, `${filePath} uses the hosted runtime`);
+    assert.match(html, /<main id="rendered-document"><\/main>/, `${filePath} has an empty render target`);
+
+    const document = resolveDocument(source);
+    assert.ok(document.content.includes("# "), `${filePath} has a document heading`);
+
+    for (const diagramSource of readDiagramSources(document.content)) {
+      assert.doesNotThrow(() => parseDiagram(diagramSource), `${filePath} has a valid diagram`);
+    }
+  }
+});
+
 test("extracts document frontmatter without treating it as Markdown content", () => {
   const document = parseDocumentFrontmatter("\n---\ntheme: dark\n---\n\n# Payments");
 
