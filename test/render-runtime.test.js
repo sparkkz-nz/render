@@ -173,7 +173,11 @@ test("Pages home promotes the published guides", () => {
   assert.match(home, /<title>Skryb - portable documents for agents and humans<\/title>/);
   assert.match(home, /href="\.\/docs\/quickstart\.html"/);
   assert.match(home, /href="\.\/docs\/reference\.html"/);
+  assert.match(home, /src="\.\/assets\/secure-doc-flow\.png"/);
+  assert.match(home, /src="\.\/assets\/source-edit\.png"/);
+  assert.match(home, /src="\.\/assets\/edit-flowchart\.png"/);
   assert.match(deployment, /cp pages\/index\.html "\$site_dir\/index\.html"/);
+  assert.match(deployment, /cp -R pages\/assets "\$site_dir\/assets"/);
   assert.match(deployment, /cp pages\/docs\/quickstart\.html "\$site_dir\/docs\/index\.html"/);
 });
 
