@@ -1,5 +1,5 @@
 ---
-name: render-document
+name: skryb-document
 description: Create valid, portable Skryb HTML documents with canonical Markdown and editable diagrams.
 ---
 
@@ -131,15 +131,3 @@ Before returning a document, verify:
   prose.
 - The finished file can be opened in a browser directly from the local file
   system.
-
-## Worked examples
-
-The checked fixtures demonstrate valid documents:
-
-- [Simple document](../../../test/fixtures/render-document/simple-document.html)
-- [Flowchart document](../../../test/fixtures/render-document/flowchart-document.html)
-- [Sequence document](../../../test/fixtures/render-document/sequence-document.html)
-- [Themed document](../../../test/fixtures/render-document/themed-document.html)
-
-Do not create examples for future Markdown extensions until their syntax and
-serialization behavior are implemented and added to the syntax reference.

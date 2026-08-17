@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptDirectory, "..");
-const sourcePath = path.join(repositoryRoot, ".github", "skills", "render-document", "reference.md");
+const sourcePath = path.join(repositoryRoot, ".github", "skills", "skryb-document", "reference.md");
 const outputDirectory = path.join(repositoryRoot, "pages", "docs");
 const outputPath = path.join(outputDirectory, "reference.html");
 
