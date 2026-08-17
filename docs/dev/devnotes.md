@@ -5,7 +5,7 @@
 For normal use, load the current main runtime from the latest channel:
 
 ```html
-<script src="https://sparkkz-nz.github.io/render/latest/skryb-runtime.js" defer></script>
+<script src="https://sparkkz-nz.github.io/skryb/latest/skryb-runtime.js" defer></script>
 ```
 
 Use the shared development channel only for short-lived branch verification.
@@ -14,7 +14,7 @@ For a short-lived development preview, use the dev channel:
 
 ```html
 <script
-  src="https://sparkkz-nz.github.io/render/dev/skryb-runtime.js"
+  src="https://sparkkz-nz.github.io/skryb/dev/skryb-runtime.js"
   defer>
 </script>
 ```
@@ -22,12 +22,12 @@ For a short-lived development preview, use the dev channel:
 The dev channel is overwritten by the most recently pushed non-main branch and
 must not be used by distributed documents.
 
-For a shareable document, publish the final runtime to the `sparkkz-makes`
+For a shareable document, publish the final runtime to the `sparkkz-nz`
 GitHub Pages site and use its absolute URL:
 
 ```html
 <script
-  src="https://sparkkz-nz.github.io/render/releases/v1.0.0/skryb-runtime.js"
+  src="https://sparkkz-nz.github.io/skryb/releases/v1.0.0/skryb-runtime.js"
   defer>
 </script>
 ```

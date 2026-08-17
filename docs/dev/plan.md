@@ -48,15 +48,15 @@ content and references a rendering runtime through a script element.
 During development, use a relative script URL:
 
 ```html
-<script src="https://sparkkz-nz.github.io/render/latest/skryb-runtime.js" defer></script>
+<script src="https://sparkkz-nz.github.io/skryb/latest/skryb-runtime.js" defer></script>
 ```
 
 For distribution, use an immutable versioned runtime URL hosted from
-`sparkkz-makes` GitHub Pages:
+`sparkkz-nz` GitHub Pages:
 
 ```html
 <script
-  src="https://sparkkz-nz.github.io/render/releases/v1.0.0/skryb-runtime.js"
+  src="https://sparkkz-nz.github.io/skryb/releases/v1.0.0/skryb-runtime.js"
   defer>
 </script>
 ```
@@ -370,7 +370,7 @@ technical documentation without manual SVG changes.
 ### Slice 4: Package and publish the runtime
 
 - Choose and bundle production runtime dependencies.
-- Publish an immutable versioned runtime to `sparkkz-makes` GitHub Pages.
+- Publish an immutable versioned runtime to `sparkkz-nz` GitHub Pages.
 - Update the sample document to use the published runtime.
 - Verify a downloaded HTML copy loads the public runtime successfully in a
   browser session that is not logged into GitHub.
@@ -417,7 +417,7 @@ Browser-level tests should cover:
 4. Should the first public runtime use one external editor library or a small
    custom SVG interaction layer?
 5. What is the initial runtime versioning and release process for the
-   `sparkkz-makes` Pages repository?
+   `skryb` GitHub Pages repository?
 
 ## Next step
 

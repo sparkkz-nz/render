@@ -8,7 +8,7 @@ codebase while continuing to publish one minified, browser-ready
 the current contract:
 
 ```html
-<script src="https://sparkkz-nz.github.io/render/latest/skryb-runtime.js" defer></script>
+<script src="https://sparkkz-nz.github.io/skryb/latest/skryb-runtime.js" defer></script>
 ```
 
 The source document remains canonical. It contains Markdown, frontmatter, and

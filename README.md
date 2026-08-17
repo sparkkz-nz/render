@@ -29,7 +29,7 @@ Create an HTML file containing a `template#source`, a
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hello skryb</title>
   <script
-    src="https://sparkkz-nz.github.io/render/latest/skryb-runtime.js"
+    src="https://sparkkz-nz.github.io/skryb/latest/skryb-runtime.js"
     defer>
   </script>
 </head>
@@ -53,13 +53,13 @@ current document contract.
 
 ```html
 <!-- Latest runtime from main: suitable for normal use and local experiments. -->
-<script src="https://sparkkz-nz.github.io/render/latest/skryb-runtime.js" defer></script>
+<script src="https://sparkkz-nz.github.io/skryb/latest/skryb-runtime.js" defer></script>
 
 <!-- Immutable release snapshot: use for documents you publish or distribute. -->
-<script src="https://sparkkz-nz.github.io/render/releases/v1.2.0/skryb-runtime.js" defer></script>
+<script src="https://sparkkz-nz.github.io/skryb/releases/v1.2.0/skryb-runtime.js" defer></script>
 
 <!-- Shared branch build: use only for short-lived pre-merge testing. -->
-<script src="https://sparkkz-nz.github.io/render/dev/skryb-runtime.js" defer></script>
+<script src="https://sparkkz-nz.github.io/skryb/dev/skryb-runtime.js" defer></script>
 ```
 
 Each push to `main` tests and publishes the latest runtime. A Git tag beginning

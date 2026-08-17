@@ -34,7 +34,7 @@ or diagram types that the reference does not document.
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Document title</title>
   <script
-    src="https://sparkkz-nz.github.io/render/latest/skryb-runtime.js"
+    src="https://sparkkz-nz.github.io/skryb/latest/skryb-runtime.js"
     defer>
   </script>
 </head>
@@ -55,9 +55,9 @@ Use one of these script sources:
 
 | Document purpose | Script source |
 | --- | --- |
-| Normal local or shared use | `https://sparkkz-nz.github.io/render/latest/skryb-runtime.js` |
-| Short-lived pre-merge testing only | `https://sparkkz-nz.github.io/render/dev/skryb-runtime.js` |
-| Published or distributed document | `https://sparkkz-nz.github.io/render/releases/<tag>/skryb-runtime.js` |
+| Normal local or shared use | `https://sparkkz-nz.github.io/skryb/latest/skryb-runtime.js` |
+| Short-lived pre-merge testing only | `https://sparkkz-nz.github.io/skryb/dev/skryb-runtime.js` |
+| Published or distributed document | `https://sparkkz-nz.github.io/skryb/releases/<tag>/skryb-runtime.js` |
 
 Use a real released tag, such as `v1.2.0`, in a pinned URL. Never use the shared
 development channel in an enduring document. A local relative runtime is valid

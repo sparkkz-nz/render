@@ -16,7 +16,7 @@ Save the following as `architecture.html`:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Checkout architecture</title>
   <script
-    src="https://sparkkz-nz.github.io/render/latest/skryb-runtime.js"
+    src="https://sparkkz-nz.github.io/skryb/latest/skryb-runtime.js"
     defer>
   </script>
 </head>
@@ -120,9 +120,9 @@ Use the appropriate script URL for the document's purpose:
 
 | Purpose | Runtime URL |
 | --- | --- |
-| Normal use | `https://sparkkz-nz.github.io/render/latest/skryb-runtime.js` |
-| Pre-merge testing of a branch | `https://sparkkz-nz.github.io/render/dev/skryb-runtime.js` |
-| Published or distributed document | `https://sparkkz-nz.github.io/render/releases/<version>/skryb-runtime.js` |
+| Normal use | `https://sparkkz-nz.github.io/skryb/latest/skryb-runtime.js` |
+| Pre-merge testing of a branch | `https://sparkkz-nz.github.io/skryb/dev/skryb-runtime.js` |
+| Published or distributed document | `https://sparkkz-nz.github.io/skryb/releases/<version>/skryb-runtime.js` |
 
 The development URL is shared and replaced by the next branch build. Replace
 `<version>` with a released tag such as `v1.2.0` when pinning a published
