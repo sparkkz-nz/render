@@ -770,13 +770,13 @@ test("sequence diagrams use configurable participant layout and expand the canva
     "canvas:",
     "  width: 600",
     "  participantSpacing: 260",
-    "  participantWidth: 180",
+    "  participantSize: { width: 180, height: 60 }",
     "participants:",
     "  - id: client",
     "    label: Client",
     "  - id: service",
     "    label: Service",
-    "    size: { width: 240 }",
+    "    size: { width: 120, height: 48 }",
     "  - id: database",
     "    label: Database",
     "messages:",
@@ -793,17 +793,21 @@ test("sequence diagrams use configurable participant layout and expand the canva
   assert.match(defaultMarkup, /<rect x="0" y="28" width="180" height="42"/);
   assert.match(defaultMarkup, /M 90 \d+ L 310 \d+/);
   assert.equal(diagram.canvas.participantSpacing, 260);
-  assert.equal(diagram.canvas.participantWidth, 180);
+  assert.equal(JSON.stringify(diagram.canvas.participantSize), JSON.stringify({ width: 180, height: 60 }));
   assert.equal(JSON.stringify(parseDiagram(serializeDiagram(diagram))), JSON.stringify(diagram));
   assert.match(markup, /viewBox="0 0 700 \d+"/);
-  assert.match(markup, /<rect x="0" y="28" width="180" height="42"/);
-  assert.match(markup, /<rect x="230" y="28" width="240" height="42"/);
-  assert.match(markup, /<rect x="520" y="28" width="180" height="42"/);
+  assert.match(markup, /<rect x="0" y="28" width="180" height="60"/);
+  assert.match(markup, /<rect x="290" y="28" width="120" height="48"/);
+  assert.match(markup, /<rect x="520" y="28" width="180" height="60"/);
   assert.match(markup, /M 90 \d+ L 350 \d+"/);
   assert.match(markup, /M 350 \d+ L 610 \d+"/);
   assert.throws(
     () => parseDiagram(source.replace("participantSpacing: 260", "participantSpacing: 0")),
     /Sequence canvas.participantSpacing must be a positive number/
+  );
+  assert.throws(
+    () => parseDiagram(source.replace("{ width: 180, height: 60 }", "180")),
+    /Sequence canvas.participantSize must be a mapping/
   );
 });
 
