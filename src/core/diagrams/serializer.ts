@@ -51,6 +51,13 @@ export function serializeDiagram(diagram: Diagram): string {
   }
 
   if (diagram.type === "sequence") {
+    if (diagram.canvas !== undefined) {
+      lines.push("canvas:");
+      for (const [key, value] of Object.entries(diagram.canvas)) {
+        lines.push(`  ${key}: ${formatScalar(value)}`);
+      }
+    }
+
     lines.push("participants:");
     for (const participant of diagram.participants || []) {
       lines.push(...serializeItem(participant as unknown as Record<string, unknown>));

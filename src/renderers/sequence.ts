@@ -14,8 +14,8 @@ export function renderSequenceDiagram(
   renderToolbar: DiagramToolbarRenderer
 ): string {
   const theme = getTheme(diagram, state.documentTheme);
-  const width = Number((diagram as { canvas?: { width?: number } }).canvas?.width) || 1000;
-  const baseHeight = Number((diagram as { canvas?: { height?: number } }).canvas?.height) || 560;
+  const baseWidth = Number(diagram.canvas?.width) || 1000;
+  const baseHeight = Number(diagram.canvas?.height) || 560;
   const participants = diagram.participants || [];
   const messages = diagram.messages || [];
   const activations = diagram.activations || [];
@@ -24,24 +24,31 @@ export function renderSequenceDiagram(
   const leftMargin = 90;
   const rightMargin = 90;
   const headerTop = 28;
-  const participantBoxWidth = 160;
+  const participantBoxWidth = Number(diagram.canvas?.participantWidth) || 180;
   const participantBoxHeight = 42;
+  const participantSpacing = Number(diagram.canvas?.participantSpacing) || 220;
   const actorHeaderHeight = 74;
   const noteBaseHeight = 48;
   const noteGap = 18;
   const messageSpacing = 56;
   const sequenceMarkerId = `docdiagram-sequence-arrow-${diagramIndex}`;
   const lifelineTop = headerTop + actorHeaderHeight + 12;
+  const firstParticipant = participants[0];
+  const lastParticipant = participants[participants.length - 1];
+  const firstParticipantWidth = Math.max(participantBoxWidth, Number(firstParticipant?.size?.width) || 0);
+  const lastParticipantWidth = Math.max(participantBoxWidth, Number(lastParticipant?.size?.width) || 0);
+  const requiredWidth = participants.length > 1
+    ? firstParticipantWidth / 2 + participantSpacing * (participants.length - 1) + lastParticipantWidth / 2
+    : participantBoxWidth + leftMargin + rightMargin;
+  const width = Math.max(baseWidth, requiredWidth, leftMargin + rightMargin);
   const positions = new Map<string, number>();
-  const availableWidth = Math.max(0, width - leftMargin - rightMargin);
-  const participantStep = participants.length > 1 ? availableWidth / (participants.length - 1) : 0;
 
   participants.forEach((participant, index) => {
     positions.set(
       participant.id,
       participants.length === 1
-        ? leftMargin + availableWidth / 2
-        : leftMargin + participantStep * index
+        ? width / 2
+        : firstParticipantWidth / 2 + participantSpacing * index
     );
   });
 

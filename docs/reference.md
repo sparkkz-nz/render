@@ -208,7 +208,7 @@ object fields use six spaces. Blank lines and `#` comments are allowed.
 | `version` | No | A document-defined diagram version, commonly `1`. |
 | `id` | No | A document-defined diagram identifier. |
 | `theme` | No | `light` or `dark`; overrides document `theme`. |
-| `canvas` | No | Canvas mapping containing `width`, `height`, and optional `grid`. Omitted canvases default to `1000` by `560`. |
+| `canvas` | No | Canvas mapping. Flowcharts support `width`, `height`, and optional `grid`; sequences support `width`, `height`, `participantSpacing`, and `participantWidth`. Omitted canvases default to `1000` by `560`. |
 | `nodes` | Flowchart | List of flowchart nodes. |
 | `edges` | Flowchart | List of flowchart connectors. |
 | `participants` | Sequence | Ordered sequence participants. |
@@ -302,6 +302,9 @@ graphical editor.
 type: sequence
 version: 1
 id: payment-authorisation
+canvas:
+  participantSpacing: 220
+  participantWidth: 180
 participants:
   - id: shopper
     label: Shopper
@@ -344,6 +347,12 @@ For participants and notes, `palette` uses `{ tone, colour }`, `style` supports
 `width` and `height` values. The graphical sequence inspector can edit
 participant, note, and message presentation, but structural changes remain
 source-editor-only.
+
+Sequence `canvas.participantSpacing` sets the horizontal distance between
+participant lifelines (default `220`), while `canvas.participantWidth` sets the
+default non-actor participant box width (default `180`). A participant's
+`size.width` or `size.height` overrides that box dimension. The canvas expands
+horizontally as needed to retain the configured lifeline spacing.
 
 ## Editing and serialization
 

@@ -728,6 +728,59 @@ test("sequence diagrams parse, round-trip, and render with lightweight edit cont
   assert.doesNotMatch(markup, /docdiagram-create-node/);
 });
 
+test("sequence diagrams use configurable participant layout and expand the canvas", () => {
+  const defaultMarkup = renderDiagram(sequenceSource([
+    "participants:",
+    "  - id: client",
+    "    label: Client",
+    "  - id: service",
+    "    label: Service",
+    "messages:",
+    "  - from: client",
+    "    to: service",
+    "    label: Request"
+  ].join("\n")), 0);
+  const source = sequenceSource([
+    "canvas:",
+    "  width: 600",
+    "  participantSpacing: 260",
+    "  participantWidth: 180",
+    "participants:",
+    "  - id: client",
+    "    label: Client",
+    "  - id: service",
+    "    label: Service",
+    "    size: { width: 240 }",
+    "  - id: database",
+    "    label: Database",
+    "messages:",
+    "  - from: client",
+    "    to: service",
+    "    label: Request",
+    "  - from: service",
+    "    to: database",
+    "    label: Query"
+  ].join("\n"));
+  const diagram = parseDiagram(source);
+  const markup = renderDiagram(source, 0);
+
+  assert.match(defaultMarkup, /<rect x="0" y="28" width="180" height="42"/);
+  assert.match(defaultMarkup, /M 90 \d+ L 310 \d+/);
+  assert.equal(diagram.canvas.participantSpacing, 260);
+  assert.equal(diagram.canvas.participantWidth, 180);
+  assert.equal(JSON.stringify(parseDiagram(serializeDiagram(diagram))), JSON.stringify(diagram));
+  assert.match(markup, /viewBox="0 0 700 \d+"/);
+  assert.match(markup, /<rect x="0" y="28" width="180" height="42"/);
+  assert.match(markup, /<rect x="230" y="28" width="240" height="42"/);
+  assert.match(markup, /<rect x="520" y="28" width="180" height="42"/);
+  assert.match(markup, /M 90 \d+ L 350 \d+"/);
+  assert.match(markup, /M 350 \d+ L 610 \d+"/);
+  assert.throws(
+    () => parseDiagram(source.replace("participantSpacing: 260", "participantSpacing: 0")),
+    /Sequence canvas.participantSpacing must be a positive number/
+  );
+});
+
 test("clampZoom limits diagram zoom to supported discrete bounds", () => {
   assert.equal(clampZoom(10), 25);
   assert.equal(clampZoom(125), 125);
