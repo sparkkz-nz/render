@@ -12,7 +12,7 @@ human corrections. It is not a general-purpose document authoring application.
 Documents accept a CommonMark-style baseline: headings, nested lists, quotes,
 thematic breaks, inline formatting, links, language-labelled code fences, and
 tables. They also support GFM-style strikethrough and task lists. The
-[syntax reference](docs/reference.md#markdown-compatibility) defines the exact
+[syntax reference](https://sparkkz-nz.github.io/skryb/docs/reference.html#markdown-compatibility) defines the exact
 compatibility and safety rules, including literal raw HTML and permitted
 link/image URLs.
 
@@ -45,8 +45,8 @@ This document can be opened directly from your file system.
 ```
 
 Save it as `hello-skryb.html` and open it in a browser. See the
-[getting-started guide](docs/getting-started.md) for a diagram and editing
-walkthrough, or the [syntax reference](docs/reference.md) for the complete
+[getting-started guide](https://sparkkz-nz.github.io/skryb/docs/quickstart.html) for a diagram and editing
+walkthrough, or the [syntax reference](https://sparkkz-nz.github.io/skryb/docs/reference.html) for the complete
 current document contract.
 
 ## Runtime URLs
@@ -73,9 +73,9 @@ will embed a pinned runtime in the saved document.
 
 ## Documentation
 
-- [Getting started](docs/getting-started.md): create, open, edit, and save a
+- [Getting started](https://sparkkz-nz.github.io/skryb/docs/quickstart.html): create, open, edit, and save a
   portable document.
-- [Syntax reference](docs/reference.md): supported HTML, frontmatter, Markdown,
+- [Syntax reference](https://sparkkz-nz.github.io/skryb/docs/reference.html): supported HTML, frontmatter, Markdown,
   flowchart YAML, and editing behaviour.
 - [Agent authoring skill](.github/skills/render-document/SKILL.md): instructions
   and checked examples for agents creating valid skryb documents.

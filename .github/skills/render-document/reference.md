@@ -1,4 +1,4 @@
-# render reference
+# Skryb reference
 
 This reference describes the source format accepted by the current
 [Skryb runtime](../dist/skryb-runtime.js). Source is embedded in an HTML document
@@ -182,8 +182,7 @@ reordering, and custom breakpoints are intentionally unsupported.
 Use a `diagram` fenced block. Every diagram declares its `type`, which selects
 its canonical YAML model:
 
-````markdown
-```diagram
+```yaml
 type: flowchart
 version: 1
 id: payment-flow
@@ -193,7 +192,6 @@ canvas:
 nodes: []
 edges: []
 ```
-````
 
 The parser accepts mappings, lists, and inline mappings such as
 `{ x: 60, y: 100 }`. Indentation is significant: top-level sections start in
@@ -396,7 +394,8 @@ content to source; source text does not attempt to infer a rendered location.
 
 Use `/latest/skryb-runtime.js` for normal use, `/dev/skryb-runtime.js` only for
 short-lived branch testing, and `/releases/<tag>/skryb-runtime.js` for immutable
-published documents. See [getting started](getting-started.md) for URLs and
+published documents. See the
+[quickstart](https://sparkkz-nz.github.io/skryb/docs/quickstart.html) for URLs and
 examples.
 
 Current limitations include the intentionally small Markdown subset, flowcharts
