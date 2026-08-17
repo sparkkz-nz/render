@@ -24,8 +24,8 @@ export function renderSequenceDiagram(
   const leftMargin = 90;
   const rightMargin = 90;
   const headerTop = 28;
-  const participantBoxWidth = Number(diagram.canvas?.participantWidth) || 180;
-  const participantBoxHeight = 42;
+  const participantBoxWidth = Number(diagram.canvas?.participantSize?.width) || 180;
+  const participantBoxHeight = Number(diagram.canvas?.participantSize?.height) || 42;
   const participantSpacing = Number(diagram.canvas?.participantSpacing) || 220;
   const actorHeaderHeight = 74;
   const noteBaseHeight = 48;
@@ -35,8 +35,8 @@ export function renderSequenceDiagram(
   const lifelineTop = headerTop + actorHeaderHeight + 12;
   const firstParticipant = participants[0];
   const lastParticipant = participants[participants.length - 1];
-  const firstParticipantWidth = Math.max(participantBoxWidth, Number(firstParticipant?.size?.width) || 0);
-  const lastParticipantWidth = Math.max(participantBoxWidth, Number(lastParticipant?.size?.width) || 0);
+  const firstParticipantWidth = Number(firstParticipant?.size?.width) || participantBoxWidth;
+  const lastParticipantWidth = Number(lastParticipant?.size?.width) || participantBoxWidth;
   const requiredWidth = participants.length > 1
     ? firstParticipantWidth / 2 + participantSpacing * (participants.length - 1) + lastParticipantWidth / 2
     : participantBoxWidth + leftMargin + rightMargin;
@@ -99,8 +99,8 @@ export function renderSequenceDiagram(
       state.documentTheme,
       state.documentColorScheme
     );
-    const headerWidth = Math.max(participantBoxWidth, Number(participant.size?.width) || 0);
-    const headerHeight = Math.max(participantBoxHeight, Number(participant.size?.height) || 0);
+    const headerWidth = Number(participant.size?.width) || participantBoxWidth;
+    const headerHeight = Number(participant.size?.height) || participantBoxHeight;
     if (participant.kind === "actor") {
       const headY = headerTop + 10;
       const chestY = headY + 18;

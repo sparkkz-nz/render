@@ -27,7 +27,7 @@ const sequenceMessageStyles = ["solid", "dashed"] as const;
 const sequenceActivationFields = ["participant", "from", "to"] as const;
 const sequenceNoteFields = ["at", "after", "label", "palette", "style", "size"] as const;
 const sequenceGroupFields = ["label", "from", "to"] as const;
-const sequenceCanvasFields = ["width", "height", "participantSpacing", "participantWidth"] as const;
+const sequenceCanvasFields = ["width", "height", "participantSpacing", "participantSize"] as const;
 
 type ParsedObject = Record<string, unknown>;
 
@@ -339,11 +339,30 @@ function validateSequenceDiagram(diagram: SequenceDiagram, colorScheme = "classi
     throw new Error("Sequence diagram groups must be a list.");
   }
 
+  if (diagram.canvas !== undefined && (typeof diagram.canvas !== "object" || Array.isArray(diagram.canvas))) {
+    throw new Error("Sequence canvas must be a mapping.");
+  }
   assertAllowedFields(diagram.canvas as ParsedObject | undefined, sequenceCanvasFields, "sequence canvas");
-  for (const key of sequenceCanvasFields) {
+  for (const key of ["width", "height", "participantSpacing"] as const) {
     const value = diagram.canvas?.[key];
     if (value !== undefined && (!Number.isFinite(value) || Number(value) <= 0)) {
       throw new Error(`Sequence canvas.${key} must be a positive number.`);
+    }
+  }
+  if (diagram.canvas?.participantSize !== undefined) {
+    if (typeof diagram.canvas.participantSize !== "object" || Array.isArray(diagram.canvas.participantSize)) {
+      throw new Error("Sequence canvas.participantSize must be a mapping.");
+    }
+    assertAllowedFields(
+      diagram.canvas.participantSize as unknown as ParsedObject,
+      ["width", "height"],
+      "sequence canvas participantSize"
+    );
+    for (const key of ["width", "height"] as const) {
+      const value = diagram.canvas.participantSize[key];
+      if (value !== undefined && (!Number.isFinite(value) || Number(value) <= 0)) {
+        throw new Error(`Sequence canvas.participantSize.${key} must be a positive number.`);
+      }
     }
   }
 

@@ -111,7 +111,7 @@ export interface SequenceCanvas {
   width?: number;
   height?: number;
   participantSpacing?: number;
-  participantWidth?: number;
+  participantSize?: Size;
 }
 
 export interface SequenceDiagram {

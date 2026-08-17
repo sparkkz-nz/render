@@ -15,8 +15,10 @@ colourScheme: classic
 
 # Skryb reference
 
-This is a concise reference for the portable Skryb document format. Start with
-the [quickstart](quickstart.html) for a working example.
+This reference defines the source format accepted by the Skryb runtime. It is
+intended for authors, developers, and agents that need to produce portable,
+valid documents. Start with the [quickstart](quickstart.html) for a working
+example.
 
 ## Document shell
 
@@ -34,12 +36,31 @@ colourScheme: classic
 ---
 ```
 
-`theme` is `light` or `dark`; the supported `colourScheme` is `classic`.
+| Key | Values | Default |
+| --- | --- | --- |
+| `theme` | `light`, `dark` | `light` |
+| `colourScheme` | `classic` | `classic` |
+
+Frontmatter must be the first non-empty source content. Unknown or malformed
+frontmatter is not a supported extension point.
 
 ## Markdown and formatting
 
-Use headings, paragraphs, lists, links, block quotes, fenced code blocks, and
-tables. Formatting directives create semantic layout components:
+Skryb supports a deliberate CommonMark-style subset plus the following GFM
+constructs. Unsupported syntax remains readable source instead of being
+silently transformed.
+
+| Construct | Status | Notes |
+| --- | --- | --- |
+| Headings | Supported | Levels 1 through 6. |
+| Paragraphs, thematic breaks, lists, and block quotes | Supported | Nested lists and non-`1` ordered starts are supported. |
+| Emphasis, strong text, strikethrough, and inline code | Supported | Use standard Markdown markers. |
+| Links and images | Safe URLs only | Relative, fragment, `http:`, `https:`, and `mailto:` links are allowed. |
+| Fenced code blocks | Supported | Language labels add a code class; no syntax highlighting is provided. |
+| Tables and task lists | Supported | Tables support alignment and escaped pipes; task boxes are disabled. |
+| Raw HTML and other extensions | Literal | HTML is never interpreted or executed. |
+
+Formatting directives create semantic layout components:
 
 :::panel { title="Panel" tone=light colour=cyan }
 Panels group related Markdown.
@@ -54,10 +75,26 @@ Use `section`, `panel`, `callout`, `stack`, and `grid` directives only with
 their documented attributes. Grids accept `2`, `3`, `2fr 1fr`, or `1fr 2fr`
 columns and contain panels, callouts, or stacks directly.
 
+| Directive | Attributes and rules |
+| --- | --- |
+| `section`, `panel` | Optional `title`; supply both `tone` and `colour` or neither; optional `fill`, `stroke`, and `text` overrides. |
+| `callout` | Panel attributes plus optional `kind`: `note`, `info`, `warning`, or `success`. |
+| `grid` | Required `columns`: `2`, `3`, `"2fr 1fr"`, or `"1fr 2fr"`; direct children are panels, callouts, or stacks. |
+| `stack` | No attributes; vertically groups content in a grid cell. |
+
 ## Flowchart diagrams
 
 Flowcharts need `type: flowchart`, a `canvas`, nodes with stable `id`, `label`,
 and `shape`, plus edges with explicit endpoint anchors.
+
+| Top-level field | Required | Description |
+| --- | --- | --- |
+| `type` | Yes | `flowchart` or `sequence`. |
+| `version`, `id` | No | Document-defined metadata. |
+| `theme` | No | `light` or `dark`; overrides document theme. |
+| `canvas` | No | Flowchart: `width`, `height`, optional positive `grid`. Sequence: `width`, `height`, `participantSpacing`, and `participantSize`. |
+| `nodes`, `edges` | Flowchart | Ordered node and connector lists. |
+| `participants`, `messages` | Sequence | Ordered participant and message lists. |
 
 ```diagram
 type: flowchart
@@ -108,9 +145,22 @@ Supported shapes are `rounded-rectangle`, `circle`, `oval`, `database`,
 `document`. Nodes can use `position`, `size`, `palette`, `style`, `subtitle`,
 and nested `children`.
 
-Edges use `source`, `target`, `sourceAnchor`, `targetAnchor`, optional `label`,
-optional `route` (`orthogonal`, `straight`, or `curved`), and optional `start`
-or `end` markers (`none`, `arrow`, or `circle`).
+| Node field | Values / behaviour |
+| --- | --- |
+| `id`, `label`, `shape` | Required. IDs are stable and unique; shape is one of the supported shapes. |
+| `position`, `size` | `{ x, y }` and positive `{ width, height }`; child positions are relative to their parent. |
+| `subtitle` | Optional text below the label. |
+| `textVAlign`, `textHAlign` | `top` or `center`; `left`, `center`, or `right`. |
+| `palette`, `style` | Palette is `{ tone, colour }`; style supports `fill`, `stroke`, `text`, and `strokeWidth`. |
+| `children` | Optional nested nodes. |
+
+| Edge field | Values / behaviour |
+| --- | --- |
+| `source`, `target` | Existing node IDs. |
+| `sourceAnchor`, `targetAnchor` | Required: `top`, `right`, `bottom`, or `left`. |
+| `label`, `route` | Optional label and `orthogonal`, `straight`, or `curved` route. |
+| `start`, `end` | Optional `none`, `arrow`, or `circle` markers. |
+| `style` | Optional `stroke`, `strokeWidth`, and `text`. |
 
 ## Sequence diagrams
 
@@ -122,6 +172,9 @@ Participants have unique `id` and visible `label`; messages name existing
 type: sequence
 version: 1
 id: fulfilment-request
+canvas:
+  participantSpacing: 220
+  participantSize: { width: 180, height: 42 }
 participants:
   - id: customer
     label: Customer
@@ -151,6 +204,19 @@ Optional `activations` span inclusive one-based message positions. Optional
 `notes` attach visible text after a message, and optional `groups` frame a range
 of messages. Participant and note presentation supports `palette`, `style`,
 and positive `size.width` or `size.height` overrides.
+
+| Sequence field | Required | Description |
+| --- | --- | --- |
+| `participants` | Yes | Unique `id`, visible `label`, optional `kind: actor`, `palette`, `style`, and `size`. |
+| `messages` | Yes | Existing `from` and `to` participant IDs, visible `label`, optional `style: solid` or `dashed`. |
+| `activations` | No | `participant` and inclusive one-based `from` and `to` message positions. |
+| `notes` | No | `at` participant ID, `after` position, visible `label`, optional presentation and `size`. |
+| `groups` | No | Visible `label` and inclusive one-based `from` and `to` message positions. |
+
+`canvas.participantSpacing` defaults to `220`. `canvas.participantSize` defaults
+to `{ width: 180, height: 42 }`; a participant's `size.width` and
+`size.height` override those defaults. The canvas expands horizontally to
+preserve configured lifeline spacing.
 
 ## Save and share
 

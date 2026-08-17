@@ -70,9 +70,11 @@ jobs:
           mkdir -p "$destination"
           cp dist/skryb-runtime.js "$destination/skryb-runtime.js"
           cp hello-runtime.js "$site_dir/hello-runtime.js"
-          cp pages/index.html "$site_dir/index.html"
           mkdir -p "$site_dir/docs"
           cp pages/docs/*.html "$site_dir/docs/"
+          cp pages/docs/quickstart.html "$site_dir/index.html"
+          cp pages/docs/quickstart.html "$site_dir/docs/index.html"
+          cp pages/docs/reference.html "$site_dir/reference.html"
 
           (
             cd "$site_dir"
