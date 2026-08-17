@@ -768,9 +768,9 @@ test("sequence diagrams use configurable participant layout and expand the canva
   const defaultMarkup = renderDiagram(sequenceSource([
     "participants:",
     "  - id: client",
-    "    label: Client",
+    "    label: \"Client\\nApp\"",
     "  - id: service",
-    "    label: Service",
+    "    label: \"Service\\nAPI\"",
     "messages:",
     "  - from: client",
     "    to: service",
@@ -783,9 +783,9 @@ test("sequence diagrams use configurable participant layout and expand the canva
     "  participantSize: { width: 180, height: 60 }",
     "participants:",
     "  - id: client",
-    "    label: Client",
+    "    label: \"Client\\nApp\"",
     "  - id: service",
-    "    label: Service",
+    "    label: \"Service\\nAPI\"",
     "    size: { width: 120, height: 48 }",
     "  - id: database",
     "    label: Database",
@@ -809,6 +809,8 @@ test("sequence diagrams use configurable participant layout and expand the canva
   assert.match(markup, /<rect x="0" y="28" width="180" height="60"/);
   assert.match(markup, /<rect x="290" y="28" width="120" height="48"/);
   assert.match(markup, /<rect x="520" y="28" width="180" height="60"/);
+  assert.match(markup, /<tspan x="90">Client<\/tspan><tspan x="90" dy="16">App<\/tspan>/);
+  assert.match(markup, /<tspan x="350">Service<\/tspan><tspan x="350" dy="16">API<\/tspan>/);
   assert.match(markup, /M 90 \d+ L 350 \d+"/);
   assert.match(markup, /M 350 \d+ L 610 \d+"/);
   assert.throws(
