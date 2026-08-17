@@ -107,9 +107,17 @@ export interface SequenceGroup {
   to: number;
 }
 
+export interface SequenceCanvas {
+  width?: number;
+  height?: number;
+  participantSpacing?: number;
+  participantWidth?: number;
+}
+
 export interface SequenceDiagram {
   type: "sequence";
   theme?: string;
+  canvas?: SequenceCanvas;
   participants?: SequenceParticipant[];
   messages?: SequenceMessage[];
   activations?: SequenceActivation[];

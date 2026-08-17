@@ -27,6 +27,7 @@ const sequenceMessageStyles = ["solid", "dashed"] as const;
 const sequenceActivationFields = ["participant", "from", "to"] as const;
 const sequenceNoteFields = ["at", "after", "label", "palette", "style", "size"] as const;
 const sequenceGroupFields = ["label", "from", "to"] as const;
+const sequenceCanvasFields = ["width", "height", "participantSpacing", "participantWidth"] as const;
 
 type ParsedObject = Record<string, unknown>;
 
@@ -318,7 +319,7 @@ function validateFlowchartDiagram(diagram: FlowchartDiagram, colorScheme = "clas
 }
 
 function validateSequenceDiagram(diagram: SequenceDiagram, colorScheme = "classic"): void {
-  if (diagram.canvas !== undefined || diagram.nodes !== undefined || diagram.edges !== undefined) {
+  if (diagram.nodes !== undefined || diagram.edges !== undefined) {
     throw new Error("Sequence diagrams do not support flowchart sections.");
   }
 
@@ -336,6 +337,14 @@ function validateSequenceDiagram(diagram: SequenceDiagram, colorScheme = "classi
 
   if (diagram.groups !== undefined && !Array.isArray(diagram.groups)) {
     throw new Error("Sequence diagram groups must be a list.");
+  }
+
+  assertAllowedFields(diagram.canvas as ParsedObject | undefined, sequenceCanvasFields, "sequence canvas");
+  for (const key of sequenceCanvasFields) {
+    const value = diagram.canvas?.[key];
+    if (value !== undefined && (!Number.isFinite(value) || Number(value) <= 0)) {
+      throw new Error(`Sequence canvas.${key} must be a positive number.`);
+    }
   }
 
   const participantIds = new Set<string>();
