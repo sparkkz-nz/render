@@ -166,6 +166,17 @@ test("published reference renders Markdown and YAML source blocks", () => {
   assert.match(markup, /type: sequence/);
 });
 
+test("Pages home promotes the published guides", () => {
+  const home = fs.readFileSync(path.resolve(__dirname, "..", "pages", "index.html"), "utf8");
+  const deployment = fs.readFileSync(path.resolve(__dirname, "..", ".github", "workflows", "deploy-pages.yml"), "utf8");
+
+  assert.match(home, /<title>Skryb - portable documents for agents and humans<\/title>/);
+  assert.match(home, /href="\.\/docs\/quickstart\.html"/);
+  assert.match(home, /href="\.\/docs\/reference\.html"/);
+  assert.match(deployment, /cp pages\/index\.html "\$site_dir\/index\.html"/);
+  assert.match(deployment, /cp pages\/docs\/quickstart\.html "\$site_dir\/docs\/index\.html"/);
+});
+
 test("extracts document frontmatter without treating it as Markdown content", () => {
   const document = parseDocumentFrontmatter("\n---\ntheme: dark\n---\n\n# Payments");
 
