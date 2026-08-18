@@ -463,10 +463,17 @@ export function injectStyles(): void {
       filter: drop-shadow(0 0 4px rgb(39 117 197 / 65%));
     }
     .docdiagram-resize-handle {
-      cursor: nwse-resize;
       fill: #ffffff;
       stroke: #3574c7;
       stroke-width: 2;
+    }
+    .docdiagram-resize-handle[data-resize-corner="top-left"],
+    .docdiagram-resize-handle[data-resize-corner="bottom-right"] {
+      cursor: nwse-resize;
+    }
+    .docdiagram-resize-handle[data-resize-corner="top-right"],
+    .docdiagram-resize-handle[data-resize-corner="bottom-left"] {
+      cursor: nesw-resize;
     }
     .docdiagram-connection-port,
     .docdiagram-edge-endpoint {

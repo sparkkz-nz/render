@@ -1,6 +1,5 @@
 import {
   edgeAnchors,
-  minimumNodeSize,
   type FlowchartDiagram,
   type FlowchartEdge,
   type FlowchartNode,
@@ -12,11 +11,13 @@ import {
   deleteConnector,
   deleteNode,
   expandCanvasForNode,
+  getResizeNodeOrigin,
   reconnectConnector,
+  resizeFlowchartNode,
   setEdgeLabel,
   setNodeLabel
 } from "../core/diagrams/mutations";
-import { clampNodeSize, getGridSize, getNodeEffectiveStyle, snapToGrid } from "../core/diagrams/styles";
+import { getGridSize, getNodeEffectiveStyle, snapToGrid } from "../core/diagrams/styles";
 import { getNodeBounds } from "../renderers/flowchart";
 import { findFlowchartNode, flattenFlowchartNodes, getFlowchartNodeBounds, reparentFlowchartNode } from "../core/diagrams/hierarchy";
 import type { ConnectionDrag } from "../renderers/types";
@@ -230,8 +231,13 @@ export class DiagramEditor {
     const resizeHandle = closest(event, ".docdiagram-resize-handle");
     if (resizeHandle) {
       const group = resizeHandle.closest(".docdiagram-node");
-      if (group) {
-        this.resizeNode(svg, event, group);
+      const corner = resizeHandle.getAttribute("data-resize-corner");
+      if (
+        group &&
+        (corner === "top-left" || corner === "top-right" ||
+          corner === "bottom-left" || corner === "bottom-right")
+      ) {
+        this.resizeNode(svg, event, group, corner);
       }
       return;
     }
@@ -397,7 +403,12 @@ export class DiagramEditor {
     editor.select();
   }
 
-  private resizeNode(svg: SVGSVGElement, event: PointerEvent, group: Element): void {
+  private resizeNode(
+    svg: SVGSVGElement,
+    event: PointerEvent,
+    group: Element,
+    corner: "top-left" | "top-right" | "bottom-left" | "bottom-right"
+  ): void {
     event.preventDefault();
     const diagramIndex = pointerNumber(group.getAttribute("data-diagram-index") || undefined);
     const nodeId = group.getAttribute("data-node-id") || "";
@@ -407,24 +418,15 @@ export class DiagramEditor {
       return;
     }
     const start = this.svgPoint(svg, event);
-    const origin = {
-      width: Number(node.size?.width) || 190,
-      height: Number(node.size?.height) || 80
-    };
-    const grid = getGridSize(diagram);
+    const origin = getResizeNodeOrigin(node);
     let resized = false;
     this.capturePointer(svg, event);
     const move = (moveEvent: PointerEvent) => {
       const point = this.svgPoint(svg, moveEvent);
-      let width = clampNodeSize(origin.width + point.x - start.x, minimumNodeSize.width, grid);
-      let height = clampNodeSize(origin.height + point.y - start.y, minimumNodeSize.height, grid);
-      if (node.shape === "circle") {
-        const diameter = Math.max(width, height);
-        width = diameter;
-        height = diameter;
-      }
-      resized = resized || width !== origin.width || height !== origin.height;
-      node.size = { ...node.size, width, height };
+      resizeFlowchartNode(diagram, node, corner, point.x - start.x, point.y - start.y, origin);
+      const width = Number(node.size?.width) || 190;
+      const height = Number(node.size?.height) || 80;
+      resized = resized || width !== origin.size.width || height !== origin.size.height;
       this.updateNodeSizeMarkup(group, node, width, height);
     };
     const finish = (finishEvent: PointerEvent) => {
@@ -456,7 +458,7 @@ export class DiagramEditor {
     const nodeBody = group.querySelector<SVGElement>(".docdiagram-node-body");
     const label = group.querySelector<SVGTextElement>(".docdiagram-node-label");
     const subtitle = group.querySelector<SVGTextElement>(".docdiagram-node-subtitle");
-    const handle = group.querySelector<SVGElement>(".docdiagram-resize-handle");
+    const handles = group.querySelectorAll<SVGElement>(".docdiagram-resize-handle");
     if (!nodeBody) {
       return;
     }
@@ -478,8 +480,11 @@ export class DiagramEditor {
         tspan.setAttribute("x", String(layout.centerX));
       }
     }
-    handle?.setAttribute("x", String(x + width - 7));
-    handle?.setAttribute("y", String(y + height - 7));
+    for (const handle of handles) {
+      const corner = handle.getAttribute("data-resize-corner");
+      handle.setAttribute("x", String(corner?.endsWith("left") ? x - 7 : x + width - 7));
+      handle.setAttribute("y", String(corner?.startsWith("top") ? y - 7 : y + height - 7));
+    }
   }
 
   private getNodePortPoint(node: FlowchartNode, anchor: string): Position {

@@ -171,7 +171,14 @@ export function renderFlowchartDiagram(
         ? renderTextBlock(layout.centerX, layout.subtitleStartY, layout.subtitleLines, layout.subtitleLineHeight, "docdiagram-node-subtitle", style.text || "", layout.textAnchor)
         : "",
       isSelected && isDiagramEditing && !isEditing
-        ? `<rect class="docdiagram-resize-handle" x="${x + nodeWidth - 7}" y="${y + nodeHeight - 7}" width="14" height="14" rx="3"/>`
+        ? [
+          ["top-left", x - 7, y - 7],
+          ["top-right", x + nodeWidth - 7, y - 7],
+          ["bottom-left", x - 7, y + nodeHeight - 7],
+          ["bottom-right", x + nodeWidth - 7, y + nodeHeight - 7]
+        ].map(([corner, handleX, handleY]) =>
+          `<rect class="docdiagram-resize-handle" data-resize-corner="${corner}" x="${handleX}" y="${handleY}" width="14" height="14" rx="3"/>`
+        ).join("")
         : "",
       isSelected && isDiagramEditing && !isEditing
         ? edgeAnchors.map((anchor) => {
