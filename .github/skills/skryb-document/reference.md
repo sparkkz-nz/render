@@ -1,12 +1,12 @@
-# render reference
+# Skryb reference
 
-This reference describes the source format accepted by the current
-[Skryb runtime](../dist/skryb-runtime.js). Source is embedded in an HTML document
-and remains canonical after diagram edits.
+This reference describes the source format accepted by the Skryb runtime.
+Source is embedded in an HTML document and remains canonical after diagram
+edits.
 
 ## HTML document shell
 
-A render document requires:
+A Skryb document requires:
 
 ```html
 <script src="https://sparkkz-nz.github.io/skryb/latest/skryb-runtime.js" defer></script>
@@ -40,7 +40,7 @@ runtime reports unsupported `theme` and `colourScheme` values.
 
 ## Markdown compatibility
 
-render supports a deliberately defined compatibility target: CommonMark-style
+Skryb supports a deliberately defined compatibility target: CommonMark-style
 document structure plus the GFM additions listed below. It is not an open-ended
 Markdown implementation; unsupported syntax remains visible source instead of
 being silently removed or converted.
@@ -54,14 +54,14 @@ being silently removed or converted.
 | Emphasis, strong text, and strikethrough | Supported | Use `*text*`, `**text**`, and `~~text~~`. |
 | Inline code | Supported | Use backticks, such as `` `value` ``. |
 | Links | Supported with safe URLs | Relative URLs, fragments, `http:`, `https:`, and `mailto:` are rendered. Other schemes, including `javascript:`, stay readable Markdown source. |
-| Fenced code blocks | Supported | The fence language produces a `language-<name>` class on `<code>`; render does not provide syntax highlighting. |
+| Fenced code blocks | Supported | The fence language produces a `language-<name>` class on `<code>`; scryb does not provide syntax highlighting. |
 | Tables | Supported | Header rows, left/centre/right alignment, and escaped cell separators (`\|`) are supported. |
 | Task lists | Supported | `- [ ]` and `- [x]` render as disabled checkboxes because prose editing is not available. |
 | Images | Supported with safe URLs | Relative images and safe `http:`, `https:`, or `data:image/(gif\|jpeg\|png\|webp);base64,...` sources render with their Markdown alt text. |
 | Raw HTML | Intentionally literal | HTML is escaped and displayed as source; it is never executed or interpreted. |
 | Other Markdown extensions | Intentionally literal | Keep unsupported input readable rather than relying on undocumented output. |
 
-`diagram` remains a render-specific fence rather than an ordinary code block.
+`diagram` remains a skryb-specific fence rather than an ordinary code block.
 All other fenced blocks, including a `text` block containing the word `diagram`,
 render as code.
 
@@ -78,7 +78,7 @@ with a backslash.
 
 ## Formatting extensions
 
-render adds a small, nested directive syntax for structured presentation without
+skryb adds a small, nested directive syntax for structured presentation without
 raw HTML wrappers. Directive bodies contain ordinary supported Markdown,
 including diagrams. The source remains readable when viewed without the
 runtime.
@@ -182,8 +182,7 @@ reordering, and custom breakpoints are intentionally unsupported.
 Use a `diagram` fenced block. Every diagram declares its `type`, which selects
 its canonical YAML model:
 
-````markdown
-```diagram
+```yaml
 type: flowchart
 version: 1
 id: payment-flow
@@ -193,7 +192,6 @@ canvas:
 nodes: []
 edges: []
 ```
-````
 
 The parser accepts mappings, lists, and inline mappings such as
 `{ x: 60, y: 100 }`. Indentation is significant: top-level sections start in
@@ -396,7 +394,8 @@ content to source; source text does not attempt to infer a rendered location.
 
 Use `/latest/skryb-runtime.js` for normal use, `/dev/skryb-runtime.js` only for
 short-lived branch testing, and `/releases/<tag>/skryb-runtime.js` for immutable
-published documents. See [getting started](getting-started.md) for URLs and
+published documents. See the
+[quickstart](https://sparkkz-nz.github.io/skryb/docs/quickstart.html) for URLs and
 examples.
 
 Current limitations include the intentionally small Markdown subset, flowcharts

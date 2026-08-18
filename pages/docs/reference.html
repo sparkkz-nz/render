@@ -8,26 +8,30 @@
 </head>
 <body>
   <template id="source" type="text/markdown">
----
-theme: light
-colourScheme: classic
----
-
 # Skryb reference
 
-This reference defines the source format accepted by the Skryb runtime. It is
-intended for authors, developers, and agents that need to produce portable,
-valid documents. Start with the [quickstart](quickstart.html) for a working
-example.
+This reference describes the source format accepted by the Skryb runtime.
+Source is embedded in an HTML document and remains canonical after diagram
+edits.
 
-## Document shell
+## HTML document shell
 
-Every document has an HTML shell with a `template#source` containing canonical
-Markdown and an empty `main#rendered-document` for generated content. Load the
-Skryb runtime with a deferred script. Do not author content directly in the
-rendered container.
+A Skryb document requires:
 
-Optional document frontmatter appears at the start of the source:
+```html
+&lt;script src="https://sparkkz-nz.github.io/skryb/latest/skryb-runtime.js" defer&gt;&lt;/script&gt;
+&lt;template id="source" type="text/markdown"&gt;
+# Document title
+&lt;/template&gt;
+&lt;main id="rendered-document"&gt;&lt;/main&gt;
+```
+
+Use a normal HTML document with UTF-8 encoding and a viewport meta tag. The
+runtime reads only `template#source` and renders into `main#rendered-document`.
+
+## Frontmatter
+
+Frontmatter is optional and must be the first non-empty source content:
 
 ```yaml
 ---
@@ -41,253 +45,372 @@ colourScheme: classic
 | `theme` | `light`, `dark` | `light` |
 | `colourScheme` | `classic` | `classic` |
 
-Frontmatter must be the first non-empty source content. Unknown or malformed
-frontmatter is not a supported extension point.
+Unknown or malformed frontmatter is not a supported extension point. The
+runtime reports unsupported `theme` and `colourScheme` values.
 
-## Markdown and formatting
+## Markdown compatibility
 
-Skryb supports a deliberate CommonMark-style subset plus the following GFM
-constructs. Unsupported syntax remains readable source instead of being
-silently transformed.
+Skryb supports a deliberately defined compatibility target: CommonMark-style
+document structure plus the GFM additions listed below. It is not an open-ended
+Markdown implementation; unsupported syntax remains visible source instead of
+being silently removed or converted.
 
 | Construct | Status | Notes |
 | --- | --- | --- |
 | Headings | Supported | Levels 1 through 6. |
-| Paragraphs, thematic breaks, lists, and block quotes | Supported | Nested lists and non-`1` ordered starts are supported. |
-| Emphasis, strong text, strikethrough, and inline code | Supported | Use standard Markdown markers. |
-| Links and images | Safe URLs only | Relative, fragment, `http:`, `https:`, and `mailto:` links are allowed. |
-| Fenced code blocks | Supported | Language labels add a code class; no syntax highlighting is provided. |
-| Tables and task lists | Supported | Tables support alignment and escaped pipes; task boxes are disabled. |
-| Raw HTML and other extensions | Literal | HTML is never interpreted or executed. |
+| Paragraphs and thematic breaks | Supported | Use blank lines between paragraphs; `---`, `***`, and `___` create a thematic break. |
+| Ordered and unordered lists | Supported | Nested lists are supported. Ordered lists retain a non-`1` start value. |
+| Block quotes | Supported | Prefix consecutive lines with `&gt;`. |
+| Emphasis, strong text, and strikethrough | Supported | Use `*text*`, `**text**`, and `~~text~~`. |
+| Inline code | Supported | Use backticks, such as `` `value` ``. |
+| Links | Supported with safe URLs | Relative URLs, fragments, `http:`, `https:`, and `mailto:` are rendered. Other schemes, including `javascript:`, stay readable Markdown source. |
+| Fenced code blocks | Supported | The fence language produces a `language-&lt;name&gt;` class on `&lt;code&gt;`; scryb does not provide syntax highlighting. |
+| Tables | Supported | Header rows, left/centre/right alignment, and escaped cell separators (`\|`) are supported. |
+| Task lists | Supported | `- [ ]` and `- [x]` render as disabled checkboxes because prose editing is not available. |
+| Images | Supported with safe URLs | Relative images and safe `http:`, `https:`, or `data:image/(gif\|jpeg\|png\|webp);base64,...` sources render with their Markdown alt text. |
+| Raw HTML | Intentionally literal | HTML is escaped and displayed as source; it is never executed or interpreted. |
+| Other Markdown extensions | Intentionally literal | Keep unsupported input readable rather than relying on undocumented output. |
 
-Formatting directives create semantic layout components:
+`diagram` remains a skryb-specific fence rather than an ordinary code block.
+All other fenced blocks, including a `text` block containing the word `diagram`,
+render as code.
 
-:::panel { title="Panel" tone=light colour=cyan }
-Panels group related Markdown.
-:::
-
-:::callout { title="Editing safely" tone=light colour=yellow }
-Invalid source stays in the editor while the last valid rendered document
-remains visible. Saving always uses the latest valid source.
-:::
-
-Use `section`, `panel`, `callout`, `stack`, and `grid` directives only with
-their documented attributes. Grids accept `2`, `3`, `2fr 1fr`, or `1fr 2fr`
-columns and contain panels, callouts, or stacks directly.
-
-| Directive | Attributes and rules |
-| --- | --- |
-| `section`, `panel` | Optional `title`; supply both `tone` and `colour` or neither; optional `fill`, `stroke`, and `text` overrides. |
-| `callout` | Panel attributes plus optional `kind`: `note`, `info`, `warning`, or `success`. |
-| `grid` | Required `columns`: `2`, `3`, `"2fr 1fr"`, or `"1fr 2fr"`; direct children are panels, callouts, or stacks. |
-| `stack` | No attributes; vertically groups content in a grid cell. |
+### Table example
 
 ```markdown
-:::panel { title="Summary" tone=light colour=blue }
-Use ordinary **Markdown** inside a component.
-:::
+| Component | Owner | Status |
+| :--- | :---: | ---: |
+| API\|gateway | Platform | Ready |
 ```
 
-## Flowchart diagrams
+The alignment separator row is required. Escape a literal pipe inside a cell
+with a backslash.
 
-Flowcharts need `type: flowchart`, a `canvas`, nodes with stable `id`, `label`,
-and `shape`, plus edges with explicit endpoint anchors.
+## Formatting extensions
 
-| Top-level field | Required | Description |
+skryb adds a small, nested directive syntax for structured presentation without
+raw HTML wrappers. Directive bodies contain ordinary supported Markdown,
+including diagrams. The source remains readable when viewed without the
+runtime.
+
+```markdown
+:::panel { title="Payment lifecycle" tone=light colour=blue }
+This panel contains **ordinary Markdown**.
+::: (payment lifecycle panel)
+```
+
+Open directives must begin in column 1 and use one of `section`, `panel`,
+`callout`, `grid`, or `stack`. An opening directive has the form
+`:::name { key=value }`; braces are required when attributes are present.
+Attribute values are bare non-space values or double-quoted strings.
+
+Close a directive with `:::` in column 1. Any text after whitespace is an
+ignored closing annotation, so `::: (panel)` and `::: End panel` close exactly
+like `:::`. Annotations are for human readability only and are not checked
+against the opening directive name.
+
+Directives nest. Invalid attributes, unknown directive names, unclosed
+directives, and layout content that does not follow the rules below remain
+visible source rather than being silently dropped or reinterpreted.
+
+### Sections, panels, and callouts
+
+`section` semantically groups related content. `panel` is a bordered,
+padded visual container. Both may use:
+
+| Attribute | Values / behaviour |
+| --- | --- |
+| `title` | Optional visible title. |
+| `tone` and `colour` | Supply both or neither. `tone` is `light` or `dark`; `colour` is one of `pink`, `red`, `orange`, `yellow`, `green`, `cyan`, `blue`, `purple`, `grey`, or `bw`. |
+| `fill`, `stroke`, `text` | Optional `#RGB`, `#RGBA`, `#RRGGBB`, or `#RRGGBBAA` overrides. These take precedence over a selected palette. |
+
+Palette values use the document's `colourScheme`, including the same tone and
+colour names used by diagrams. Without a palette or overrides, components
+inherit the document theme. Selecting a palette establishes the scheme's
+standard shades; explicit `fill`, `stroke`, and `text` values override those
+individual shades.
+
+`callout` is a specialised panel for a prominent message. It accepts the
+attributes above plus optional `kind`: `note`, `info`, `warning`, or `success`
+(`info` is the default). Callouts render a visible kind label and an accessible
+label, so their meaning never relies on colour alone.
+
+### Responsive grids and stacks
+
+`grid` arranges direct child panels, callouts, or stacks in columns on larger
+screens, and collapses to one column in source order on narrow screens. Its
+required `columns` attribute supports only these intentional presets:
+
+| Value | Layout |
+| --- | --- |
+| `2` | Two equal columns. |
+| `3` | Three equal columns. |
+| `"2fr 1fr"` | Two-thirds / one-third columns. |
+| `"1fr 2fr"` | One-third / two-thirds columns. |
+
+`fr` is a CSS Grid fractional unit: `2fr 1fr` divides available width into
+three shares, assigning two to the first column and one to the second after
+grid gaps are accounted for.
+
+`stack` has no attributes and groups blocks vertically in one grid cell. Use it
+for an asymmetric layout with a wide primary panel beside stacked supporting
+content:
+
+````markdown
+:::grid { columns="2fr 1fr" }
+:::panel { title="Architecture" tone=light colour=blue }
+The primary explanation and diagram go here.
+
+```diagram
+type: flowchart
+canvas:
+  width: 600
+  height: 300
+nodes: []
+edges: []
+```
+::: (architecture panel)
+
+:::stack
+:::panel { title="Decision" tone=light colour=yellow }
+Keep canonical source readable and editable.
+::: (decision panel)
+
+:::callout { kind=warning title="Review" tone=light colour=orange }
+Confirm assumptions before publishing.
+::: (review callout)
+::: (supporting stack)
+::: (two-thirds / one-third grid)
+````
+
+Do not put ordinary Markdown directly inside a grid: wrap it in a panel,
+callout, or stack. Arbitrary CSS grids, fixed widths, column spans, visual
+reordering, and custom breakpoints are intentionally unsupported.
+
+## Diagram fences
+
+Use a `diagram` fenced block. Every diagram declares its `type`, which selects
+its canonical YAML model:
+
+```yaml
+type: flowchart
+version: 1
+id: payment-flow
+canvas:
+  width: 1080
+  height: 560
+nodes: []
+edges: []
+```
+
+The parser accepts mappings, lists, and inline mappings such as
+`{ x: 60, y: 100 }`. Indentation is significant: top-level sections start in
+column 1, list entries use two spaces, item fields use four spaces, and nested
+object fields use six spaces. Blank lines and `#` comments are allowed.
+
+### Diagram fields
+
+| Field | Required | Description |
 | --- | --- | --- |
 | `type` | Yes | `flowchart` or `sequence`. |
-| `version`, `id` | No | Document-defined metadata. |
-| `theme` | No | `light` or `dark`; overrides document theme. |
-| `canvas` | No | Flowchart: `width`, `height`, optional positive `grid`. Sequence: `width`, `height`, `participantSpacing`, and `participantSize`. |
-| `nodes`, `edges` | Flowchart | Ordered node and connector lists. |
-| `participants`, `messages` | Sequence | Ordered participant and message lists. |
+| `version` | No | A document-defined diagram version, commonly `1`. |
+| `id` | No | A document-defined diagram identifier. |
+| `theme` | No | `light` or `dark`; overrides document `theme`. |
+| `canvas` | No | Canvas mapping. Flowcharts support `width`, `height`, and optional `grid`; sequences support `width`, `height`, `participantSpacing`, and `participantSize`. Omitted canvases default to `1000` by `560`. |
+| `nodes` | Flowchart | List of flowchart nodes. |
+| `edges` | Flowchart | List of flowchart connectors. |
+| `participants` | Sequence | Ordered sequence participants. |
+| `messages` | Sequence | Ordered sequence messages. |
 
-### Flowchart YAML
+`canvas.width` and `canvas.height` are numeric SVG canvas dimensions. A positive
+numeric `canvas.grid` enables snapping while moving or resizing; omit it or use
+`0` to disable snapping.
 
-This code block shows the canonical source. Use a `diagram` fence in an authored
-document to render it.
+### Nodes
+
+Every node requires `id`, `label`, and `shape`. Use `position` and `size` to
+control placement and geometry. Nodes may contain child nodes at any depth:
 
 ```yaml
-type: flowchart
-version: 1
-id: service-map
-canvas:
-  width: 760
-  height: 340
-  grid: 5
-nodes:
-  - id: web
-    label: Web app
-    shape: rounded-rectangle
-    position: { x: 60, y: 130 }
-    size: { width: 180, height: 80 }
-    palette: { tone: light, colour: blue }
-edges:
-  - source: web
-    target: service
-    sourceAnchor: right
-    targetAnchor: left
-    label: Submit order
-    route: straight
-    end: arrow
+- id: payments-api
+  label: Payments API
+  subtitle: Owns payment intents
+  shape: oval
+  position: { x: 420, y: 210 }
+  size: { width: 220, height: 100 }
+  palette: { tone: light, colour: blue }
+  style: { stroke: "#1D4ED8", strokeWidth: 3, fill: "#DBEAFE", text: "#17202A" }
+  children:
+    - id: idempotency-store
+      label: Idempotency store
+      shape: database
+      position: { x: 20, y: 120 }
+      size: { width: 160, height: 80 }
 ```
 
-### Rendered flowchart example
+| Field | Values / behaviour |
+| --- | --- |
+| `id` | **Required.** Stable identifier used by edges. |
+| `label` | **Required.** Node text. Newlines are supported with `\n` inside a double-quoted scalar, for example `label: "Payments\nAPI"`. |
+| `subtitle` | Optional text below the label; use the same double-quoted `\n` form for multiple lines. |
+| `textVAlign` | Optional vertical text-stack alignment: `top` or `center` (default). |
+| `textHAlign` | Optional horizontal text-stack alignment: `left`, `center` (default), or `right`. |
+| `shape` | **Required.** `rounded-rectangle`, `circle`, `oval`, `database`, `diamond`, `rhombus`, `flattened-hexagon`, `chevron`, `right-chevron`, or `document`. The `document` shape is a sheet of paper with a folded top-right corner. |
+| `position` | `{ x: number, y: number }` top-left canvas position for top-level nodes, or top-left position relative to its parent for children. |
+| `size` | `{ width: number, height: number }`. Nodes have a minimum size; circles remain square. |
+| `palette` | Optional `{ tone, colour }`; selects the node's standard colours and clears explicit node colour overrides. |
+| `style` | Optional overrides: `fill`, `stroke`, `text`, and `strokeWidth`. `style.width` is rejected. |
+| `children` | Optional list of child nodes. Any shape can contain children, nesting has no depth limit, and child positions are relative to their parent. |
 
-```diagram
-type: flowchart
-version: 1
-id: service-map
-canvas:
-  width: 760
-  height: 340
-  grid: 5
-nodes:
-  - id: web
-    label: Web app
-    shape: rounded-rectangle
-    position: { x: 60, y: 130 }
-    size: { width: 180, height: 80 }
-    palette: { tone: light, colour: blue }
-  - id: service
-    label: Service
-    shape: oval
-    position: { x: 290, y: 130 }
-    size: { width: 180, height: 80 }
-    palette: { tone: light, colour: green }
-  - id: store
-    label: Orders store
-    shape: database
-    position: { x: 520, y: 120 }
-    size: { width: 180, height: 100 }
-    palette: { tone: light, colour: purple }
-edges:
-  - source: web
-    target: service
-    sourceAnchor: right
-    targetAnchor: left
-    label: Submit order
-    route: straight
-    end: arrow
-  - source: service
-    target: store
-    sourceAnchor: right
-    targetAnchor: left
-    label: Persist order
-    route: straight
-    end: arrow
+Palette `tone` is `light` or `dark`. Palette `colour` is `pink`, `red`,
+`orange`, `yellow`, `green`, `cyan`, `blue`, `purple`, `grey`, or `bw`. The
+currently supported colour scheme is `classic`.
+
+Node IDs are unique across the whole diagram, including descendants. Edges can
+connect to a parent or any child node. A child can visually extend beyond its
+parent; its relationship is independent of its shape bounds.
+
+### Edges
+
+Every edge requires both explicit endpoint anchors:
+
+```yaml
+- source: web-app
+  target: payments-api
+  sourceAnchor: right
+  targetAnchor: left
+  label: POST /payments
+  route: orthogonal
+  start: none
+  end: arrow
+  style: { stroke: "#52616B", strokeWidth: 2, text: "#3E4A54" }
 ```
 
-Supported shapes are `rounded-rectangle`, `circle`, `oval`, `database`,
-`diamond`, `rhombus`, `flattened-hexagon`, `chevron`, `right-chevron`, and
-`document`. Nodes can use `position`, `size`, `palette`, `style`, `subtitle`,
-and nested `children`.
-
-| Node field | Values / behaviour |
+| Field | Values / behaviour |
 | --- | --- |
-| `id`, `label`, `shape` | Required. IDs are stable and unique; shape is one of the supported shapes. |
-| `position`, `size` | `{ x, y }` and positive `{ width, height }`; child positions are relative to their parent. |
-| `subtitle` | Optional text below the label. |
-| `textVAlign`, `textHAlign` | `top` or `center`; `left`, `center`, or `right`. |
-| `palette`, `style` | Palette is `{ tone, colour }`; style supports `fill`, `stroke`, `text`, and `strokeWidth`. |
-| `children` | Optional nested nodes. |
+| `source`, `target` | IDs of the connected nodes. |
+| `sourceAnchor`, `targetAnchor` | **Required.** `top`, `right`, `bottom`, or `left`. |
+| `label` | Optional edge label; newlines are supported. |
+| `route` | `orthogonal`, `straight`, or `curved`. Omit for the default orthogonal route. |
+| `start`, `end` | `none`, `arrow`, or `circle`. Omit `start` for `none`; omit `end` for `arrow`. |
+| `style` | Optional `stroke`, `strokeWidth`, and `text` overrides. `style.width` is rejected. |
 
-| Edge field | Values / behaviour |
-| --- | --- |
-| `source`, `target` | Existing node IDs. |
-| `sourceAnchor`, `targetAnchor` | Required: `top`, `right`, `bottom`, or `left`. |
-| `label`, `route` | Optional label and `orthogonal`, `straight`, or `curved` route. |
-| `start`, `end` | Optional `none`, `arrow`, or `circle` markers. |
-| `style` | Optional `stroke`, `strokeWidth`, and `text`. |
+Anchors resolve on the rendered shape perimeter. Endpoint markers follow the
+edge stroke colour and maintain their own definitions, so one edge's styling
+does not affect another.
 
-## Sequence diagrams
+### Sequence diagrams
 
-Sequences use `type: sequence`, ordered `participants`, and ordered `messages`.
-Participants have unique `id` and visible `label`; messages name existing
-`from` and `to` participants and have a visible `label`.
-
-### Sequence YAML
+Sequence diagrams use a separate model with deterministic layout. Participants
+appear left to right in source order and messages appear top to bottom in source
+order. They are edited through canonical source rather than the flowchart's
+graphical editor.
 
 ```yaml
 type: sequence
 version: 1
-id: fulfilment-request
+id: payment-authorisation
 canvas:
   participantSpacing: 220
   participantSize: { width: 180, height: 42 }
 participants:
-  - id: customer
-    label: Customer
+  - id: shopper
+    label: Shopper
     kind: actor
-  - id: shop
-    label: Shop
+  - id: payments-api
+    label: Payments API
 messages:
-  - from: customer
-    to: shop
-    label: Submit order
-  - from: shop
-    to: customer
-    label: Confirmation
+  - from: shopper
+    to: payments-api
+    label: Authorise payment
+    style: solid
+  - from: payments-api
+    to: shopper
+    label: Approved
     style: dashed
+activations:
+  - participant: payments-api
+    from: 1
+    to: 2
+notes:
+  - at: payments-api
+    after: 1
+    label: Idempotency key checked
+groups:
+  - from: 1
+    to: 2
+    label: Payment flow
 ```
 
-### Rendered sequence example
-
-```diagram
-type: sequence
-version: 1
-id: fulfilment-request
-canvas:
-  participantSpacing: 220
-  participantSize: { width: 180, height: 42 }
-participants:
-  - id: customer
-    label: Customer
-    kind: actor
-  - id: shop
-    label: Shop
-  - id: fulfilment
-    label: Fulfilment
-messages:
-  - from: customer
-    to: shop
-    label: Submit order
-  - from: shop
-    to: fulfilment
-    label: Reserve stock
-  - from: fulfilment
-    to: shop
-    label: Stock reserved
-    style: dashed
-  - from: shop
-    to: customer
-    label: Confirmation
-    style: dashed
-```
-
-Optional `activations` span inclusive one-based message positions. Optional
-`notes` attach visible text after a message, and optional `groups` frame a range
-of messages. Participant and note presentation supports `palette`, `style`,
-and positive `size.width` or `size.height` overrides.
-
-| Sequence field | Required | Description |
+| Field | Required | Description |
 | --- | --- | --- |
-| `participants` | Yes | Unique `id`, visible `label` (including `\n` in a double-quoted scalar), optional `kind: actor`, `palette`, `style`, and `size`. |
-| `messages` | Yes | Existing `from` and `to` participant IDs, visible `label`, optional `style: solid` or `dashed`. |
-| `activations` | No | `participant` and inclusive one-based `from` and `to` message positions. |
-| `notes` | No | `at` participant ID, `after` position, visible `label`, optional presentation and `size`. |
-| `groups` | No | Visible `label` and inclusive one-based `from` and `to` message positions. |
+| `participants` | Yes | Ordered entries with unique `id`, visible `label`, optional `kind: actor`, and optional `palette`, `style`, or `size`. Participant labels support newlines in a double-quoted scalar. Participant presentation also styles its activation bars. |
+| `messages` | Yes | Ordered entries with existing `from` and `to` participant IDs, visible `label`, and optional `style: solid` or `dashed`. |
+| `activations` | No | Entries with `participant` and inclusive one-based `from`/`to` message positions. |
+| `notes` | No | Entries with `at` participant ID, `after` message position, visible `label`, and optional `palette`, `style`, or `size`. Notes render above activation bars. |
+| `groups` | No | Entries with inclusive one-based `from`/`to` message positions and visible `label`. |
 
-`canvas.participantSpacing` defaults to `220`. `canvas.participantSize` defaults
-to `{ width: 180, height: 42 }`; a participant's `size.width` and
-`size.height` override those defaults. The canvas expands horizontally to
-preserve configured lifeline spacing.
+For participants and notes, `palette` uses `{ tone, colour }`, `style` supports
+`fill`, `stroke`, `text`, and `strokeWidth`, and `size` supports positive
+`width` and `height` values. The graphical sequence inspector can edit
+participant, note, and message presentation, but structural changes remain
+source-editor-only.
 
-## Save and share
+Sequence `canvas.participantSpacing` sets the horizontal distance between
+participant lifelines (default `220`). `canvas.participantSize` sets the default
+non-actor participant box `{ width, height }` (default `{ width: 180, height:
+42 }`). A participant's `size.width` or `size.height` overrides the
+corresponding default. The canvas expands horizontally as needed to retain the
+configured lifeline spacing.
 
-**Save a copy** downloads a complete HTML document with the latest valid source.
-Use a pinned release runtime URL for documents you distribute unchanged; use the
-latest hosted runtime for documents that should track the current Skryb release.
+## Editing and serialization
+
+The runtime provides per-diagram zoom and edit controls. In edit mode, authors
+can select nodes and edges, edit supported properties, drag nodes, resize nodes,
+and change connector endpoints. Node and edge label editing supports multiple
+lines: **Enter** adds a line, **Ctrl/Cmd+Enter** commits, and **Escape** cancels.
+
+Every retained edit serializes the diagram back into its matching `diagram`
+fence in `template#source`. **Save a copy** downloads a complete HTML document
+containing that updated source.
+
+The document menu's **Edit source** action opens a resizable lower tray with the
+complete canonical Markdown source. Valid changes are rendered after a short
+debounce and committed directly to `template#source`; the tray stays open and
+keeps focus while the document updates. The runtime preserves the reader and
+diagram scroll positions where possible.
+
+If a draft has a frontmatter or diagram schema error, the last valid rendered
+document and its canonical source remain unchanged. The tray retains the draft
+and reports the precise error, so correcting it resumes live rendering. Saving
+always uses the latest valid canonical source; an invalid draft cannot be saved
+into a portable document. Closing a tray with an invalid draft asks whether to
+discard that draft. Saving while an invalid draft is open asks whether to save
+the last valid version instead.
+
+Use Cmd/Ctrl+Shift+E to open or close the source tray; opening is suppressed
+while focus is in another editable field, but the shortcut closes an open tray
+even from its textarea. Escape closes an open document menu but does not discard
+source text. Cmd/Ctrl+S downloads the current valid source. Native textarea undo
+and redo work normally and each undo or redo follows the same live-render path.
+Closing the tray returns keyboard focus to the document-menu button.
+
+Double-click rendered document text to open the source tray and select its first
+matching canonical-source occurrence. Generated controls and text with no exact
+source match are ignored. This navigation intentionally runs only from rendered
+content to source; source text does not attempt to infer a rendered location.
+
+## Runtime channels and limitations
+
+Use `/latest/skryb-runtime.js` for normal use, `/dev/skryb-runtime.js` only for
+short-lived branch testing, and `/releases/&lt;tag&gt;/skryb-runtime.js` for immutable
+published documents. See the
+[quickstart](https://sparkkz-nz.github.io/skryb/docs/quickstart.html) for URLs and
+examples.
+
+Current limitations include the intentionally small Markdown subset, flowcharts
+and sequence diagrams, no Mermaid import, and no offline runtime embedding.
+Planned work is listed in the [roadmap](roadmap.md).
   </template>
   <main id="rendered-document"></main>
 </body>

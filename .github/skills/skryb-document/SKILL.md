@@ -1,18 +1,19 @@
 ---
-name: render-document
-description: Create valid, portable render HTML documents with canonical Markdown and editable flowcharts.
+name: skryb-document
+description: Create valid, portable Skryb HTML documents with canonical Markdown and editable diagrams.
 ---
 
-# Author render documents
+# Author Skryb documents
 
-Use this skill when creating or updating a render document. A render document is
+Use this skill when creating or updating a Skryb document. A Skryb document is
 a portable HTML file that embeds canonical Markdown in `template#source` and
 renders it through the hosted `skryb-runtime.js` browser runtime.
 
-The complete, versioned authoring contract is the repository's
-[syntax reference](../../../docs/reference.md). Treat it as the source of truth:
-do not invent frontmatter, Markdown, YAML fields, enum values, extension fences,
-or diagram types that the reference does not document.
+The complete, versioned authoring contract is the bundled
+[schema reference](reference.md). Read it before authoring or changing a
+document. Treat it as the source of truth: do not invent frontmatter, Markdown,
+YAML fields, enum values, extension fences, or diagram types that it does not
+document.
 
 ## Authoring workflow
 
@@ -130,15 +131,3 @@ Before returning a document, verify:
   prose.
 - The finished file can be opened in a browser directly from the local file
   system.
-
-## Worked examples
-
-The checked fixtures demonstrate valid documents:
-
-- [Simple document](../../../test/fixtures/render-document/simple-document.html)
-- [Flowchart document](../../../test/fixtures/render-document/flowchart-document.html)
-- [Sequence document](../../../test/fixtures/render-document/sequence-document.html)
-- [Themed document](../../../test/fixtures/render-document/themed-document.html)
-
-Do not create examples for future Markdown extensions until their syntax and
-serialization behavior are implemented and added to the syntax reference.
