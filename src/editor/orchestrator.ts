@@ -25,6 +25,7 @@ import {
   getResizeNodeOrigin,
   createUniqueNodeId,
   getDefaultNodePosition,
+  duplicateNode,
   createConnector,
   reconnectConnector,
   resizeFlowchartNode,
@@ -185,6 +186,9 @@ export class BrowserRuntime {
         { left: diagram.scrollLeft, top: diagram.scrollTop }
       ])
     );
+    for (const diagram of this.outputElement.querySelectorAll<HTMLElement>(".docdiagram")) {
+      this.state.diagramViewportHeights.set(Number(diagram.dataset.diagramIndex), diagram.offsetHeight);
+    }
     const pageScroll = { x: globalThis.scrollX || 0, y: globalThis.scrollY || 0 };
     const previousModels = [...this.state.diagramModels];
     const previousTheme = this.state.documentTheme;
@@ -344,6 +348,7 @@ export class BrowserRuntime {
       reparentFlowchartNode,
       createUniqueNodeId,
       getDefaultNodePosition,
+      duplicateNode,
       createNode,
       getResizeNodeOrigin,
       createConnector,

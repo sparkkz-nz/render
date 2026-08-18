@@ -161,8 +161,8 @@ export const edgeMarkerDefaults = { start: "none", end: "arrow" } as const;
 export const nodeTextVAlignments = ["top", "center"] as const;
 export const nodeTextHAlignments = ["left", "center", "right"] as const;
 
-export const minimumNodeSize: Size = { width: 120, height: 60 };
-export const documentMinimumNodeSize: Size = { width: 140, height: 84 };
+export const minimumNodeSize: Size = { width: 50, height: 20 };
+export const documentMinimumNodeSize: Size = { width: 50, height: 20 };
 export const defaultNode = {
   shape: "rounded-rectangle",
   label: "New node",

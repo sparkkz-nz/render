@@ -37,6 +37,7 @@ export interface DiagramRenderState {
   editingEdge: InlineEdgeEditor | null;
   connectionDrag: ConnectionDrag | null;
   diagramZooms: Map<number, number>;
+  diagramViewportHeights: Map<number, number>;
 }
 
 export type DiagramEditingMode = "none" | "flowchart" | "sequence";

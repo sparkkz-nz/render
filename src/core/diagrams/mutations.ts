@@ -11,7 +11,7 @@ import {
   minimumNodeSize
 } from "./schema";
 import { clampNodeSize, getGridSize, getNodeColorPalette, snapToGrid } from "./styles";
-import { findFlowchartNode, flattenFlowchartNodes, getFlowchartNodeBounds } from "./hierarchy";
+import { findFlowchartNode, flattenFlowchartNodes, getFlowchartNodeBounds, getFlowchartNodePosition } from "./hierarchy";
 
 function getNodeBounds(node: FlowchartNode): { x: number; y: number; width: number; height: number } {
   return {
@@ -80,6 +80,65 @@ export function createUniqueNodeId(nodes: FlowchartNode[], base = "new-node"): s
   return `${base}-${suffix}`;
 }
 
+function createDuplicateNodeId(ids: Set<string>, shape: string): string {
+  const base = shape.replace(/[^a-z0-9]/gi, "").toLowerCase() || "node";
+  let ordinal = 1;
+  let id = "";
+
+  do {
+    id = `${base}${String(ordinal).padStart(2, "0")}`;
+    ordinal += 1;
+  } while (ids.has(id));
+
+  ids.add(id);
+  return id;
+}
+
+function getAvailableNodePosition(
+  diagram: FlowchartDiagram,
+  width: number,
+  height: number,
+  preferred: Position
+): Position {
+  const canvasWidth = Number(diagram.canvas?.width) || 1000;
+  const canvasHeight = Number(diagram.canvas?.height) || 560;
+  const grid = getGridSize(diagram);
+  const step = grid || 20;
+  const start = {
+    x: snapToGrid(preferred.x, grid),
+    y: snapToGrid(preferred.y, grid)
+  };
+
+  for (let offset = step; offset <= Math.max(canvasWidth, canvasHeight); offset += step) {
+    for (const candidate of [
+      { x: start.x + offset, y: start.y + offset },
+      { x: start.x + offset, y: start.y - offset },
+      { x: start.x - offset, y: start.y + offset },
+      { x: start.x - offset, y: start.y - offset }
+    ]) {
+      if (candidate.x < 0 || candidate.y < 0 ||
+        candidate.x + width > canvasWidth || candidate.y + height > canvasHeight) {
+        continue;
+      }
+      if (!flattenFlowchartNodes(diagram).some(({ node }) => rectanglesOverlap(
+        { ...candidate, width, height },
+        getFlowchartNodeBounds(diagram, node)
+      ))) {
+        return candidate;
+      }
+    }
+  }
+
+  const rightmostEdge = Math.max(
+    0,
+    ...flattenFlowchartNodes(diagram).map(({ node }) => {
+      const bounds = getFlowchartNodeBounds(diagram, node);
+      return bounds.x + bounds.width;
+    })
+  );
+  return { x: snapToGrid(rightmostEdge + step, grid), y: 0 };
+}
+
 export function getDefaultNodePosition(diagram: FlowchartDiagram): Position {
   const width = Number(diagram.canvas?.width) || 1000;
   const height = Number(diagram.canvas?.height) || 560;
@@ -123,6 +182,44 @@ export function createNode(diagram: FlowchartDiagram): FlowchartNode {
   };
   diagram.nodes.push(node);
   return node;
+}
+
+export function duplicateNode(diagram: FlowchartDiagram, nodeId: string): FlowchartNode | null {
+  const entry = findFlowchartNode(diagram, nodeId);
+  if (!entry) {
+    return null;
+  }
+
+  const ids = new Set(flattenFlowchartNodes(diagram).map(({ node }) => node.id));
+  const clone = (node: FlowchartNode): FlowchartNode => ({
+    id: createDuplicateNodeId(ids, node.shape),
+    label: node.label,
+    shape: node.shape,
+    ...(node.position ? { position: { ...node.position } } : {}),
+    ...(node.size ? { size: { ...node.size } } : {}),
+    ...(node.style ? { style: { ...node.style } } : {}),
+    ...(node.palette ? { palette: { ...node.palette } } : {}),
+    ...(node.subtitle !== undefined ? { subtitle: node.subtitle } : {}),
+    ...(node.textVAlign !== undefined ? { textVAlign: node.textVAlign } : {}),
+    ...(node.textHAlign !== undefined ? { textHAlign: node.textHAlign } : {}),
+    ...(node.children ? { children: node.children.map(clone) } : {})
+  });
+  const duplicate = clone(entry.node);
+  const originalBounds = getFlowchartNodeBounds(diagram, entry.node);
+  const duplicateBounds = getAvailableNodePosition(
+    diagram,
+    Number(duplicate.size?.width) || defaultNode.width,
+    Number(duplicate.size?.height) || defaultNode.height,
+    originalBounds
+  );
+  const parentPosition = entry.parent ? getFlowchartNodePosition(diagram, entry.parent) : { x: 0, y: 0 };
+  duplicate.position = {
+    x: duplicateBounds.x - parentPosition.x,
+    y: duplicateBounds.y - parentPosition.y
+  };
+  entry.siblings.push(duplicate);
+  expandCanvasForNode(diagram, duplicate);
+  return duplicate;
 }
 
 export function createConnector(

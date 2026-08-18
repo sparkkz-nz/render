@@ -192,9 +192,11 @@ export function renderFlowchartDiagram(
 
   const width = Number(diagram.canvas.width) || 1000;
   const height = Number(diagram.canvas.height) || 560;
+  const viewportHeight = state.diagramViewportHeights.get(diagramIndex);
+  const viewportStyle = viewportHeight ? ` style="box-sizing: border-box; height: ${viewportHeight}px"` : "";
 
   return [
-    `<figure class="docdiagram" data-diagram-index="${diagramIndex}" data-diagram-type="flowchart" data-editing="${isDiagramEditing}">`,
+    `<figure class="docdiagram" data-diagram-index="${diagramIndex}" data-diagram-type="flowchart" data-editing="${isDiagramEditing}"${viewportStyle}>`,
     renderToolbar(diagramIndex, "flowchart", state),
     `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Architecture diagram" data-diagram-index="${diagramIndex}" style="width: ${diagramZooms.get(diagramIndex) || 100}%">`,
     `<defs>${edgeMarkerDefs.join("")}</defs>`,

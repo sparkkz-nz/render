@@ -37,6 +37,8 @@ export function renderSequenceDiagram(
   const noteBaseHeight = 48;
   const noteGap = 18;
   const messageSpacing = 56;
+  const viewportHeight = state.diagramViewportHeights.get(diagramIndex);
+  const viewportStyle = viewportHeight ? ` style="box-sizing: border-box; height: ${viewportHeight}px"` : "";
   const sequenceMarkerId = `docdiagram-sequence-arrow-${diagramIndex}`;
   const lifelineTop = headerTop + actorHeaderHeight + 12;
   const firstParticipant = participants[0];
@@ -224,7 +226,7 @@ export function renderSequenceDiagram(
   }).join("");
 
   return [
-    `<figure class="docdiagram" data-diagram-index="${diagramIndex}" data-diagram-type="sequence" data-editing="${state.editingDiagramIndex === diagramIndex}">`,
+    `<figure class="docdiagram" data-diagram-index="${diagramIndex}" data-diagram-type="sequence" data-editing="${state.editingDiagramIndex === diagramIndex}"${viewportStyle}>`,
     renderToolbar(diagramIndex, "sequence", state),
     `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Sequence diagram" data-diagram-index="${diagramIndex}" style="width: ${state.diagramZooms.get(diagramIndex) || 100}%">`,
     `<defs>${buildEdgeMarkerDef(sequenceMarkerId, "arrow", "end", theme.edge.stroke, 2)}</defs>`,
