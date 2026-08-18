@@ -1,23 +1,296 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Skryb</title>
-  </head>
-  <body>
-    <h1>Skryb</h1>
-    <p>
-      <a href="./latest/skryb-runtime.js">Latest Skryb runtime</a>
-    </p>
-    <p>
-      Versioned runtime files are available at
-      <code>releases/&lt;version-tag&gt;/skryb-runtime.js</code>.
-    </p>
-    <h2>Documentation</h2>
-    <ul>
-      <li><a href="./docs/quickstart.html">Quickstart</a></li>
-      <li><a href="./docs/reference.html">Reference</a></li>
-    </ul>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Skryb is a portable HTML document format for agent-generated technical documents that people can still edit.">
+  <title>Skryb - portable documents for agents and humans</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #f1f5f9;
+      --muted: #a9b7cd;
+      --surface: rgba(18, 27, 48, .72);
+      --border: rgba(148, 163, 184, .2);
+      --blue: #71aef7;
+      --violet: #b89cff;
+      --mint: #79e2c2;
+      --code: #111a2e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: #07101f;
+      color: var(--ink);
+      font: 16px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+    }
+    a { color: inherit; }
+    .shell { max-width: 1180px; margin: auto; padding: 0 28px; }
+    .topbar { align-items: center; display: flex; justify-content: space-between; padding: 24px 0; }
+    .brand { font-size: 1.25rem; font-weight: 800; letter-spacing: -.04em; text-decoration: none; }
+    .brand-mark {
+      background: linear-gradient(135deg, var(--blue), var(--violet));
+      border-radius: 7px; display: inline-grid; height: 24px; margin-right: 8px;
+      place-items: center; transform: rotate(-6deg); width: 24px;
+    }
+    .brand-mark::after { background: #07101f; border-radius: 3px; content: ""; height: 10px; width: 10px; }
+    .nav { color: var(--muted); display: flex; font-size: .9rem; gap: 20px; }
+    .nav a { text-decoration: none; }
+    .nav a:hover { color: var(--ink); }
+    .hero {
+      min-height: 680px; overflow: hidden; padding: 86px 0 74px; position: relative;
+    }
+    .hero::before {
+      background: radial-gradient(circle at 50% 18%, rgba(93, 121, 255, .23), transparent 38%),
+        radial-gradient(circle at 84% 62%, rgba(53, 214, 178, .14), transparent 27%);
+      content: ""; inset: 0; pointer-events: none; position: absolute;
+    }
+    .hero-grid { align-items: center; display: grid; gap: 58px; grid-template-columns: minmax(0, .88fr) minmax(480px, 1.12fr); position: relative; }
+    .eyebrow {
+      color: var(--mint); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .75rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+    }
+    h1 { font-size: clamp(3rem, 6vw, 5.55rem); letter-spacing: -.065em; line-height: .96; margin: 17px 0 26px; }
+    h1 em { color: var(--blue); font-style: normal; }
+    .lede { color: var(--muted); font-size: 1.15rem; max-width: 560px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+    .button {
+      border: 1px solid var(--border); border-radius: 9px; display: inline-flex; font-weight: 700;
+      padding: 11px 17px; text-decoration: none; transition: transform .18s, background .18s;
+    }
+    .button:hover { transform: translateY(-2px); }
+    .button.primary { background: var(--blue); border-color: var(--blue); color: #07101f; }
+    .button.secondary { background: rgba(15, 25, 47, .7); }
+    .preview {
+      background: linear-gradient(160deg, rgba(28, 42, 73, .88), rgba(10, 18, 35, .88));
+      border: 1px solid var(--border); border-radius: 15px; box-shadow: 0 28px 70px rgba(0, 0, 0, .36);
+      overflow: hidden; transform: perspective(1400px) rotateY(-5deg) rotateX(2deg);
+    }
+    .window-bar { align-items: center; border-bottom: 1px solid var(--border); display: flex; gap: 6px; padding: 13px 16px; }
+    .dot { background: #fda4af; border-radius: 50%; height: 8px; width: 8px; }
+    .dot:nth-child(2) { background: #fcd34d; } .dot:nth-child(3) { background: #6ee7b7; }
+    .window-title { color: var(--muted); font: .7rem ui-monospace, monospace; margin-left: 8px; }
+    .editor { display: grid; grid-template-columns: .84fr 1.16fr; min-height: 395px; }
+    .source { background: rgba(6, 13, 28, .55); border-right: 1px solid var(--border); color: #c7d5ea; font: .72rem/1.75 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 24px 17px; }
+    .line { display: block; white-space: pre; } .line .key { color: #a5b4fc; } .line .value { color: #86efac; } .line .comment { color: #65748e; }
+    .document { background: #f8fafc; color: #16233a; padding: 25px; }
+    .document h2 { font-size: 1.3rem; letter-spacing: -.04em; margin: 0 0 8px; }
+    .document p { color: #536176; font-size: .73rem; margin: 0 0 17px; }
+    .flow { display: grid; gap: 9px; grid-template-columns: 1fr 28px 1fr 28px 1fr; margin: 24px 0 21px; place-items: center; }
+    .node { background: #dbeafe; border: 1.5px solid #3b82f6; border-radius: 7px; color: #1e3a8a; font-size: .65rem; font-weight: 700; padding: 11px 5px; text-align: center; width: 100%; }
+    .node.api { background: #dcfce7; border-color: #22c55e; color: #166534; border-radius: 50%; padding: 15px 4px; }
+    .node.db { background: #f3e8ff; border-color: #a855f7; color: #6b21a8; border-radius: 48%; }
+    .arrow { color: #64748b; font-size: 1.25rem; }
+    .callout { background: #eef6ff; border: 1px solid #bfdbfe; border-left: 5px solid #3b82f6; border-radius: 5px; color: #1e3a8a; font-size: .65rem; padding: 9px; }
+    .proof { border-top: 1px solid var(--border); padding: 24px 0 68px; position: relative; }
+    .proof-grid { display: grid; gap: 24px; grid-template-columns: repeat(3, 1fr); }
+    .proof-item { color: var(--muted); font-size: .88rem; } .proof-item strong { color: var(--ink); display: block; font-size: 1rem; margin-bottom: 3px; }
+    section { padding: 100px 0; }
+    .section-heading { max-width: 630px; } h2 { font-size: clamp(2rem, 4vw, 3.2rem); letter-spacing: -.055em; line-height: 1; margin: 12px 0 16px; }
+    .section-heading p { color: var(--muted); }
+    .steps { display: grid; gap: 18px; grid-template-columns: repeat(3, 1fr); margin-top: 42px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 25px; }
+    .number { color: var(--blue); font: 700 .78rem ui-monospace, monospace; }
+    .card h3 { font-size: 1.15rem; margin: 13px 0 8px; } .card p { color: var(--muted); font-size: .9rem; margin: 0; }
+    .contrast { background: linear-gradient(135deg, #0b1830, #10102a); border-block: 1px solid var(--border); }
+    .comparison { display: grid; gap: 22px; grid-template-columns: 1fr 1fr; margin-top: 42px; }
+    .comparison .card { min-height: 210px; } .comparison code { background: var(--code); border-radius: 5px; color: #bfdbfe; display: block; font: .75rem/1.65 ui-monospace, monospace; padding: 15px; }
+    .cta { padding: 115px 0; text-align: center; } .cta .section-heading { margin: auto; } .cta .actions { justify-content: center; }
+    .gallery { padding-bottom: 112px; padding-top: 0; }
+    .carousel { margin-top: 42px; outline: none; }
+    .carousel-viewport { background: var(--surface); border: 1px solid var(--border); border-radius: 13px; overflow: hidden; }
+    .carousel-slide { display: none; }
+    .carousel-slide[data-active="true"] { display: block; }
+    .carousel-image {
+      align-items: center; background: #0b1528; display: flex; justify-content: center;
+      min-height: 440px; padding: 22px;
+    }
+    .carousel-image img { display: block; max-height: 540px; max-width: 100%; object-fit: contain; }
+    .showcase-copy { padding: 19px 21px 21px; }
+    .showcase-copy h3 { font-size: 1rem; margin: 0 0 5px; }
+    .showcase-copy p { color: var(--muted); font-size: .85rem; margin: 0; }
+    .carousel-controls { align-items: center; display: flex; gap: 12px; justify-content: center; margin-top: 17px; }
+    .carousel-button {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 7px; color: var(--ink);
+      cursor: pointer; font: inherit; font-size: .85rem; padding: 8px 12px;
+    }
+    .carousel-button:hover, .carousel-button:focus-visible { border-color: var(--blue); }
+    .carousel-dots { display: flex; gap: 7px; }
+    .carousel-dot { background: #3b4b67; border: 0; border-radius: 50%; cursor: pointer; height: 9px; padding: 0; width: 9px; }
+    .carousel-dot[aria-current="true"] { background: var(--blue); }
+    footer { border-top: 1px solid var(--border); color: var(--muted); font-size: .8rem; padding: 28px 0; }
+    @media (max-width: 800px) {
+      .nav { display: none; } .hero { padding-top: 54px; } .hero-grid, .comparison { grid-template-columns: 1fr; }
+      .preview { transform: none; } .steps, .proof-grid { grid-template-columns: 1fr; } .editor { grid-template-columns: 1fr; } .source { display: none; }
+      .carousel-image { min-height: 260px; padding: 12px; } .carousel-image img { max-height: 420px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="shell">
+    <nav class="topbar" aria-label="Main navigation">
+      <a class="brand" href="./"><span class="brand-mark" aria-hidden="true"></span>skryb</a>
+      <div class="nav">
+        <a href="./docs/quickstart.html">Quickstart</a>
+        <a href="./docs/reference.html">Reference</a>
+        <a href="./latest/skryb-runtime.js">Runtime</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="shell hero-grid">
+        <div>
+          <div class="eyebrow">Portable technical documents</div>
+          <h1>Markdown meets HTML.<br>Humans meet <em>agents.</em></h1>
+          <p class="lede">Skryb gives AI agents a durable format for producing beautiful technical documents: a single HTML file with canonical Markdown, diagrams, and a human-friendly editor built in.</p>
+          <div class="actions">
+            <a class="button primary" href="./docs/quickstart.html">Start building</a>
+            <a class="button secondary" href="./docs/reference.html">Read the reference</a>
+          </div>
+        </div>
+        <div class="preview" aria-label="Illustration of a Skryb document editor">
+          <div class="window-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="window-title">architecture.skryb.html</span></div>
+          <div class="editor">
+            <div class="source">
+              <span class="line"><span class="comment">---</span></span>
+              <span class="line"><span class="key">theme</span>: <span class="value">light</span></span>
+              <span class="line"><span class="comment">---</span></span>
+              <span class="line"> </span>
+              <span class="line"># Order architecture</span>
+              <span class="line"> </span>
+              <span class="line">```diagram</span>
+              <span class="line"><span class="key">type</span>: flowchart</span>
+              <span class="line"><span class="key">nodes</span>:</span>
+              <span class="line">  - id: browser</span>
+              <span class="line">    label: Browser</span>
+              <span class="line">```</span>
+            </div>
+            <div class="document">
+              <h2>Order architecture</h2>
+              <p>How a customer order moves from browser to store.</p>
+              <div class="flow"><div class="node">Browser</div><span class="arrow">→</span><div class="node api">Orders<br>API</div><span class="arrow">→</span><div class="node db">Orders<br>store</div></div>
+              <div class="callout"><strong>Info</strong> &nbsp;The source remains embedded and editable.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="shell proof">
+      <div class="proof-grid">
+        <div class="proof-item"><strong>One portable file</strong>Source and saved edits travel together; use a local runtime beside it for offline work.</div>
+        <div class="proof-item"><strong>Deterministic diagrams</strong>Explicit YAML produces predictable layouts that remain editable, rather than a static image or opaque export.</div>
+        <div class="proof-item"><strong>Browser-only editing</strong>Drag nodes, adjust supported diagrams, edit source, and save a copy - no external authoring app required.</div>
+      </div>
+    </div>
+
+    <section class="shell">
+      <div class="section-heading">
+        <div class="eyebrow">A better handoff</div>
+        <h2>From structured intent to a document worth sharing.</h2>
+        <p>Skryb keeps the machine-readable source, deterministic diagram layout, and reader-ready experience in the same place. No separate CMS, build pipeline, external authoring app, or fragile handoff format required.</p>
+      </div>
+      <div class="steps">
+        <article class="card"><div class="number">01 / AUTHOR</div><h3>Describe the system</h3><p>Agents write standard Markdown and explicit diagram YAML. The source is readable, reviewable, and versionable.</p></article>
+        <article class="card"><div class="number">02 / RENDER</div><h3>Open anywhere</h3><p>The browser runtime turns the source into responsive documentation with deterministic, interactive SVG diagrams.</p></article>
+        <article class="card"><div class="number">03 / REFINE</div><h3>Keep humans in the loop</h3><p>People can edit source, drag and rearrange supported diagrams, and download a complete updated document without leaving the browser.</p></article>
+      </div>
+    </section>
+
+    <section class="contrast">
+      <div class="shell">
+        <div class="section-heading">
+          <div class="eyebrow">The contract</div>
+          <h2>Not a screenshot. Not a dead export.</h2>
+          <p>Skryb documents remain alive after an agent creates them.</p>
+        </div>
+        <div class="comparison">
+          <article class="card"><h3>What agents write</h3><code>type: sequence
+participants:
+  - id: customer
+    label: Customer
+messages:
+  - from: customer
+    to: orders
+    label: Place order</code></article>
+          <article class="card"><h3>What people receive</h3><p>A polished document with deterministic diagrams, semantic components, portable source, and an editing path that does not require the original agent, an external app, or its environment.</p><a class="button secondary" href="./docs/quickstart.html">See a working document</a></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="shell cta">
+      <div class="section-heading">
+        <div class="eyebrow">Start with the format</div>
+        <h2>Make technical knowledge portable.</h2>
+        <p>Learn the document shell, create a diagram, and save a document your team can keep improving.</p>
+      </div>
+      <div class="actions">
+        <a class="button primary" href="./docs/quickstart.html">Open the quickstart</a>
+        <a class="button secondary" href="./docs/reference.html">Browse the schema</a>
+      </div>
+    </section>
+
+    <section class="shell gallery">
+      <div class="section-heading">
+        <div class="eyebrow">Made to be used</div>
+        <h2>Beautiful to read. Practical to refine.</h2>
+        <p>Skryb starts with structured source but does not stop there. Documents can present rich technical context, expose their canonical source, and let people refine diagrams directly in the browser.</p>
+      </div>
+      <div class="carousel" aria-label="Skryb feature screenshots" tabindex="0">
+        <div class="carousel-viewport">
+          <article class="carousel-slide" data-active="true">
+            <div class="carousel-image"><img src="./assets/secure-doc-flow.png" alt="A rendered Skryb document showing a secure ingestion workflow, callouts, and an editable flowchart"></div>
+            <div class="showcase-copy"><h3>Reader-ready technical context</h3><p>Combine prose, callouts, and diagrams in one portable document that gives a system its surrounding explanation.</p></div>
+          </article>
+          <article class="carousel-slide" data-active="false">
+            <div class="carousel-image"><img src="./assets/source-edit.png" alt="The Skryb source editor open beneath a rendered sequence diagram"></div>
+            <div class="showcase-copy"><h3>Canonical source, always close</h3><p>Open the source tray to inspect or edit the Markdown and YAML that defines the document.</p></div>
+          </article>
+          <article class="carousel-slide" data-active="false">
+            <div class="carousel-image"><img src="./assets/edit-flowchart.png" alt="The Skryb diagram inspector adjusting a selected flowchart node"></div>
+            <div class="showcase-copy"><h3>Refine diagrams in place</h3><p>Select, drag, resize, and restyle supported flowchart elements without a separate diagramming tool.</p></div>
+          </article>
+          <article class="carousel-slide" data-active="false">
+            <div class="carousel-image"><img src="./assets/sequence.png" alt="A rendered Skryb sequence diagram with styled callouts and participants"></div>
+            <div class="showcase-copy"><h3>Sequence diagrams with intent</h3><p>Express ordered interactions as canonical YAML and render a rich, deterministic view with no external diagram service.</p></div>
+          </article>
+        </div>
+        <div class="carousel-controls">
+          <button class="carousel-button" type="button" data-carousel-previous>Previous</button>
+          <div class="carousel-dots" aria-label="Choose screenshot">
+            <button class="carousel-dot" type="button" aria-label="Show reader-ready document" aria-current="true"></button>
+            <button class="carousel-dot" type="button" aria-label="Show source editor" aria-current="false"></button>
+            <button class="carousel-dot" type="button" aria-label="Show diagram inspector" aria-current="false"></button>
+            <button class="carousel-dot" type="button" aria-label="Show sequence diagram" aria-current="false"></button>
+          </div>
+          <button class="carousel-button" type="button" data-carousel-next>Next</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer><div class="shell">Skryb &middot; Portable HTML documents for agents and humans</div></footer>
+  <script>
+    const carousel = document.querySelector(".carousel");
+    const slides = [...carousel.querySelectorAll(".carousel-slide")];
+    const dots = [...carousel.querySelectorAll(".carousel-dot")];
+    let activeSlide = 0;
+    const showSlide = (index) => {
+      activeSlide = (index + slides.length) % slides.length;
+      slides.forEach((slide, slideIndex) => {
+        slide.dataset.active = String(slideIndex === activeSlide);
+        dots[slideIndex].setAttribute("aria-current", String(slideIndex === activeSlide));
+      });
+    };
+    carousel.querySelector("[data-carousel-previous]").addEventListener("click", () => showSlide(activeSlide - 1));
+    carousel.querySelector("[data-carousel-next]").addEventListener("click", () => showSlide(activeSlide + 1));
+    dots.forEach((dot, index) => dot.addEventListener("click", () => showSlide(index)));
+    carousel.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") showSlide(activeSlide - 1);
+      if (event.key === "ArrowRight") showSlide(activeSlide + 1);
+    });
+  </script>
+</body>
 </html>
