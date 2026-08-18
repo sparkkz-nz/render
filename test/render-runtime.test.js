@@ -26,6 +26,8 @@ const {
   getTheme,
   getGridSize,
   expandCanvasForNode,
+  getResizeNodeOrigin,
+  resizeFlowchartNode,
   flattenFlowchartNodes,
   getFlowchartNodeBounds,
   reparentFlowchartNode,
@@ -582,6 +584,58 @@ test("flowchart nodes support arbitrary nesting with relative coordinates and ed
   assert.match(markup, /data-node-id="platform"/);
   assert.match(markup, /data-node-id="store"/);
   assert.match(markup, /data-node-id="client"/);
+});
+
+test("resizing from each corner anchors the opposite corner and preserves nested positions", () => {
+  const diagram = parseDiagram(flowchartSource([
+    "canvas:",
+    "  width: 800",
+    "  height: 500",
+    "nodes:",
+    "  - id: container",
+    "    label: Container",
+    "    shape: rounded-rectangle",
+    "    position: { x: 100, y: 80 }",
+    "    size: { width: 300, height: 200 }",
+    "    children:",
+    "      - id: child",
+    "        label: Child",
+    "        shape: rounded-rectangle",
+    "        position: { x: 40, y: 50 }",
+    "        size: { width: 120, height: 60 }",
+    "edges:"
+  ].join("\n")));
+  const container = diagram.nodes[0];
+  const child = container.children[0];
+  const childBounds = getFlowchartNodeBounds(diagram, child);
+
+  const origin = getResizeNodeOrigin(container);
+  resizeFlowchartNode(diagram, container, "top-left", -30, -20, origin);
+  resizeFlowchartNode(diagram, container, "top-left", -60, -40, origin);
+
+  assert.equal(JSON.stringify(container.position), JSON.stringify({ x: 40, y: 40 }));
+  assert.equal(JSON.stringify(container.size), JSON.stringify({ width: 360, height: 240 }));
+  assert.equal(JSON.stringify(getFlowchartNodeBounds(diagram, child)), JSON.stringify(childBounds));
+
+  const resizeCases = [
+    { corner: "top-right", horizontalDelta: 60, verticalDelta: -40, position: { x: 100, y: 40 } },
+    { corner: "bottom-left", horizontalDelta: -60, verticalDelta: 40, position: { x: 40, y: 80 } },
+    { corner: "bottom-right", horizontalDelta: 60, verticalDelta: 40, position: { x: 100, y: 80 } }
+  ];
+  for (const { corner, horizontalDelta, verticalDelta, position } of resizeCases) {
+    const node = {
+      id: corner,
+      label: corner,
+      shape: "rounded-rectangle",
+      position: { x: 100, y: 80 },
+      size: { width: 300, height: 200 }
+    };
+    const oneNodeDiagram = { canvas: { width: 800, height: 500 }, nodes: [node], edges: [] };
+    resizeFlowchartNode(oneNodeDiagram, node, corner, horizontalDelta, verticalDelta);
+
+    assert.equal(JSON.stringify(node.position), JSON.stringify(position));
+    assert.equal(JSON.stringify(node.size), JSON.stringify({ width: 360, height: 240 }));
+  }
 });
 
 test("flowchart node text stack alignment parses, renders, and round-trips", () => {

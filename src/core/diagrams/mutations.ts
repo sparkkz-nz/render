@@ -231,6 +231,83 @@ function getMinimumNodeDimensions(shape: string): Size {
   return shape === "document" ? documentMinimumNodeSize : minimumNodeSize;
 }
 
+export type ResizeCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+
+export interface ResizeNodeOrigin {
+  position: Position;
+  size: Size;
+  childPositions: ReadonlyMap<FlowchartNode, Position>;
+}
+
+export function getResizeNodeOrigin(node: FlowchartNode): ResizeNodeOrigin {
+  return {
+    position: {
+      x: Number(node.position?.x) || 0,
+      y: Number(node.position?.y) || 0
+    },
+    size: {
+      width: Number(node.size?.width) || defaultNode.width,
+      height: Number(node.size?.height) || defaultNode.height
+    },
+    childPositions: new Map((node.children || []).map((child) => [
+      child,
+      {
+        x: Number(child.position?.x) || 0,
+        y: Number(child.position?.y) || 0
+      }
+    ]))
+  };
+}
+
+export function resizeFlowchartNode(
+  diagram: FlowchartDiagram,
+  node: FlowchartNode,
+  corner: ResizeCorner,
+  horizontalDelta: number,
+  verticalDelta: number,
+  origin: ResizeNodeOrigin = getResizeNodeOrigin(node)
+): FlowchartNode {
+  const grid = getGridSize(diagram);
+  const minimumDimensions = getMinimumNodeDimensions(node.shape);
+  const resizesFromLeft = corner.endsWith("left");
+  const resizesFromTop = corner.startsWith("top");
+  let width = clampNodeSize(
+    origin.size.width + (resizesFromLeft ? -horizontalDelta : horizontalDelta),
+    minimumDimensions.width,
+    grid
+  );
+  let height = clampNodeSize(
+    origin.size.height + (resizesFromTop ? -verticalDelta : verticalDelta),
+    minimumDimensions.height,
+    grid
+  );
+
+  if (node.shape === "circle") {
+    const diameter = Math.max(width, height);
+    width = diameter;
+    height = diameter;
+  }
+
+  const position = {
+    ...node.position,
+    x: resizesFromLeft ? origin.position.x + origin.size.width - width : origin.position.x,
+    y: resizesFromTop ? origin.position.y + origin.size.height - height : origin.position.y
+  };
+  const childOffsetX = origin.position.x - position.x;
+  const childOffsetY = origin.position.y - position.y;
+  for (const child of node.children || []) {
+    const childPosition = origin.childPositions.get(child) || child.position || { x: 0, y: 0 };
+    child.position = {
+      ...child.position,
+      x: childPosition.x + childOffsetX,
+      y: childPosition.y + childOffsetY
+    };
+  }
+  node.position = position;
+  node.size = { ...node.size, width, height };
+  return node;
+}
+
 export function setNodeSize(diagram: FlowchartDiagram, node: FlowchartNode, dimension: string, rawValue: unknown): FlowchartNode {
   const grid = getGridSize(diagram);
   const minimumDimensions = getMinimumNodeDimensions(node.shape);
