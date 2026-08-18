@@ -34,6 +34,7 @@ const {
   createUniqueNodeId,
   getDefaultNodePosition,
   createNode,
+  duplicateNode,
   createConnector,
   reconnectConnector,
   deleteConnector,
@@ -1010,6 +1011,71 @@ test("creates uniquely identified default nodes at a grid-aligned available posi
     position: { x: 210, y: 190 },
     size: { width: 190, height: 80 }
   }));
+});
+
+test("duplicates a node subtree with shape-derived IDs and independent properties", () => {
+  const diagram = {
+    type: "flowchart",
+    canvas: { width: 700, height: 500, grid: 10 },
+    nodes: [{
+      id: "platform",
+      label: "Platform",
+      shape: "rounded-rectangle",
+      position: { x: 100, y: 100 },
+      size: { width: 200, height: 150 },
+      palette: { tone: "dark", colour: "blue" },
+      children: [{
+        id: "api",
+        label: "API",
+        shape: "chevron",
+        position: { x: 20, y: 30 },
+        size: { width: 120, height: 60 },
+        style: { stroke: "#123456" }
+      }]
+    }, {
+      id: "roundedrectangle01",
+      label: "Existing",
+      shape: "rounded-rectangle",
+      position: { x: 400, y: 40 },
+      size: { width: 120, height: 60 }
+    }],
+    edges: []
+  };
+  const duplicate = duplicateNode(diagram, "platform");
+
+  assert.ok(duplicate);
+  assert.equal(duplicate.id, "roundedrectangle02");
+  assert.equal(duplicate.children[0].id, "chevron01");
+  assert.equal(duplicate.label, "Platform");
+  assert.equal(JSON.stringify(duplicate.palette), JSON.stringify({ tone: "dark", colour: "blue" }));
+  assert.notEqual(JSON.stringify(duplicate.position), JSON.stringify(diagram.nodes[0].position));
+  assert.equal(JSON.stringify(duplicate.children[0].position), JSON.stringify({ x: 20, y: 30 }));
+  assert.doesNotMatch(serializeDiagram(diagram), /undefined/);
+  assert.doesNotThrow(() => parseDiagram(serializeDiagram(diagram)));
+
+  duplicate.children[0].style.stroke = "#abcdef";
+  assert.equal(diagram.nodes[0].children[0].style.stroke, "#123456");
+});
+
+test("duplicates a node outside a full canvas instead of overlapping existing content", () => {
+  const diagram = {
+    type: "flowchart",
+    canvas: { width: 300, height: 200 },
+    nodes: [{
+      id: "full-canvas",
+      label: "Full canvas",
+      shape: "rounded-rectangle",
+      position: { x: 0, y: 0 },
+      size: { width: 300, height: 200 }
+    }],
+    edges: []
+  };
+  const duplicate = duplicateNode(diagram, "full-canvas");
+
+  assert.ok(duplicate);
+  assert.equal(duplicate.position.x, 320);
+  assert.equal(duplicate.position.y, 0);
+  assert.ok(diagram.canvas.width >= 660);
 });
 
 test("creates, reconnects, and deletes connectors without dangling endpoints", () => {

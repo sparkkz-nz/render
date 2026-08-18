@@ -49,7 +49,8 @@ export function createEditorState(): EditorState {
     documentFormat: "centered",
     savedSource: "",
     editSessionDiagram: null,
-    diagramZooms: new Map()
+    diagramZooms: new Map(),
+    diagramViewportHeights: new Map()
   };
 }
 

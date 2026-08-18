@@ -10,6 +10,7 @@ import {
   createConnector,
   deleteConnector,
   deleteNode,
+  duplicateNode,
   expandCanvasForNode,
   getResizeNodeOrigin,
   reconnectConnector,
@@ -106,16 +107,20 @@ export class DiagramEditor {
       this.wireInlineEditor(editor);
     }
 
-    if (!this.host.outputElement.dataset.deleteShortcutBound) {
-      this.host.outputElement.dataset.deleteShortcutBound = "true";
+    if (!this.host.outputElement.dataset.editingShortcutsBound) {
+      this.host.outputElement.dataset.editingShortcutsBound = "true";
       document.addEventListener("keydown", (event) => {
-        if (this.host.state.editingDiagramIndex === null || (event.key !== "Delete" && event.key !== "Backspace")) {
+        if (this.host.state.editingDiagramIndex === null) {
           return;
         }
         if (event.target instanceof Element && event.target.matches("input, textarea, select, [contenteditable]")) {
           return;
         }
-        if (this.host.state.selectedNode || this.host.state.selectedEdge) {
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "d" && this.host.state.selectedNode) {
+          event.preventDefault();
+          this.duplicateSelectedNode();
+        } else if ((event.key === "Delete" || event.key === "Backspace") &&
+          (this.host.state.selectedNode || this.host.state.selectedEdge)) {
           event.preventDefault();
           this.deleteSelected();
         }
@@ -347,6 +352,25 @@ export class DiagramEditor {
       return;
     }
     clearEditorState(this.host.state);
+    this.host.persistDiagramModels();
+    this.host.renderDocument();
+  }
+
+  private duplicateSelectedNode(): void {
+    const selectedNode = this.host.state.selectedNode;
+    if (!selectedNode) {
+      return;
+    }
+    const diagram = diagramAt(this.host.state, selectedNode.diagramIndex);
+    if (!diagram) {
+      return;
+    }
+    const duplicate = duplicateNode(diagram, selectedNode.nodeId);
+    if (!duplicate) {
+      return;
+    }
+    this.host.state.selectedNode = { diagramIndex: selectedNode.diagramIndex, nodeId: duplicate.id };
+    this.host.state.selectedEdge = null;
     this.host.persistDiagramModels();
     this.host.renderDocument();
   }
