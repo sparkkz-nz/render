@@ -302,6 +302,11 @@ export class BrowserRuntime {
     }
     output?.replaceChildren();
     output?.removeAttribute("data-editing-shortcuts-bound");
+    for (const attribute of [...(output?.attributes || [])]) {
+      if (attribute.name === "style" || attribute.name.startsWith("data-")) {
+        output?.removeAttribute(attribute.name);
+      }
+    }
     const blob = new Blob([`<!doctype html>\n${copy.outerHTML}`], { type: "text/html;charset=utf-8" });
     const link = document.createElement("a");
     const title = document.title.toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, "");

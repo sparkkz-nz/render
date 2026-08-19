@@ -225,14 +225,14 @@ export const colourSchemes: Record<string, ColourScheme> = {
   midnight: {
     label: "Midnight",
     light: roles(
-      colour("Background", "#FAFAFF", "#D9D8EE", "#17152D"), colour("Pale", "#F0EFFF", "#C6C2E8", "#29234D"), colour("Light", "#E3E0FF", "#958ED0", "#29234D"), colour("Neutral", "#C8C2EF", "#625BA3", "#211B42"), colour("Dark", "#30275E", "#201943", "#F8F7FF"),
-      colour("Soft", "#EAE5FF", "#9D8CE7", "#35276D"), colour("Accent", "#D7CEFF", "#6754C7", "#2D2364", "#F0EDFF"), colour("Strong", "#5540B5", "#3E2D98", "#FFFFFF", "#7563D6", "#A99BFF"),
-      colour("Note", "#E1E9FF", "#5578C9", "#243968"), colour("Success", "#DEF6EA", "#338E68", "#143F2C"), colour("Warning", "#FFF0D7", "#C77624", "#66350F"), colour("Danger", "#FCE1EB", "#C84972", "#661B36"), colour("Highlight", "#FFF5C9", "#B48A18", "#5F4500")
+      colour("Background", "#F5F7FC", "#CAD3E4", "#101D38"), colour("Pale", "#E9EEF8", "#B6C4DC", "#172744"), colour("Light", "#D9E2F2", "#91A5C5", "#172744"), colour("Neutral", "#C1CEE1", "#6F85A6", "#14223C"), colour("Dark", "#243B63", "#1B3155", "#F5F8FF"),
+      colour("Soft", "#DCE7FA", "#93A9CE", "#1A3158"), colour("Accent", "#C9DBFA", "#5E7FB4", "#152D54", "#D6E3F8"), colour("Strong", "#345F9D", "#2C548D", "#FFFFFF", "#416EAE", "#6F91C2"),
+      colour("Note", "#DBE7F8", "#5277AE", "#1D355D"), colour("Success", "#DDEFE8", "#3E886A", "#173F31"), colour("Warning", "#F8E9D1", "#B9702D", "#5D3513"), colour("Danger", "#F4E0E5", "#AD5570", "#591F30"), colour("Highlight", "#F8F0C9", "#A88222", "#554300")
     ),
     dark: roles(
-      colour("Background", "#131126", "#393354", "#F4F2FF"), colour("Pale", "#1E1938", "#514878", "#F0EEFF"), colour("Light", "#2B2450", "#6B619A", "#F8F7FF"), colour("Neutral", "#443B72", "#9D92CC", "#FFFFFF"), colour("Dark", "#B9B1E6", "#DCD8F7", "#18142E"),
-      colour("Soft", "#2A2052", "#A898F0", "#F0ECFF"), colour("Accent", "#3B2E75", "#B2A5FF", "#F7F5FF", "#2B205A"), colour("Strong", "#6954D0", "#C4BAFF", "#FFFFFF", "#4D3AA9", "#B2A5FF"),
-      colour("Note", "#202C56", "#82A1F0", "#E1E9FF"), colour("Success", "#123D2E", "#65D2A0", "#DEF6EA"), colour("Warning", "#4A2B10", "#F0A45C", "#FFF0D7"), colour("Danger", "#4C172B", "#EF7FA4", "#FCE1EB"), colour("Highlight", "#4A390B", "#DFC74F", "#FFF5C9")
+      colour("Background", "#081426", "#1F3554", "#E8F0FF"), colour("Pale", "#0D1C32", "#2A4265", "#E5EEFF"), colour("Light", "#132843", "#3A557A", "#EDF4FF"), colour("Neutral", "#1E385B", "#59779E", "#EEF5FF"), colour("Dark", "#91A9C9", "#AFC2DB", "#0A172A"),
+      colour("Soft", "#112B4D", "#527AA9", "#E1EEFF"), colour("Accent", "#173B68", "#6389BA", "#ECF4FF", "#1B416E"), colour("Strong", "#2C629F", "#6D98CD", "#FFFFFF", "#356FAF", "#6D98CD"),
+      colour("Note", "#132A4A", "#6D96C8", "#DDEAFF"), colour("Success", "#123B31", "#5FBA91", "#DDF3E8"), colour("Warning", "#422C14", "#D09150", "#FBEAD1"), colour("Danger", "#431E2B", "#D27691", "#F8E1E8"), colour("Highlight", "#403710", "#C5A543", "#FAF2CA")
     )
   },
   paper: {
