@@ -16,13 +16,13 @@ export function injectStyles(): void {
     }
     html[data-docdiagram-theme="light"],
     body[data-docdiagram-theme="light"] {
-      background: #ffffff;
-      color: #17202a;
+      background: var(--docdiagram-page-background, #ffffff);
+      color: var(--docdiagram-page-text, #17202a);
     }
     html[data-docdiagram-theme="dark"],
     body[data-docdiagram-theme="dark"] {
-      background: #17202a;
-      color: #f3f8fc;
+      background: var(--docdiagram-page-background, #17202a);
+      color: var(--docdiagram-page-text, #f3f8fc);
     }
     #rendered-document {
       background: var(--docdiagram-background);
@@ -297,6 +297,55 @@ export function injectStyles(): void {
       font: inherit;
       padding: .35rem .55rem;
     }
+    .docdiagram-source-actions {
+      align-items: center;
+      display: flex;
+      gap: .5rem;
+      position: relative;
+    }
+    .docdiagram-source-menu-toggle {
+      background: var(--docdiagram-control-background);
+      border: 1px solid var(--docdiagram-border);
+      border-radius: 6px;
+      color: var(--docdiagram-text);
+      cursor: pointer;
+      font: inherit;
+      padding: .35rem .55rem;
+    }
+    .docdiagram-source-menu {
+      background: var(--docdiagram-background);
+      border: 1px solid var(--docdiagram-border);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgb(21 41 62 / 18%);
+      display: flex;
+      flex-direction: column;
+      gap: .3rem;
+      padding: .5rem;
+      position: absolute;
+      right: 2.5rem;
+      bottom: calc(100% + .35rem);
+      width: max-content;
+      z-index: 50;
+    }
+    .docdiagram-source-menu[hidden] {
+      display: none;
+    }
+    .docdiagram-source-menu button {
+      background: var(--docdiagram-control-background);
+      border: 1px solid var(--docdiagram-border);
+      border-radius: 5px;
+      color: var(--docdiagram-text);
+      cursor: pointer;
+      font: inherit;
+      padding: .35rem .55rem;
+      text-align: left;
+    }
+    .docdiagram-source-menu-heading {
+      color: var(--docdiagram-muted);
+      font-size: .8rem;
+      font-weight: 700;
+      padding: .1rem .2rem;
+    }
     .docdiagram-source-label {
       display: flex;
       flex: 1;
@@ -363,11 +412,11 @@ export function injectStyles(): void {
       border-radius: 5px;
       color: var(--docdiagram-swatch-text);
       display: block;
-      font-size: .75rem;
+      font-size: .7rem;
       font-weight: 700;
-      line-height: 1.15;
-      min-height: 1.2rem;
-      padding: .25rem .4rem;
+      line-height: 1.05;
+      min-height: .9rem;
+      padding: .18rem .3rem;
       text-align: center;
     }
     .docdiagram-palette-swatch input:checked + span {
@@ -442,6 +491,59 @@ export function injectStyles(): void {
     .docdiagram-field input[type="number"] {
       width: 4.6rem;
     }
+    .docdiagram-inspector-row {
+      align-items: center;
+      color: var(--docdiagram-muted);
+      display: flex;
+      font-size: .9rem;
+      gap: .4rem;
+      min-width: 0;
+    }
+    .docdiagram-inspector-row > span:first-child {
+      min-width: 2.8rem;
+    }
+    .docdiagram-inspector-row .docdiagram-field {
+      gap: .35rem;
+    }
+    .docdiagram-inspector-row .docdiagram-field-compact {
+      max-width: 4.6rem;
+    }
+    .docdiagram-inspector-row select,
+    .docdiagram-inspector-row input {
+      min-width: 0;
+      width: 4.6rem;
+    }
+    .docdiagram-inspector-row select {
+      width: auto;
+    }
+    .docdiagram-inspector-actions {
+      display: flex;
+      gap: .5rem;
+      justify-content: flex-end;
+      margin-top: .2rem;
+    }
+    .docdiagram-inspector-actions button {
+      background: var(--docdiagram-control-background);
+      border: 1px solid var(--docdiagram-border);
+      border-radius: 6px;
+      color: var(--docdiagram-text);
+      cursor: pointer;
+      font: inherit;
+      padding: .35rem .55rem;
+    }
+    .docdiagram-inspector-actions .docdiagram-inspector-delete {
+      color: #b42318;
+    }
+    .docdiagram-visually-hidden {
+      height: 1px;
+      margin: -1px;
+      overflow: hidden;
+      padding: 0;
+      position: absolute;
+      width: 1px;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+    }
     .docdiagram-inspector-textarea {
       box-sizing: border-box;
       font-family: inherit;
@@ -461,6 +563,12 @@ export function injectStyles(): void {
       padding: 1rem;
       position: relative;
       resize: vertical;
+    }
+    .docdiagram {
+      scrollbar-width: none;
+    }
+    .docdiagram::-webkit-scrollbar {
+      display: none;
     }
     .docdiagram-panning svg {
       cursor: grabbing;

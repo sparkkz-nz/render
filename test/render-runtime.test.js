@@ -164,6 +164,7 @@ test("published reference renders Markdown and YAML source blocks", () => {
   assert.match(markup, /<pre><code class="language-yaml">/);
   assert.match(markup, /type: flowchart/);
   assert.match(markup, /type: sequence/);
+  assert.match(source, /:::diagram \{ id=payment-flow \}/);
 });
 
 test("Pages home promotes the published guides", () => {
@@ -1044,6 +1045,24 @@ test("diagram viewports can be vertically resized", () => {
   assert.match(runtime, /\.docdiagram \{[\s\S]*resize: vertical/);
 });
 
+test("diagram scrollbars are visually hidden while retaining overflow support", () => {
+  assert.match(runtime, /\.docdiagram \{\s*scrollbar-width: none;/);
+  assert.match(runtime, /\.docdiagram::-webkit-scrollbar \{\s*display: none;/);
+});
+
+test("runtime chrome uses the document colour scheme for the page background", () => {
+  assert.match(runtime, /background: var\(--docdiagram-page-background, #ffffff\);/);
+  assert.match(runtime, /--docdiagram-page-background/);
+});
+
+test("source editor chrome includes insert and help controls with an accessible close button", () => {
+  assert.match(runtime, /class="docdiagram-source-menu-toggle" aria-label="Source editor menu"/);
+  assert.match(runtime, /data-source-template="flowchart"/);
+  assert.match(runtime, /data-source-template="diagram-reference"/);
+  assert.match(runtime, /class="docdiagram-source-help">Help/);
+  assert.match(runtime, /class="docdiagram-source-close" aria-label="Close source editor"/);
+});
+
 test("callouts use a prominent left accent border", () => {
   assert.match(runtime, /\.docdiagram-callout \{\s*border-left-width: 8px;/);
 });
@@ -1636,11 +1655,28 @@ test("buildEdgePath produces deterministic geometry for every route and anchor p
   );
 
   const overlapping = buildEdgePath(source, source, "right", "right", "orthogonal");
-  assert.equal(overlapping.path, "M 100 100 L 140 100 L 100 100");
-  assert.deepEqual(JSON.parse(JSON.stringify(overlapping.midpoint)), { x: 140, y: 100 });
+  assert.equal(overlapping.path, "M 100 100 L 100 100");
+  assert.deepEqual(JSON.parse(JSON.stringify(overlapping.midpoint)), { x: 100, y: 100 });
 
   const sameSide = buildEdgePath({ x: 300, y: 100 }, { x: 100, y: 100 }, "right", "right", "orthogonal");
-  assert.equal(sameSide.path, "M 300 100 L 340 100 L 140 100 L 100 100");
+  assert.equal(sameSide.path, "M 300 100 L 400 100 L 100 100");
+
+  const balanced = buildEdgePath(source, target, "right", "left", "orthogonal");
+  assert.equal(balanced.path, "M 100 100 L 200 100 L 200 220 L 300 220");
+
+  const rightTarget = buildEdgePath({ x: 190, y: 40 }, { x: 300, y: 40 }, "right", "right", "orthogonal");
+  assert.equal(rightTarget.path, "M 190 40 L 355 40 L 300 40");
+  assert.deepEqual(JSON.parse(JSON.stringify(rightTarget.endTangent)), { x: -55, y: 0 });
+
+  const reverse = buildEdgePath({ x: 490, y: 140 }, { x: 100, y: 140 }, "right", "left", "orthogonal");
+  assert.equal(reverse.path, "M 490 140 L 685 140 L 685 -55 L -95 -55 L -95 140 L 100 140");
+  assert.deepEqual(JSON.parse(JSON.stringify(reverse.startTangent)), { x: 195, y: 0 });
+  assert.deepEqual(JSON.parse(JSON.stringify(reverse.endTangent)), { x: 195, y: 0 });
+
+  const aligned = buildEdgePath({ x: 100, y: 100 }, { x: 100, y: 300 }, "right", "left", "orthogonal");
+  assert.equal(aligned.path, "M 100 100 L 200 100 L 200 0 L 0 0 L 0 300 L 100 300");
+  assert.deepEqual(JSON.parse(JSON.stringify(aligned.startTangent)), { x: 100, y: 0 });
+  assert.deepEqual(JSON.parse(JSON.stringify(aligned.endTangent)), { x: 100, y: 0 });
 });
 
 test("edge inspector exposes route and both endpoint-side controls", () => {
