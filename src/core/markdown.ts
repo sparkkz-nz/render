@@ -9,6 +9,17 @@ type DirectiveOpen = {
   attributes: Record<string, string>;
 };
 
+type DiagramDefinition = {
+  source: string;
+  id: string;
+};
+
+type DiagramReferenceRegistry = {
+  definitions: Map<string, DiagramDefinition>;
+  duplicateDefinitionIds: Set<string>;
+  referenceCounts: Map<string, number>;
+};
+
 function splitTableRow(line: string): string[] {
   const cells: string[] = [];
   let cell = "";
@@ -71,6 +82,21 @@ function parseDirectiveOpen(line: string): DirectiveOpen | null {
   }
 
   return { name: match[1] as DirectiveName, attributes };
+}
+
+function parseDiagramReference(line: string): { id: string } | null {
+  const match = line.match(/^:::diagram\s+\{\s*id=(?:"([^"]+)"|([^\s}]+))\s*\}\s*$/);
+  const id = match?.[1] ?? match?.[2];
+  return id ? { id } : null;
+}
+
+function getDiagramId(source: string): string | null {
+  const match = source.match(/^id:\s*(?:"([^"]+)"|([^\s#]+))\s*$/m);
+  return match?.[1] ?? match?.[2] ?? null;
+}
+
+function stripBlockQuotePrefix(line: string): string {
+  return line.replace(/^(?: {0,3}> ?)+/, "");
 }
 
 function isDirectiveClose(line: string): boolean {
@@ -184,13 +210,59 @@ export function renderInline(source: string): string {
 export function renderMarkdown(
   source: string,
   state: { diagramIndex: number } = { diagramIndex: 0 },
-  options?: { renderDiagram: (source: string, index: number) => string; documentColorScheme?: string }
+  options?: {
+    renderDiagram?: (source: string, index: number) => string;
+    documentColorScheme?: string;
+    diagramReferenceRegistry?: DiagramReferenceRegistry;
+  }
 ): string {
   const lines = source.replace(/\r\n/g, "\n").split("\n");
   const renderDiagram = options?.renderDiagram ?? ((_: string, __: number) => {
     throw new Error("renderDiagram callback is required for diagram blocks.");
   });
   const documentColorScheme = options?.documentColorScheme || "classic";
+  const registry = options?.diagramReferenceRegistry || (() => {
+    const definitions = new Map<string, DiagramDefinition>();
+    const duplicateDefinitionIds = new Set<string>();
+    const referenceCounts = new Map<string, number>();
+    const normalizedLines = lines.map(stripBlockQuotePrefix);
+
+    for (let index = 0; index < normalizedLines.length; index += 1) {
+      if (!/^```diagram\s*$/.test(normalizedLines[index])) {
+        continue;
+      }
+      const closeOffset = normalizedLines.slice(index + 1).findIndex((candidate) => /^```\s*$/.test(candidate));
+      if (closeOffset === -1) {
+        break;
+      }
+      const definitionSource = normalizedLines.slice(index + 1, index + closeOffset + 1).join("\n");
+      const id = getDiagramId(definitionSource);
+      if (id) {
+        if (definitions.has(id)) {
+          duplicateDefinitionIds.add(id);
+        } else {
+          definitions.set(id, { id, source: definitionSource });
+        }
+      }
+      index += closeOffset + 1;
+    }
+
+    let fenceOpen = false;
+    for (const line of normalizedLines) {
+      if (/^```/.test(line)) {
+        fenceOpen = !fenceOpen;
+        continue;
+      }
+      if (!fenceOpen) {
+        const reference = parseDiagramReference(line);
+        if (reference) {
+          referenceCounts.set(reference.id, (referenceCounts.get(reference.id) || 0) + 1);
+        }
+      }
+    }
+    return { definitions, duplicateDefinitionIds, referenceCounts };
+  })();
+  const { definitions: diagramDefinitions, duplicateDefinitionIds, referenceCounts } = registry;
 
   function isBlockStart(index: number): boolean {
     const line = lines[index] || "";
@@ -345,6 +417,23 @@ export function renderMarkdown(
       }
 
       if (/^:::/.test(line)) {
+        const reference = parseDiagramReference(line);
+        if (reference) {
+          const definition = diagramDefinitions.get(reference.id);
+          const references = referenceCounts.get(reference.id) || 0;
+          if (!definition) {
+            output.push(`<section class="docdiagram-error"><strong>Diagram "${escapeHtml(reference.id)}" could not be found.</strong></section>`);
+          } else if (duplicateDefinitionIds.has(reference.id)) {
+            output.push(`<section class="docdiagram-error"><strong>Diagram "${escapeHtml(reference.id)}" has multiple definitions.</strong></section>`);
+          } else if (references > 1) {
+            output.push(`<section class="docdiagram-error"><strong>Diagram "${escapeHtml(reference.id)}" is referenced more than once.</strong></section>`);
+          } else {
+            output.push(renderDiagram(definition.source, state.diagramIndex));
+            state.diagramIndex += 1;
+          }
+          index += 1;
+          continue;
+        }
         const rendered = renderDirective(index, end);
         if (rendered) {
           output.push(rendered.html);
@@ -366,8 +455,13 @@ export function renderMarkdown(
         const closeIndex = index + closing + 1;
         const content = lines.slice(index + 1, closeIndex).join("\n");
         if (fence[1] === "diagram") {
-          output.push(renderDiagram(content, state.diagramIndex));
-          state.diagramIndex += 1;
+          const id = getDiagramId(content);
+          if (id && duplicateDefinitionIds.has(id)) {
+            output.push(`<section class="docdiagram-error"><strong>Diagram "${escapeHtml(id)}" has multiple definitions.</strong></section>`);
+          } else if (!id || !referenceCounts.has(id)) {
+            output.push(renderDiagram(content, state.diagramIndex));
+            state.diagramIndex += 1;
+          }
         } else {
           const className = fence[1] ? ` class="language-${escapeHtml(fence[1])}"` : "";
           output.push(`<pre><code${className}>${escapeHtml(content)}</code></pre>`);
@@ -395,7 +489,10 @@ export function renderMarkdown(
           quoteLines.push(lines[index].replace(/^ {0,3}> ?/, ""));
           index += 1;
         }
-        output.push(`<blockquote>${renderMarkdown(quoteLines.join("\n"), state, options)}</blockquote>`);
+        output.push(`<blockquote>${renderMarkdown(quoteLines.join("\n"), state, {
+          ...options,
+          diagramReferenceRegistry: registry
+        })}</blockquote>`);
         continue;
       }
 

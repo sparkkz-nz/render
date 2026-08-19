@@ -162,14 +162,29 @@ export class BrowserRuntime {
 
   public persistDiagramModels(): void {
     let diagramIndex = 0;
-    const source = this.getSource().replace(/\r\n/g, "\n").replace(
-      /^```diagram\s*\n([\s\S]*?)^```$/gm,
-      () => {
-        const diagram = this.state.diagramModels[diagramIndex];
+    const sourceBeforePersistence = this.getSource().replace(/\r\n/g, "\n");
+    const diagramsById = new Map<string, Diagram[]>();
+    for (const diagram of this.state.diagramModels) {
+      const id = (diagram as { id?: unknown }).id;
+      if (typeof id === "string") {
+        diagramsById.set(id, [...(diagramsById.get(id) || []), diagram]);
+      }
+    }
+    const uniqueDiagramsById = new Map(
+      [...diagramsById].flatMap(([id, diagrams]) => diagrams.length === 1 ? [[id, diagrams[0]] as const] : [])
+    );
+    const source = sourceBeforePersistence.replace(
+      /^((?: {0,3}> ?)*)```diagram\s*\n([\s\S]*?)^((?: {0,3}> ?)*)```$/gm,
+      (_, prefix: string, diagramSource: string, closingPrefix: string) => {
+        const normalizedDiagramSource = diagramSource.replace(/^(?: {0,3}> ?)+/gm, "");
+        const definitionId = normalizedDiagramSource.match(/^id:\s*(?:"([^"]+)"|([^\s#]+))\s*$/m)?.slice(1).find(Boolean);
+        const diagram = (definitionId && uniqueDiagramsById.get(definitionId)) || this.state.diagramModels[diagramIndex];
         diagramIndex += 1;
-        return diagram
-          ? `\`\`\`diagram\n${serializeDiagram(diagram)}\n\`\`\``
-          : "```diagram\n```";
+        const serializedDiagram = diagram ? serializeDiagram(diagram) : "";
+        const serializedLines = serializedDiagram
+          ? serializedDiagram.split("\n").map((line) => `${prefix}${line}`).join("\n")
+          : "";
+        return `${prefix}\`\`\`diagram\n${serializedLines ? `${serializedLines}\n` : ""}${closingPrefix}\`\`\``;
       }
     );
     this.setSource(source);

@@ -50,6 +50,20 @@ export function validateDocumentSource(source: string): { content: string; front
   const document = resolveDocument(source);
   const lines = document.content.replace(/\r\n/g, "\n").split("\n");
   let index = 0;
+  const diagramIds = new Set<string>();
+  let hasDiagramReferences = false;
+  let referenceFenceOpen = false;
+  for (const line of lines) {
+    const normalizedLine = line.replace(/^(?: {0,3}> ?)+/, "");
+    if (/^```/.test(normalizedLine)) {
+      referenceFenceOpen = !referenceFenceOpen;
+      continue;
+    }
+    if (!referenceFenceOpen && /^:::diagram\s+\{\s*id=/.test(normalizedLine)) {
+      hasDiagramReferences = true;
+      break;
+    }
+  }
 
   while (index < lines.length) {
     const line = lines[index].replace(/^(?: {0,3}> ?)+/, "");
@@ -73,6 +87,15 @@ export function validateDocumentSource(source: string): { content: string; front
         .map((candidate) => candidate.replace(/^(?: {0,3}> ?)+/, ""))
         .join("\n");
       parseDiagram(diagramSource, document.colourScheme);
+      const id = diagramSource.match(/^id:\s*(?:"([^"]+)"|([^\s#]+))\s*$/m)?.slice(1).find(Boolean);
+      if (id) {
+        if (diagramIds.has(id)) {
+          throw new Error(`Duplicate diagram id: ${id}`);
+        }
+        diagramIds.add(id);
+      } else if (hasDiagramReferences) {
+        throw new Error("Every diagram requires an id when using diagram references.");
+      }
     }
     index = closeIndex + 1;
   }
