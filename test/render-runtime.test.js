@@ -320,6 +320,37 @@ test("validates diagram fences with trailing closing-fence whitespace", () => {
   );
 });
 
+test("requires document-wide unique diagram IDs when diagram references are used", () => {
+  const diagram = [
+    "```diagram",
+    "type: flowchart",
+    "id: flow",
+    "canvas:",
+    "nodes:",
+    "edges:",
+    "```"
+  ];
+  assert.throws(
+    () => validateDocumentSource([":::diagram { id=flow }", "", ...diagram, "", ...diagram].join("\n")),
+    /Duplicate diagram id: flow/
+  );
+  assert.throws(
+    () => validateDocumentSource([
+      ":::diagram { id=flow }",
+      "",
+      ...diagram,
+      "",
+      "```diagram",
+      "type: flowchart",
+      "canvas:",
+      "nodes:",
+      "edges:",
+      "```"
+    ].join("\n")),
+    /Every diagram requires an id when using diagram references/
+  );
+});
+
 test("rejects an unclosed code fence before source commit", () => {
   assert.throws(
     () => validateDocumentSource("```diagram\nversion: 1"),
@@ -412,6 +443,86 @@ test("keeps diagram fences distinct from language-labelled code fences", () => {
 
   assert.match(markup, /<pre><code class="language-text">diagram<\/code><\/pre>/);
   assert.match(markup, /<figure class="docdiagram"/);
+});
+
+test("renders diagram references in reading order and omits their later definitions", () => {
+  const markup = renderMarkdown([
+    "# Payments",
+    "",
+    "The flow appears here.",
+    "",
+    ":::diagram { id=payments-flowchart }",
+    "",
+    "## Next section",
+    "",
+    "```diagram",
+    "type: flowchart",
+    "id: payments-flowchart",
+    "canvas:",
+    "  width: 600",
+    "  height: 300",
+    "nodes:",
+    "edges:",
+    "```"
+  ].join("\n"));
+
+  assert.equal([...markup.matchAll(/<figure class="docdiagram"/g)].length, 1);
+  assert.ok(markup.indexOf('<figure class="docdiagram"') < markup.indexOf("<h2>Next section</h2>"));
+});
+
+test("reports missing, duplicate, and repeated diagram references", () => {
+  const missing = renderMarkdown(":::diagram { id=missing }");
+  const repeated = renderMarkdown([
+    ":::diagram { id=flow }",
+    ":::diagram { id=flow }",
+    "```diagram",
+    "type: flowchart",
+    "id: flow",
+    "canvas:",
+    "nodes:",
+    "edges:",
+    "```"
+  ].join("\n"));
+  const duplicate = renderMarkdown([
+    ":::diagram { id=flow }",
+    "```diagram",
+    "type: flowchart",
+    "id: flow",
+    "canvas:",
+    "nodes:",
+    "edges:",
+    "```",
+    "```diagram",
+    "type: flowchart",
+    "id: flow",
+    "canvas:",
+    "nodes:",
+    "edges:",
+    "```"
+  ].join("\n"));
+
+  assert.match(missing, /Diagram "missing" could not be found/);
+  assert.match(repeated, /Diagram "flow" is referenced more than once/);
+  assert.match(duplicate, /Diagram "flow" has multiple definitions/);
+});
+
+test("does not treat diagram references in fenced code as real references", () => {
+  const markup = renderMarkdown([
+    "```text",
+    ":::diagram { id=flow }",
+    "```",
+    "",
+    "```diagram",
+    "type: flowchart",
+    "id: flow",
+    "canvas:",
+    "nodes:",
+    "edges:",
+    "```"
+  ].join("\n"));
+
+  assert.match(markup, /<pre><code class="language-text">:::diagram \{ id=flow \}<\/code><\/pre>/);
+  assert.equal([...markup.matchAll(/<figure class="docdiagram"/g)].length, 1);
 });
 
 test("shares diagram indices with diagrams nested in block quotes", () => {

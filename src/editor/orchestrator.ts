@@ -162,10 +162,22 @@ export class BrowserRuntime {
 
   public persistDiagramModels(): void {
     let diagramIndex = 0;
-    const source = this.getSource().replace(/\r\n/g, "\n").replace(
+    const sourceBeforePersistence = this.getSource().replace(/\r\n/g, "\n");
+    const diagramsById = new Map<string, Diagram[]>();
+    for (const diagram of this.state.diagramModels) {
+      const id = (diagram as { id?: unknown }).id;
+      if (typeof id === "string") {
+        diagramsById.set(id, [...(diagramsById.get(id) || []), diagram]);
+      }
+    }
+    const uniqueDiagramsById = new Map(
+      [...diagramsById].flatMap(([id, diagrams]) => diagrams.length === 1 ? [[id, diagrams[0]] as const] : [])
+    );
+    const source = sourceBeforePersistence.replace(
       /^```diagram\s*\n([\s\S]*?)^```$/gm,
-      () => {
-        const diagram = this.state.diagramModels[diagramIndex];
+      (_, diagramSource: string) => {
+        const definitionId = diagramSource.match(/^id:\s*(?:"([^"]+)"|([^\s#]+))\s*$/m)?.slice(1).find(Boolean);
+        const diagram = (definitionId && uniqueDiagramsById.get(definitionId)) || this.state.diagramModels[diagramIndex];
         diagramIndex += 1;
         return diagram
           ? `\`\`\`diagram\n${serializeDiagram(diagram)}\n\`\`\``

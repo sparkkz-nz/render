@@ -9,6 +9,11 @@ type DirectiveOpen = {
   attributes: Record<string, string>;
 };
 
+type DiagramDefinition = {
+  source: string;
+  id: string;
+};
+
 function splitTableRow(line: string): string[] {
   const cells: string[] = [];
   let cell = "";
@@ -71,6 +76,17 @@ function parseDirectiveOpen(line: string): DirectiveOpen | null {
   }
 
   return { name: match[1] as DirectiveName, attributes };
+}
+
+function parseDiagramReference(line: string): { id: string } | null {
+  const match = line.match(/^:::diagram\s+\{\s*id=(?:"([^"]+)"|([^\s}]+))\s*\}\s*$/);
+  const id = match?.[1] ?? match?.[2];
+  return id ? { id } : null;
+}
+
+function getDiagramId(source: string): string | null {
+  const match = source.match(/^id:\s*(?:"([^"]+)"|([^\s#]+))\s*$/m);
+  return match?.[1] ?? match?.[2] ?? null;
 }
 
 function isDirectiveClose(line: string): boolean {
@@ -191,6 +207,44 @@ export function renderMarkdown(
     throw new Error("renderDiagram callback is required for diagram blocks.");
   });
   const documentColorScheme = options?.documentColorScheme || "classic";
+  const diagramDefinitions = new Map<string, DiagramDefinition>();
+  const duplicateDefinitionIds = new Set<string>();
+  const referenceCounts = new Map<string, number>();
+
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!/^```diagram\s*$/.test(lines[index])) {
+      continue;
+    }
+    const closeOffset = lines.slice(index + 1).findIndex((candidate) => /^```\s*$/.test(candidate));
+    if (closeOffset === -1) {
+      break;
+    }
+    const definitionSource = lines.slice(index + 1, index + closeOffset + 1).join("\n");
+    const id = getDiagramId(definitionSource);
+    if (id) {
+      if (diagramDefinitions.has(id)) {
+        duplicateDefinitionIds.add(id);
+      } else {
+        diagramDefinitions.set(id, { id, source: definitionSource });
+      }
+    }
+    index += closeOffset + 1;
+  }
+
+  let fenceOpen = false;
+  for (const line of lines) {
+    if (/^```/.test(line)) {
+      fenceOpen = !fenceOpen;
+      continue;
+    }
+    if (fenceOpen) {
+      continue;
+    }
+    const reference = parseDiagramReference(line);
+    if (reference) {
+      referenceCounts.set(reference.id, (referenceCounts.get(reference.id) || 0) + 1);
+    }
+  }
 
   function isBlockStart(index: number): boolean {
     const line = lines[index] || "";
@@ -345,6 +399,23 @@ export function renderMarkdown(
       }
 
       if (/^:::/.test(line)) {
+        const reference = parseDiagramReference(line);
+        if (reference) {
+          const definition = diagramDefinitions.get(reference.id);
+          const references = referenceCounts.get(reference.id) || 0;
+          if (!definition) {
+            output.push(`<section class="docdiagram-error"><strong>Diagram "${escapeHtml(reference.id)}" could not be found.</strong></section>`);
+          } else if (duplicateDefinitionIds.has(reference.id)) {
+            output.push(`<section class="docdiagram-error"><strong>Diagram "${escapeHtml(reference.id)}" has multiple definitions.</strong></section>`);
+          } else if (references > 1) {
+            output.push(`<section class="docdiagram-error"><strong>Diagram "${escapeHtml(reference.id)}" is referenced more than once.</strong></section>`);
+          } else {
+            output.push(renderDiagram(definition.source, state.diagramIndex));
+            state.diagramIndex += 1;
+          }
+          index += 1;
+          continue;
+        }
         const rendered = renderDirective(index, end);
         if (rendered) {
           output.push(rendered.html);
@@ -366,8 +437,13 @@ export function renderMarkdown(
         const closeIndex = index + closing + 1;
         const content = lines.slice(index + 1, closeIndex).join("\n");
         if (fence[1] === "diagram") {
-          output.push(renderDiagram(content, state.diagramIndex));
-          state.diagramIndex += 1;
+          const id = getDiagramId(content);
+          if (id && duplicateDefinitionIds.has(id)) {
+            output.push(`<section class="docdiagram-error"><strong>Diagram "${escapeHtml(id)}" has multiple definitions.</strong></section>`);
+          } else if (!id || !referenceCounts.has(id)) {
+            output.push(renderDiagram(content, state.diagramIndex));
+            state.diagramIndex += 1;
+          }
         } else {
           const className = fence[1] ? ` class="language-${escapeHtml(fence[1])}"` : "";
           output.push(`<pre><code${className}>${escapeHtml(content)}</code></pre>`);
