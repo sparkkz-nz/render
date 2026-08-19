@@ -525,6 +525,23 @@ test("does not treat diagram references in fenced code as real references", () =
   assert.equal([...markup.matchAll(/<figure class="docdiagram"/g)].length, 1);
 });
 
+test("resolves diagram references across block quotes", () => {
+  const markup = renderMarkdown([
+    ":::diagram { id=flow }",
+    "",
+    "> ```diagram",
+    "> type: flowchart",
+    "> id: flow",
+    "> canvas:",
+    "> nodes:",
+    "> edges:",
+    "> ```"
+  ].join("\n"));
+
+  assert.equal([...markup.matchAll(/<figure class="docdiagram"/g)].length, 1);
+  assert.doesNotMatch(markup, /could not be found/);
+});
+
 test("shares diagram indices with diagrams nested in block quotes", () => {
   const diagram = [
     "```diagram",

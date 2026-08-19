@@ -14,6 +14,12 @@ type DiagramDefinition = {
   id: string;
 };
 
+type DiagramReferenceRegistry = {
+  definitions: Map<string, DiagramDefinition>;
+  duplicateDefinitionIds: Set<string>;
+  referenceCounts: Map<string, number>;
+};
+
 function splitTableRow(line: string): string[] {
   const cells: string[] = [];
   let cell = "";
@@ -87,6 +93,10 @@ function parseDiagramReference(line: string): { id: string } | null {
 function getDiagramId(source: string): string | null {
   const match = source.match(/^id:\s*(?:"([^"]+)"|([^\s#]+))\s*$/m);
   return match?.[1] ?? match?.[2] ?? null;
+}
+
+function stripBlockQuotePrefix(line: string): string {
+  return line.replace(/^(?: {0,3}> ?)+/, "");
 }
 
 function isDirectiveClose(line: string): boolean {
@@ -200,51 +210,59 @@ export function renderInline(source: string): string {
 export function renderMarkdown(
   source: string,
   state: { diagramIndex: number } = { diagramIndex: 0 },
-  options?: { renderDiagram: (source: string, index: number) => string; documentColorScheme?: string }
+  options?: {
+    renderDiagram?: (source: string, index: number) => string;
+    documentColorScheme?: string;
+    diagramReferenceRegistry?: DiagramReferenceRegistry;
+  }
 ): string {
   const lines = source.replace(/\r\n/g, "\n").split("\n");
   const renderDiagram = options?.renderDiagram ?? ((_: string, __: number) => {
     throw new Error("renderDiagram callback is required for diagram blocks.");
   });
   const documentColorScheme = options?.documentColorScheme || "classic";
-  const diagramDefinitions = new Map<string, DiagramDefinition>();
-  const duplicateDefinitionIds = new Set<string>();
-  const referenceCounts = new Map<string, number>();
+  const registry = options?.diagramReferenceRegistry || (() => {
+    const definitions = new Map<string, DiagramDefinition>();
+    const duplicateDefinitionIds = new Set<string>();
+    const referenceCounts = new Map<string, number>();
+    const normalizedLines = lines.map(stripBlockQuotePrefix);
 
-  for (let index = 0; index < lines.length; index += 1) {
-    if (!/^```diagram\s*$/.test(lines[index])) {
-      continue;
+    for (let index = 0; index < normalizedLines.length; index += 1) {
+      if (!/^```diagram\s*$/.test(normalizedLines[index])) {
+        continue;
+      }
+      const closeOffset = normalizedLines.slice(index + 1).findIndex((candidate) => /^```\s*$/.test(candidate));
+      if (closeOffset === -1) {
+        break;
+      }
+      const definitionSource = normalizedLines.slice(index + 1, index + closeOffset + 1).join("\n");
+      const id = getDiagramId(definitionSource);
+      if (id) {
+        if (definitions.has(id)) {
+          duplicateDefinitionIds.add(id);
+        } else {
+          definitions.set(id, { id, source: definitionSource });
+        }
+      }
+      index += closeOffset + 1;
     }
-    const closeOffset = lines.slice(index + 1).findIndex((candidate) => /^```\s*$/.test(candidate));
-    if (closeOffset === -1) {
-      break;
-    }
-    const definitionSource = lines.slice(index + 1, index + closeOffset + 1).join("\n");
-    const id = getDiagramId(definitionSource);
-    if (id) {
-      if (diagramDefinitions.has(id)) {
-        duplicateDefinitionIds.add(id);
-      } else {
-        diagramDefinitions.set(id, { id, source: definitionSource });
+
+    let fenceOpen = false;
+    for (const line of normalizedLines) {
+      if (/^```/.test(line)) {
+        fenceOpen = !fenceOpen;
+        continue;
+      }
+      if (!fenceOpen) {
+        const reference = parseDiagramReference(line);
+        if (reference) {
+          referenceCounts.set(reference.id, (referenceCounts.get(reference.id) || 0) + 1);
+        }
       }
     }
-    index += closeOffset + 1;
-  }
-
-  let fenceOpen = false;
-  for (const line of lines) {
-    if (/^```/.test(line)) {
-      fenceOpen = !fenceOpen;
-      continue;
-    }
-    if (fenceOpen) {
-      continue;
-    }
-    const reference = parseDiagramReference(line);
-    if (reference) {
-      referenceCounts.set(reference.id, (referenceCounts.get(reference.id) || 0) + 1);
-    }
-  }
+    return { definitions, duplicateDefinitionIds, referenceCounts };
+  })();
+  const { definitions: diagramDefinitions, duplicateDefinitionIds, referenceCounts } = registry;
 
   function isBlockStart(index: number): boolean {
     const line = lines[index] || "";
@@ -471,7 +489,10 @@ export function renderMarkdown(
           quoteLines.push(lines[index].replace(/^ {0,3}> ?/, ""));
           index += 1;
         }
-        output.push(`<blockquote>${renderMarkdown(quoteLines.join("\n"), state, options)}</blockquote>`);
+        output.push(`<blockquote>${renderMarkdown(quoteLines.join("\n"), state, {
+          ...options,
+          diagramReferenceRegistry: registry
+        })}</blockquote>`);
         continue;
       }
 
