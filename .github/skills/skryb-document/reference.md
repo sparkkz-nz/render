@@ -25,18 +25,22 @@ Frontmatter is optional and must be the first non-empty source content:
 
 ```yaml
 ---
-theme: light
-colourScheme: classic
+theme: auto
+colourScheme: ice
 ---
 ```
 
 | Key | Values | Default |
 | --- | --- | --- |
-| `theme` | `light`, `dark` | `light` |
-| `colourScheme` | `classic` | `classic` |
+| `theme` | `auto`, `light`, `dark` | `auto` |
+| `colourScheme` | `classic`, `ice`, `midnight`, `paper` | `classic` |
 
 Unknown or malformed frontmatter is not a supported extension point. The
-runtime reports unsupported `theme` and `colourScheme` values.
+runtime reports unsupported `theme` and `colourScheme` values. `auto` follows
+the viewer's system preference. The selected colour scheme supplies designed
+light and dark variants to document chrome, components, diagrams, edges, and
+markers. The document menu can change either setting; those changes become
+canonical when the document is saved.
 
 ## Markdown compatibility
 
@@ -111,14 +115,14 @@ padded visual container. Both may use:
 | Attribute | Values / behaviour |
 | --- | --- |
 | `title` | Optional visible title. |
-| `tone` and `colour` | Supply both or neither. `tone` is `light` or `dark`; `colour` is one of `pink`, `red`, `orange`, `yellow`, `green`, `cyan`, `blue`, `purple`, `grey`, or `bw`. |
+| `palette` | Optional semantic role: `background`, `pale`, `light`, `neutral`, `dark`, `accent-soft`, `accent`, `accent-strong`, `note`, `success`, `warning`, `danger`, or `highlight`. |
 | `fill`, `stroke`, `text` | Optional `#RGB`, `#RGBA`, `#RRGGBB`, or `#RRGGBBAA` overrides. These take precedence over a selected palette. |
 
-Palette values use the document's `colourScheme`, including the same tone and
-colour names used by diagrams. Without a palette or overrides, components
-inherit the document theme. Selecting a palette establishes the scheme's
-standard shades; explicit `fill`, `stroke`, and `text` values override those
-individual shades.
+Palettes use the document's `colourScheme` and resolved theme. Use structural
+roles for ordinary content, accent roles for emphasis, and status roles for
+meaningful exceptions. Without a palette or overrides, components inherit the
+document style. Explicit `fill`, `stroke`, and `text` values override those
+individual treatments.
 
 `callout` is a specialised panel for a prominent message. It accepts the
 attributes above plus optional `kind`: `note`, `info`, `warning`, or `success`
@@ -205,7 +209,6 @@ object fields use six spaces. Blank lines and `#` comments are allowed.
 | `type` | Yes | `flowchart` or `sequence`. |
 | `version` | No | A document-defined diagram version, commonly `1`. |
 | `id` | No | A document-defined diagram identifier. |
-| `theme` | No | `light` or `dark`; overrides document `theme`. |
 | `canvas` | No | Canvas mapping. Flowcharts support `width`, `height`, and optional `grid`; sequences support `width`, `height`, `participantSpacing`, and `participantSize`. Omitted canvases default to `1000` by `560`. |
 | `nodes` | Flowchart | List of flowchart nodes. |
 | `edges` | Flowchart | List of flowchart connectors. |
@@ -248,13 +251,14 @@ control placement and geometry. Nodes may contain child nodes at any depth:
 | `shape` | **Required.** `rounded-rectangle`, `circle`, `oval`, `database`, `diamond`, `rhombus`, `flattened-hexagon`, `chevron`, `right-chevron`, or `document`. The `document` shape is a sheet of paper with a folded top-right corner. |
 | `position` | `{ x: number, y: number }` top-left canvas position for top-level nodes, or top-left position relative to its parent for children. |
 | `size` | `{ width: number, height: number }`. Nodes have a minimum size; circles remain square. |
-| `palette` | Optional `{ tone, colour }`; selects the node's standard colours and clears explicit node colour overrides. |
+| `palette` | Optional semantic palette role; selects the scheme-aware node treatment and clears explicit node colour overrides. |
 | `style` | Optional overrides: `fill`, `stroke`, `text`, and `strokeWidth`. `style.width` is rejected. |
 | `children` | Optional list of child nodes. Any shape can contain children, nesting has no depth limit, and child positions are relative to their parent. |
 
-Palette `tone` is `light` or `dark`. Palette `colour` is `pink`, `red`,
-`orange`, `yellow`, `green`, `cyan`, `blue`, `purple`, `grey`, or `bw`. The
-currently supported colour scheme is `classic`.
+Palette roles are `background`, `pale`, `light`, `neutral`, `dark`,
+`accent-soft`, `accent`, `accent-strong`, `note`, `success`, `warning`,
+`danger`, and `highlight`. A diagram always inherits the document-wide theme
+and colour scheme; per-diagram scheme overrides are not supported.
 
 Node IDs are unique across the whole diagram, including descendants. Edges can
 connect to a parent or any child node. A child can visually extend beyond its
@@ -340,7 +344,7 @@ groups:
 | `notes` | No | Entries with `at` participant ID, `after` message position, visible `label`, and optional `palette`, `style`, or `size`. Notes render above activation bars. |
 | `groups` | No | Entries with inclusive one-based `from`/`to` message positions and visible `label`. |
 
-For participants and notes, `palette` uses `{ tone, colour }`, `style` supports
+For participants and notes, `palette` uses a semantic role, `style` supports
 `fill`, `stroke`, `text`, and `strokeWidth`, and `size` supports positive
 `width` and `height` values. The graphical sequence inspector can edit
 participant, note, and message presentation, but structural changes remain
