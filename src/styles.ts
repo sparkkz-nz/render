@@ -385,11 +385,13 @@ export function injectStyles(): void {
       background: var(--docdiagram-background);
       border: 1px solid var(--docdiagram-border);
       border-radius: 8px;
+      box-sizing: border-box;
       box-shadow: 0 4px 12px rgb(21 41 62 / 18%);
       display: flex;
       flex-direction: column;
       gap: .6rem;
       max-height: calc(100vh - 5.5rem);
+      overflow-x: hidden;
       overflow-y: auto;
       padding: 1rem;
       position: fixed;
@@ -408,6 +410,7 @@ export function injectStyles(): void {
       font-size: .9rem;
       gap: .75rem;
       justify-content: space-between;
+      min-width: 0;
       width: 100%;
     }
     .docdiagram-field-wide {

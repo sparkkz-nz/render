@@ -113,7 +113,8 @@ export class DiagramEditor {
         if (this.host.state.editingDiagramIndex === null) {
           return;
         }
-        if (event.target instanceof Element && event.target.matches("input, textarea, select, [contenteditable]")) {
+        const activeElement = document.activeElement;
+        if (activeElement instanceof Element && activeElement.matches("input, textarea, select, [contenteditable]")) {
           return;
         }
         if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "d" && this.host.state.selectedNode) {
@@ -124,7 +125,7 @@ export class DiagramEditor {
           event.preventDefault();
           this.deleteSelected();
         }
-      });
+      }, true);
     }
   }
 
