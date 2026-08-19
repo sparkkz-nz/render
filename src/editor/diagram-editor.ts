@@ -45,6 +45,8 @@ function pointerNumber(value: string | undefined): number {
 }
 
 export class DiagramEditor {
+  private editingShortcutsBound = false;
+
   public constructor(private readonly host: DiagramEditorHost) {}
 
   public enableCanvasPanning(): void {
@@ -107,8 +109,8 @@ export class DiagramEditor {
       this.wireInlineEditor(editor);
     }
 
-    if (!this.host.outputElement.dataset.editingShortcutsBound) {
-      this.host.outputElement.dataset.editingShortcutsBound = "true";
+    if (!this.editingShortcutsBound) {
+      this.editingShortcutsBound = true;
       document.addEventListener("keydown", (event) => {
         if (this.host.state.editingDiagramIndex === null) {
           return;
