@@ -93,7 +93,6 @@ ${n}`;let c=!1,l=o.slice(i+1,a).map(u=>{if(!u.trim()||u.trimStart().startsWith("
       display: block;
       max-width: 100%;
       overflow-x: auto;
-      white-space: nowrap;
     }
     #rendered-document th,
     #rendered-document td {
