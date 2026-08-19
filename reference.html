@@ -231,8 +231,9 @@ numeric `canvas.grid` enables snapping while moving or resizing; omit it or use
 
 ### Nodes
 
-Every node requires `id`, `label`, and `shape`. Use `position` and `size` to
-control placement and geometry. Nodes may contain child nodes at any depth:
+Every node requires `id` and `shape`; `label` must be present but may be empty.
+Use `position` and `size` to control placement and geometry. Nodes may contain
+child nodes at any depth:
 
 ```yaml
 - id: payments-api
@@ -254,7 +255,7 @@ control placement and geometry. Nodes may contain child nodes at any depth:
 | Field | Values / behaviour |
 | --- | --- |
 | `id` | **Required.** Stable identifier used by edges. |
-| `label` | **Required.** Node text. Newlines are supported with `\n` inside a double-quoted scalar, for example `label: "Payments\nAPI"`. |
+| `label` | **Required.** Node text; use `label: ""` for an unlabeled shape. Newlines are supported with `\n` inside a double-quoted scalar, for example `label: "Payments\nAPI"`. |
 | `subtitle` | Optional text below the label; use the same double-quoted `\n` form for multiple lines. |
 | `textVAlign` | Optional vertical text-stack alignment: `top` or `center` (default). |
 | `textHAlign` | Optional horizontal text-stack alignment: `left`, `center` (default), or `right`. |
