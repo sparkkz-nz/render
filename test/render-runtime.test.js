@@ -17,8 +17,7 @@ vm.runInContext(runtime, context, { filename: "dist/skryb-runtime.js" });
 
 const {
   supportedDiagramTypes,
-  nodeColorPalettes,
-  nodeColorSchemes,
+  colourSchemes,
   nodeShapes,
   edgeAnchors,
   edgeRoutes,
@@ -569,11 +568,11 @@ test("shares diagram indices with diagrams nested in block quotes", () => {
 test("renders nested formatting components and responsive grid layouts", () => {
   const markup = renderMarkdown([
     ':::grid { columns="2fr 1fr" }',
-    ':::panel { title="Primary" tone=light colour=blue }',
+    ':::panel { title="Primary" palette=accent }',
     "Primary **Markdown** content.",
     "::: (panel)",
     ":::stack",
-    ':::callout { kind=warning title="Review required" tone=dark colour=yellow }',
+    ':::callout { kind=warning title="Review required" palette=highlight }',
     "Confirm the _operational_ assumptions.",
     "::: (callout)",
     ':::panel { title="Supporting detail" fill=#ffffff stroke=#111827 text=#17202a }',
@@ -584,7 +583,7 @@ test("renders nested formatting components and responsive grid layouts", () => {
   ].join("\n"));
 
   assert.match(markup, /class="docdiagram-grid" style="--docdiagram-grid-columns:minmax\(0, 2fr\) minmax\(0, 1fr\)"/);
-  assert.match(markup, /class="docdiagram-component docdiagram-panel docdiagram-component-styled" style="--docdiagram-component-fill:#BFDBFE;--docdiagram-component-stroke:#1D4ED8;--docdiagram-component-text:#1E3A8A"/);
+  assert.match(markup, /class="docdiagram-component docdiagram-panel docdiagram-component-styled" style="[^"]*--docdiagram-component-fill:#BFDBFE;--docdiagram-component-stroke:#2563EB;--docdiagram-component-text:#1E3A8A/);
   assert.match(markup, /class="docdiagram-stack"/);
   assert.match(markup, /<aside class="docdiagram-component docdiagram-component-styled docdiagram-callout docdiagram-callout-warning".*aria-label="Review required callout">/);
   assert.match(markup, /<div class="docdiagram-callout-kind">warning<\/div>/);
@@ -637,7 +636,7 @@ test("does not treat directive-looking fenced code as nested components", () => 
 
 test("marks explicitly styled components so their palette takes precedence over document theme styles", () => {
   const markup = renderMarkdown([
-    ':::section { tone=dark colour=blue }',
+    ':::section { palette=accent }',
     "[Reference](https://example.com), `code`, and a table header.",
     "",
     "| Name | Value |",
@@ -649,7 +648,7 @@ test("marks explicitly styled components so their palette takes precedence over 
   ].join("\n"));
 
   assert.match(markup, /class="docdiagram-component docdiagram-section docdiagram-component-styled"/);
-  assert.match(markup, /--docdiagram-component-fill:#1D4ED8;--docdiagram-component-stroke:#DBEAFE;--docdiagram-component-text:#DBEAFE/);
+  assert.match(markup, /--docdiagram-component-fill:#BFDBFE;--docdiagram-component-stroke:#2563EB;--docdiagram-component-text:#1E3A8A/);
   assert.match(runtime, /docdiagram-section:not\(\.docdiagram-component-styled\)/);
   assert.match(runtime, /\.docdiagram-component pre,[\s\S]*background: transparent/);
   assert.match(runtime, /\.docdiagram-component blockquote \{[\s\S]*color: inherit/);
@@ -904,11 +903,11 @@ test("sequence diagrams parse, round-trip, and render with lightweight edit cont
     "  - id: client",
     "    label: Client",
     "    kind: actor",
-    "    palette: { tone: dark, colour: blue }",
+    "    palette: accent",
     "    size: { width: 200, height: 56 }",
     "  - id: server",
     "    label: Server",
-    "    palette: { tone: dark, colour: green }",
+    "    palette: success",
     "    size: { width: 200, height: 56 }",
     "messages:",
     "  - from: client",
@@ -927,7 +926,7 @@ test("sequence diagrams parse, round-trip, and render with lightweight edit cont
     "  - at: server",
     "    after: 1",
     "    label: Process request",
-    "    palette: { tone: light, colour: yellow }",
+    "    palette: highlight",
     "    size: { width: 220, height: 64 }",
     "groups:",
     "  - label: Authentication",
@@ -959,7 +958,7 @@ test("sequence diagrams parse, round-trip, and render with lightweight edit cont
   assert.match(markup, /stroke-dasharray="8 5"/);
   assert.match(markup, /width="200" height="56"/);
   assert.match(markup, /width="220" height="64"/);
-  assert.match(markup, /docdiagram-sequence-activation[^>]*fill="#15803D"/);
+  assert.match(markup, /docdiagram-sequence-activation[^>]*fill="#DCFCE7"[^>]*stroke="#16A34A"/);
   assert.ok(markup.indexOf("docdiagram-sequence-activation") < markup.indexOf("docdiagram-sequence-note"));
   assert.match(markup, /docdiagram-start-editing/);
   assert.doesNotMatch(markup, /docdiagram-create-node/);
@@ -1151,7 +1150,7 @@ test("duplicates a node subtree with shape-derived IDs and independent propertie
       shape: "rounded-rectangle",
       position: { x: 100, y: 100 },
       size: { width: 200, height: 150 },
-      palette: { tone: "dark", colour: "blue" },
+      palette: "accent",
       children: [{
         id: "api",
         label: "API",
@@ -1175,7 +1174,7 @@ test("duplicates a node subtree with shape-derived IDs and independent propertie
   assert.equal(duplicate.id, "roundedrectangle02");
   assert.equal(duplicate.children[0].id, "chevron01");
   assert.equal(duplicate.label, "Platform");
-  assert.equal(JSON.stringify(duplicate.palette), JSON.stringify({ tone: "dark", colour: "blue" }));
+  assert.equal(duplicate.palette, "accent");
   assert.notEqual(JSON.stringify(duplicate.position), JSON.stringify(diagram.nodes[0].position));
   assert.equal(JSON.stringify(duplicate.children[0].position), JSON.stringify({ x: 20, y: 30 }));
   assert.doesNotMatch(serializeDiagram(diagram), /undefined/);
@@ -1289,11 +1288,7 @@ test("parses and serializes diagram themes and style overrides", () => {
   );
 });
 
-test("rejects an unsupported diagram theme", () => {
-  assert.throws(() => getTheme({ theme: "neon" }), /Unsupported diagram theme: neon/);
-});
-
-test("renders themed defaults and explicit style overrides", () => {
+test("renders document-theme defaults and explicit style overrides", () => {
   const source = flowchartSource([
     "theme: dark",
     "canvas:",
@@ -1322,9 +1317,9 @@ test("renders themed defaults and explicit style overrides", () => {
   const markup = renderDiagram(source, 0);
 
   assert.match(markup, /fill="#123456"/);
-  assert.match(markup, /stroke="#71AEF7" stroke-width="4"/);
+  assert.match(markup, /stroke="#3574C7" stroke-width="4"/);
   assert.match(markup, /stroke="#ABCDEF" stroke-width="3"/);
-  assert.match(markup, /fill="#F3F8FC"/);
+  assert.match(markup, /fill="#EAF2FF"/);
 });
 
 test("renders edges as selectable groups with a wide hit target", () => {
@@ -1371,19 +1366,19 @@ test("supportedDiagramTypes, nodeShapes, edgeAnchors, edgeRoutes, and edgeMarker
   assert.equal(JSON.stringify([...edgeMarkerStyles]), JSON.stringify(["none", "arrow", "circle"]));
 });
 
-test("node color palettes replace manual fill, stroke, and text overrides together", () => {
+test("semantic palette roles replace manual fill, stroke, and text overrides together", () => {
   const node = {
     style: { fill: "#ffffff", stroke: "#000000", strokeWidth: 3, text: "#222222" }
   };
 
-  setNodeColorPalette(node, "dark", "pink");
+  setNodeColorPalette(node, "danger");
 
-  assert.equal(JSON.stringify(node.palette), JSON.stringify({ tone: "dark", colour: "pink" }));
+  assert.equal(node.palette, "danger");
   assert.equal(JSON.stringify(node.style), JSON.stringify({ strokeWidth: 3 }));
   const style = getNodeEffectiveStyle({ theme: "light" }, node);
-  assert.equal(style.fill, nodeColorPalettes.pink.dark.fill);
-  assert.equal(style.stroke, nodeColorPalettes.pink.dark.stroke);
-  assert.equal(style.text, nodeColorPalettes.pink.dark.text);
+  assert.equal(style.fill, colourSchemes.classic.light.danger.fill);
+  assert.equal(style.stroke, colourSchemes.classic.light.danger.stroke);
+  assert.equal(style.text, colourSchemes.classic.light.danger.text);
   assert.equal(style.strokeWidth, 3);
 
   setNodeStyleOverride(node, "fill", "#ffffff");
@@ -1394,46 +1389,27 @@ test("node color palettes replace manual fill, stroke, and text overrides togeth
   assert.equal(overridden.stroke, "#000000");
   assert.equal(overridden.text, "#222222");
 
-  setNodeColorPalette(node, "light", "blue");
+  setNodeColorPalette(node, "accent");
   assert.equal(JSON.stringify(node.style), JSON.stringify({ strokeWidth: 3 }));
   const reselected = getNodeEffectiveStyle({ theme: "light" }, node);
-  assert.equal(reselected.fill, nodeColorPalettes.blue.light.fill);
-  assert.equal(reselected.stroke, nodeColorPalettes.blue.light.stroke);
-  assert.equal(reselected.text, nodeColorPalettes.blue.light.text);
+  assert.equal(reselected.fill, colourSchemes.classic.light.accent.fill);
+  assert.equal(reselected.stroke, colourSchemes.classic.light.accent.stroke);
+  assert.equal(reselected.text, colourSchemes.classic.light.accent.text);
 });
 
-test("node color palettes include neutral grey and black-and-white tones", () => {
-  assert.deepEqual(Object.keys(nodeColorSchemes), ["classic"]);
-  assert.deepEqual(Object.keys(nodeColorPalettes), [
-    "pink",
-    "red",
-    "orange",
-    "yellow",
-    "green",
-    "cyan",
-    "blue",
-    "purple",
-    "grey",
-    "bw"
-  ]);
-  assert.equal(nodeColorPalettes.grey.light.fill, "#E5E7EB");
-  assert.equal(nodeColorPalettes.grey.light.stroke, "#4B5563");
-  assert.equal(nodeColorPalettes.grey.light.text, "#374151");
-  assert.equal(nodeColorPalettes.grey.dark.fill, "#4B5563");
-  assert.equal(nodeColorPalettes.grey.dark.stroke, "#E5E7EB");
-  assert.equal(nodeColorPalettes.grey.dark.text, "#F9FAFB");
-  assert.equal(nodeColorPalettes.bw.light.fill, "#FFFFFF");
-  assert.equal(nodeColorPalettes.bw.light.stroke, "#111827");
-  assert.equal(nodeColorPalettes.bw.light.text, "#111827");
-  assert.equal(nodeColorPalettes.bw.dark.fill, "#111827");
-  assert.equal(nodeColorPalettes.bw.dark.stroke, "#FFFFFF");
-  assert.equal(nodeColorPalettes.bw.dark.text, "#FFFFFF");
+test("colour schemes provide every semantic role in distinct light and dark variants", () => {
+  assert.deepEqual(Object.keys(colourSchemes), ["classic", "ice", "midnight", "paper"]);
+  for (const scheme of Object.values(colourSchemes)) {
+    assert.deepEqual(Object.keys(scheme.light), Object.keys(scheme.dark));
+    assert.equal(Object.keys(scheme.light).length, 13);
+  }
+  assert.notEqual(colourSchemes.ice.light.accent.fill, colourSchemes.ice.dark.accent.fill);
 });
 
 test("palette selection serializes without an empty style mapping", () => {
   const diagram = parseDiagram(twoNodeEdgeSource([]));
 
-  setNodeColorPalette(diagram.nodes[0], "light", "grey");
+  setNodeColorPalette(diagram.nodes[0], "neutral");
 
   assert.equal(diagram.nodes[0].style, undefined);
   assert.equal(
@@ -1488,14 +1464,14 @@ test("resolves effective node and edge styles from theme defaults and overrides"
   const node = { id: "api", label: "Payments API" };
   const styledNode = { ...node, style: { fill: "#123456" } };
 
-  assert.equal(getNodeEffectiveStyle(diagram, node).fill, "#193A61");
+  assert.equal(getNodeEffectiveStyle(diagram, node).fill, "#EAF2FF");
   assert.equal(getNodeEffectiveStyle(diagram, styledNode).fill, "#123456");
-  assert.equal(getNodeEffectiveStyle(diagram, styledNode).stroke, "#71AEF7");
+  assert.equal(getNodeEffectiveStyle(diagram, styledNode).stroke, "#3574C7");
 
   const edge = { source: "api", target: "api" };
   const styledEdge = { ...edge, style: { stroke: "#ABCDEF" } };
 
-  assert.equal(getEdgeEffectiveStyle(diagram, edge).stroke, "#B8C7D5");
+  assert.equal(getEdgeEffectiveStyle(diagram, edge).stroke, "#52616B");
   assert.equal(getEdgeEffectiveStyle(diagram, styledEdge).stroke, "#ABCDEF");
 });
 

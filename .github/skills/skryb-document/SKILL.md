@@ -71,17 +71,18 @@ Use formatting directives only as specified in the syntax reference. They begin
 in column 1, wrap ordinary supported Markdown, and can nest:
 
 ```markdown
-:::panel { title="Summary" tone=light colour=blue }
+:::panel { title="Summary" palette=accent }
 Readable **Markdown** content.
 ::: (summary panel)
 ```
 
 Use `section` for semantic grouping, `panel` for a bordered visual container,
 and `callout` for a labelled `note`, `info`, `warning`, or `success` message.
-Use both `tone` (`light` or `dark`) and `colour` when selecting a palette; the
-palette names are the same as diagram palettes. `fill`, `stroke`, and `text`
-accept only documented hexadecimal overrides and take precedence over a
-palette.
+Use one semantic `palette` role (`background`, `pale`, `light`, `neutral`,
+`dark`, `accent-soft`, `accent`, `accent-strong`, `note`, `success`, `warning`,
+`danger`, or `highlight`). The document's colour scheme and theme resolve its
+visual treatment. `fill`, `stroke`, and `text` accept only documented
+hexadecimal overrides and take precedence over a palette.
 
 Use `grid` only for the documented `columns` presets: `2`, `3`, `"2fr 1fr"`,
 or `"1fr 2fr"`. A grid's direct children must be `panel`, `callout`, or
@@ -101,7 +102,7 @@ the values in the syntax reference, including:
 
 - node shapes: `rounded-rectangle`, `circle`, `oval`, `database`, `diamond`,
   `rhombus`, `flattened-hexagon`, `chevron`, `right-chevron`, and `document`;
-- node palettes: `{ tone: light|dark, colour: pink|red|orange|yellow|green|cyan|blue|purple|grey|bw }`;
+- node palettes: `palette: background|pale|light|neutral|dark|accent-soft|accent|accent-strong|note|success|warning|danger|highlight`;
 - anchors: `top`, `right`, `bottom`, and `left`;
 - routes: `orthogonal`, `straight`, and `curved`;
 - endpoint markers: `none`, `arrow`, and `circle`.

@@ -30,19 +30,19 @@ nodes:
     shape: rounded-rectangle
     position: { x: 50, y: 110 }
     size: { width: 180, height: 80 }
-    palette: { tone: light, colour: blue }
+    palette: accent
   - id: orders-api
     label: Order service
     shape: oval
     position: { x: 360, y: 110 }
     size: { width: 180, height: 80 }
-    palette: { tone: light, colour: green }
+    palette: success
   - id: orders-db
     label: Orders database
     shape: database
     position: { x: 670, y: 110 }
     size: { width: 180, height: 80 }
-    palette: { tone: light, colour: purple }
+    palette: accent-strong
 edges:
   - source: storefront
     target: orders-api

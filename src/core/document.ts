@@ -1,5 +1,6 @@
-import { diagramThemes, nodeColorSchemes } from "./diagrams/schema";
+import { colourSchemes } from "./diagrams/schema";
 import { parseDiagram, parseScalar } from "./diagrams/parser";
+import { resolveTheme } from "./diagrams/styles";
 
 export function parseDocumentFrontmatter(source: string): { content: string; frontmatter: Record<string, unknown> } {
   const lines = source.replace(/\r\n/g, "\n").split("\n");
@@ -30,23 +31,25 @@ export function parseDocumentFrontmatter(source: string): { content: string; fro
   return { content: lines.slice(closingIndex + 1).join("\n"), frontmatter };
 }
 
-export function resolveDocument(source: string): { content: string; frontmatter: Record<string, unknown>; theme: string; colourScheme: string } {
+export function resolveDocument(source: string): { content: string; frontmatter: Record<string, unknown>; theme: string; resolvedTheme: "light" | "dark"; colourScheme: string } {
   const document = parseDocumentFrontmatter(source);
-  const theme = String(document.frontmatter.theme || "light");
+  const theme = String(document.frontmatter.theme || "auto");
   const colourScheme = String(document.frontmatter.colourScheme || "classic");
 
-  if (!diagramThemes[theme]) {
+  let resolvedTheme: "light" | "dark";
+  try {
+    resolvedTheme = resolveTheme(theme);
+  } catch {
     throw new Error(`Unsupported document theme: ${theme}`);
   }
-
-  if (!nodeColorSchemes[colourScheme]) {
+  if (!colourSchemes[colourScheme]) {
     throw new Error(`Unsupported document colour scheme: ${colourScheme}`);
   }
 
-  return { ...document, theme, colourScheme };
+  return { ...document, theme, resolvedTheme, colourScheme };
 }
 
-export function validateDocumentSource(source: string): { content: string; frontmatter: Record<string, unknown>; theme: string; colourScheme: string } {
+export function validateDocumentSource(source: string): { content: string; frontmatter: Record<string, unknown>; theme: string; resolvedTheme: "light" | "dark"; colourScheme: string } {
   const document = resolveDocument(source);
   const lines = document.content.replace(/\r\n/g, "\n").split("\n");
   let index = 0;
@@ -103,7 +106,7 @@ export function validateDocumentSource(source: string): { content: string; front
   return document;
 }
 
-export function setFrontmatterTheme(source: string, themeName: string): string {
+export function setFrontmatterSetting(source: string, settingName: "theme" | "colourScheme", value: string): string {
   const normalized = source.replace(/\r\n/g, "\n");
   const lines = normalized.split("\n");
   const openingIndex = lines.findIndex((line) => line.trim() !== "");
@@ -111,26 +114,26 @@ export function setFrontmatterTheme(source: string, themeName: string): string {
   const closingIndex = hasFrontmatter ? lines.indexOf("---", openingIndex + 1) : -1;
 
   if (!hasFrontmatter || closingIndex === -1) {
-    return `---\ntheme: ${themeName}\n---\n${normalized}`;
+    return `---\n${settingName}: ${value}\n---\n${normalized}`;
   }
 
-  let themeSet = false;
+  let settingSet = false;
   const frontmatterLines = lines.slice(openingIndex + 1, closingIndex).map((line) => {
     if (!line.trim() || line.trimStart().startsWith("#")) {
       return line;
     }
 
     const propertyMatch = line.match(/^([^:]+):\s*(.*)$/);
-    if (propertyMatch && propertyMatch[1] === "theme") {
-      themeSet = true;
-      return `theme: ${themeName}`;
+    if (propertyMatch && propertyMatch[1] === settingName) {
+      settingSet = true;
+      return `${settingName}: ${value}`;
     }
 
     return line;
   });
 
-  if (!themeSet) {
-    frontmatterLines.push(`theme: ${themeName}`);
+  if (!settingSet) {
+    frontmatterLines.push(`${settingName}: ${value}`);
   }
 
   return [
@@ -138,6 +141,14 @@ export function setFrontmatterTheme(source: string, themeName: string): string {
     ...frontmatterLines,
     ...lines.slice(closingIndex)
   ].join("\n");
+}
+
+export function setFrontmatterTheme(source: string, themeName: string): string {
+  return setFrontmatterSetting(source, "theme", themeName);
+}
+
+export function setFrontmatterColourScheme(source: string, colourScheme: string): string {
+  return setFrontmatterSetting(source, "colourScheme", colourScheme);
 }
 
 export function findSourceTextRange(source: string, text: string): { start: number; end: number } | null {

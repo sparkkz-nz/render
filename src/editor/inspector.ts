@@ -2,7 +2,8 @@ import {
   edgeAnchors,
   edgeMarkerStyles,
   edgeRoutes,
-  nodeColorSchemes,
+  colourSchemes,
+  paletteRoles,
   nodeShapes,
   type FlowchartDiagram,
   type FlowchartEdge,
@@ -41,43 +42,40 @@ export interface InspectorHost {
 type ControlElement = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 type SequenceInspectable = SequenceParticipant | SequenceNote | SequenceMessage;
 
-function paletteMarkup(colourScheme: string, selectedColour: string): string {
-  return Object.entries(nodeColorSchemes[colourScheme] || {}).map(
-    ([name, palette]) => `<option value="${name}"${name === selectedColour ? " selected" : ""}>${palette.label}</option>`
+function paletteMarkup(colourScheme: string, theme: string, selectedPalette: string, name: string): string {
+  const palette = colourSchemes[colourScheme]?.[theme === "dark" ? "dark" : "light"];
+  return [
+    ["Structure", paletteRoles.slice(0, 5)],
+    ["Accent", paletteRoles.slice(5, 8)],
+    ["Status", paletteRoles.slice(8)]
+  ].map(([group, roles]) =>
+    `<fieldset class="docdiagram-palette-group"><legend>${group}</legend>${(roles as readonly string[]).map((role) => {
+      const preset = palette?.[role as keyof typeof palette];
+      return `<label class="docdiagram-palette-swatch"><input type="radio" name="${name}" value="${role}"${role === selectedPalette ? " checked" : ""}><span style="--docdiagram-swatch-fill:${preset?.fill};--docdiagram-swatch-stroke:${preset?.stroke};--docdiagram-swatch-text:${preset?.text}">${preset?.label || role}</span></label>`;
+    }).join("")}</fieldset>`
   ).join("");
 }
 
 export function buildNodeInspectorFields(
   diagram: FlowchartDiagram,
   node: FlowchartNode,
-  colourScheme = "classic"
+  colourScheme = "classic",
+  documentTheme = "light"
 ): string {
   const grid = getGridSize(diagram);
-  const style = getNodeEffectiveStyle(diagram, node);
+  const style = getNodeEffectiveStyle(diagram, node, documentTheme, colourScheme);
   const width = Number(node.size?.width) || 190;
   const height = Number(node.size?.height) || 80;
   const minimum = node.shape === "document" ? { width: 140, height: 84 } : { width: 120, height: 60 };
   const widthMinimum = grid ? Math.ceil(minimum.width / grid) * grid : minimum.width;
   const heightMinimum = grid ? Math.ceil(minimum.height / grid) * grid : minimum.height;
   const step = grid || 1;
-  const palettes = nodeColorSchemes[colourScheme] || {};
-  const matchingPalette = Object.entries(palettes).find(([, palette]) =>
-    [palette.light, palette.dark].some((preset) =>
-      preset.fill.toLowerCase() === (style.fill || "").toLowerCase() &&
-      preset.stroke.toLowerCase() === (style.stroke || "").toLowerCase() &&
-      preset.text.toLowerCase() === (style.text || "").toLowerCase()
-    )
-  );
-  const matchingColour = node.palette?.colour || matchingPalette?.[0] || "blue";
-  const matchingTone = node.palette?.tone || (matchingPalette && matchingPalette[1].light.fill.toLowerCase() === (style.fill || "").toLowerCase()
-    ? "light"
-    : "dark");
+  const selectedPalette = node.palette || "accent";
 
   return [
     `<label class="docdiagram-field docdiagram-field-wide">Label<textarea class="docdiagram-inspector-label docdiagram-inspector-textarea" rows="2">${escapeHtml(node.label)}</textarea></label>`,
     `<label class="docdiagram-field docdiagram-field-wide">Subtitle<textarea class="docdiagram-inspector-subtitle docdiagram-inspector-textarea" rows="2">${escapeHtml(node.subtitle || "")}</textarea></label>`,
-    `<label class="docdiagram-field">Tone<select class="docdiagram-inspector-tone"><option value="light"${matchingTone === "light" ? " selected" : ""}>Light</option><option value="dark"${matchingTone === "dark" ? " selected" : ""}>Dark</option></select></label>`,
-    `<label class="docdiagram-field">Colour<select class="docdiagram-inspector-colour">${paletteMarkup(colourScheme, matchingColour)}</select></label>`,
+    `<div class="docdiagram-field docdiagram-field-wide"><span>Palette</span><div class="docdiagram-inspector-palette">${paletteMarkup(colourScheme, documentTheme, selectedPalette, "node-palette")}</div></div>`,
     `<label class="docdiagram-field">Shape<select class="docdiagram-inspector-shape">${nodeShapes.map(
       (shape) => `<option value="${shape}"${shape === node.shape ? " selected" : ""}>${shape}</option>`
     ).join("")}</select></label>`,
@@ -126,11 +124,12 @@ export function buildSequenceInspectorFields(
   diagram: { theme?: string },
   selection: SequenceSelection,
   element: SequenceInspectable,
-  colourScheme = "classic"
+  colourScheme = "classic",
+  documentTheme = "light"
 ): string {
   const style = "from" in element
     ? null
-    : getSequenceElementEffectiveStyle(diagram, element);
+    : getSequenceElementEffectiveStyle(diagram, element, documentTheme, colourScheme);
   const supportsPresentation = selection.kind !== "message";
   const presentation = supportsPresentation ? element as SequenceParticipant | SequenceNote : null;
 
@@ -140,10 +139,7 @@ export function buildSequenceInspectorFields(
       ? `<label class="docdiagram-field">Style<select class="docdiagram-sequence-inspector-message-style"><option value="solid"${(element as SequenceMessage).style !== "dashed" ? " selected" : ""}>Solid</option><option value="dashed"${(element as SequenceMessage).style === "dashed" ? " selected" : ""}>Dashed</option></select></label>`
       : "",
     supportsPresentation
-      ? `<label class="docdiagram-field">Tone<select class="docdiagram-sequence-inspector-tone"><option value="light"${presentation?.palette?.tone !== "dark" ? " selected" : ""}>Light</option><option value="dark"${presentation?.palette?.tone === "dark" ? " selected" : ""}>Dark</option></select></label>`
-      : "",
-    supportsPresentation
-      ? `<label class="docdiagram-field">Colour<select class="docdiagram-sequence-inspector-colour">${paletteMarkup(colourScheme, presentation?.palette?.colour || "blue")}</select></label>`
+      ? `<div class="docdiagram-field docdiagram-field-wide"><span>Palette</span><div class="docdiagram-sequence-inspector-palette">${paletteMarkup(colourScheme, documentTheme, presentation?.palette || "accent", "sequence-palette")}</div></div>`
       : "",
     supportsPresentation
       ? `<label class="docdiagram-field">Fill<input type="color" class="docdiagram-sequence-inspector-fill" value="${escapeHtml(style?.fill || "")}"></label><label class="docdiagram-field">Border<input type="color" class="docdiagram-sequence-inspector-stroke" value="${escapeHtml(style?.stroke || "")}"></label><label class="docdiagram-field">Text<input type="color" class="docdiagram-sequence-inspector-text" value="${escapeHtml(style?.text || "")}"></label><label class="docdiagram-field">Width<input type="number" min="1" class="docdiagram-sequence-inspector-width" value="${Number(presentation?.size?.width) || ""}"></label><label class="docdiagram-field">Height<input type="number" min="1" class="docdiagram-sequence-inspector-height" value="${Number(presentation?.size?.height) || ""}"></label>`
@@ -182,15 +178,9 @@ export function wireNodeInspector(host: InspectorHost, container: ParentNode, di
 
   change(container, ".docdiagram-inspector-label", (value) => withNode((_, node) => setNodeLabel(node, value)));
   change(container, ".docdiagram-inspector-subtitle", (value) => withNode((_, node) => setNodeSubtitle(node, value)));
-  const tone = control(container, ".docdiagram-inspector-tone");
-  const colour = control(container, ".docdiagram-inspector-colour");
-  const applyPalette = () => {
-    if (tone && colour) {
-      withNode((_, node) => setNodeColorPalette(node, tone.value, colour.value, host.state.documentColorScheme));
-    }
-  };
-  tone?.addEventListener("change", applyPalette);
-  colour?.addEventListener("change", applyPalette);
+  for (const palette of container.querySelectorAll<HTMLInputElement>(".docdiagram-inspector-palette input")) {
+    palette.addEventListener("change", () => withNode((_, node) => setNodeColorPalette(node, palette.value, host.state.documentColorScheme)));
+  }
   change(container, ".docdiagram-inspector-shape", (value) => withNode((_, node) => setNodeShape(node, value)));
   change(container, ".docdiagram-inspector-fill", (value) => withNode((_, node) => setNodeStyleOverride(node, "fill", value)));
   change(container, ".docdiagram-inspector-stroke", (value) => withNode((_, node) => setNodeStyleOverride(node, "stroke", value)));
@@ -242,15 +232,9 @@ export function wireSequenceInspector(host: InspectorHost, container: ParentNode
   }
 
   const presentation = element as SequenceParticipant | SequenceNote;
-  const tone = control(container, ".docdiagram-sequence-inspector-tone");
-  const colour = control(container, ".docdiagram-sequence-inspector-colour");
-  const applyPalette = () => {
-    if (tone && colour) {
-      update(host, () => setNodeColorPalette(presentation, tone.value, colour.value, host.state.documentColorScheme));
-    }
-  };
-  tone?.addEventListener("change", applyPalette);
-  colour?.addEventListener("change", applyPalette);
+  for (const palette of container.querySelectorAll<HTMLInputElement>(".docdiagram-sequence-inspector-palette input")) {
+    palette.addEventListener("change", () => update(host, () => setNodeColorPalette(presentation, palette.value, host.state.documentColorScheme)));
+  }
   for (const [selector, key] of [
     [".docdiagram-sequence-inspector-fill", "fill"],
     [".docdiagram-sequence-inspector-stroke", "stroke"],

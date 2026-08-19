@@ -28,6 +28,7 @@ export interface EditorState extends DiagramRenderState {
   diagramModels: Diagram[];
   selectedSequenceElement: SequenceSelection | null;
   documentTheme: string;
+  documentThemeSetting: string;
   documentColorScheme: string;
   documentFormat: "centered" | "full-width";
   savedSource: string;
@@ -45,6 +46,7 @@ export function createEditorState(): EditorState {
     editingEdge: null,
     connectionDrag: null,
     documentTheme: "light",
+    documentThemeSetting: "auto",
     documentColorScheme: "classic",
     documentFormat: "centered",
     savedSource: "",

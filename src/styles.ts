@@ -94,7 +94,11 @@ export function injectStyles(): void {
       margin: 0 .45rem 0 0;
     }
     #rendered-document .docdiagram-component {
-      background: var(--docdiagram-component-fill, var(--docdiagram-code-background));
+      background: linear-gradient(
+        135deg,
+        var(--docdiagram-component-gradient, var(--docdiagram-component-fill, var(--docdiagram-code-background))),
+        var(--docdiagram-component-fill, var(--docdiagram-code-background))
+      );
       border: 1px solid var(--docdiagram-component-stroke, var(--docdiagram-border));
       border-radius: 8px;
       color: var(--docdiagram-component-text, var(--docdiagram-text));
@@ -321,6 +325,54 @@ export function injectStyles(): void {
     }
     .docdiagram-source-error {
       color: #c2410c;
+    }
+    .docdiagram-theme-control {
+      display: flex;
+      flex-direction: column;
+      gap: .2rem;
+    }
+    .docdiagram-palette-group {
+      border: 0;
+      display: grid;
+      gap: .4rem;
+      grid-template-columns: repeat(3, minmax(4.8rem, 1fr));
+      margin: .35rem 0;
+      padding: 0;
+    }
+    .docdiagram-palette-group legend {
+      font-size: .8em;
+      font-weight: 700;
+      width: 100%;
+    }
+    .docdiagram-palette-swatch {
+      cursor: pointer;
+      display: block;
+    }
+    .docdiagram-palette-swatch input {
+      inline-size: 1px;
+      margin: -1px;
+      opacity: 0;
+      position: absolute;
+    }
+    .docdiagram-palette-swatch span {
+      background: var(--docdiagram-swatch-fill);
+      border: 2px solid var(--docdiagram-swatch-stroke);
+      border-radius: 5px;
+      color: var(--docdiagram-swatch-text);
+      display: block;
+      font-size: .75rem;
+      font-weight: 700;
+      line-height: 1.15;
+      min-height: 1.2rem;
+      padding: .25rem .4rem;
+      text-align: center;
+    }
+    .docdiagram-palette-swatch input:checked + span {
+      box-shadow: 0 0 0 2px var(--docdiagram-background), 0 0 0 4px var(--docdiagram-accent);
+    }
+    .docdiagram-palette-swatch input:focus-visible + span {
+      outline: 2px solid var(--docdiagram-accent);
+      outline-offset: 2px;
     }
     .docdiagram-theme-control {
       align-items: center;

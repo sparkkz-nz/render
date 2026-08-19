@@ -3,11 +3,11 @@ import {
   type FlowchartDiagram,
   type FlowchartNode,
   type SequenceDiagram,
-  diagramThemes,
+  colourSchemes,
   edgeAnchors,
   edgeMarkerStyles,
   edgeRoutes,
-  nodeColorSchemes,
+  paletteRoles,
   nodeTextHAlignments,
   nodeTextVAlignments,
   nodeShapes,
@@ -19,7 +19,6 @@ const flowchartNodeFields = ["id", "label", "shape", "position", "size", "style"
 const flowchartEdgeFields = ["source", "target", "sourceAnchor", "targetAnchor", "route", "label", "style", "start", "end"] as const;
 const flowchartNodeStyleFields = ["fill", "stroke", "strokeWidth", "text"] as const;
 const flowchartEdgeStyleFields = ["stroke", "strokeWidth", "text"] as const;
-const paletteFields = ["tone", "colour"] as const;
 const sequenceParticipantFields = ["id", "label", "kind", "palette", "style", "size"] as const;
 const sequenceParticipantKinds = ["actor"] as const;
 const sequenceMessageFields = ["from", "to", "label", "style"] as const;
@@ -32,7 +31,7 @@ const sequenceCanvasFields = ["width", "height", "participantSpacing", "particip
 type ParsedObject = Record<string, unknown>;
 
 type SequencePresentationCandidate = {
-  palette?: ParsedObject;
+  palette?: string;
   style?: ParsedObject;
   size?: ParsedObject;
 };
@@ -244,11 +243,9 @@ function validateFlowchartDiagram(diagram: FlowchartDiagram, colorScheme = "clas
       throw new Error(`Unsupported node textHAlign: ${node.textHAlign}`);
     }
 
-    if (node.palette) {
-      assertAllowedFields(node.palette as unknown as Record<string, unknown>, paletteFields, `palette for node "${node.id}"`);
-      const palette = (nodeColorSchemes[colorScheme]?.[node.palette.colour] as unknown as Record<string, unknown> | undefined)?.[node.palette.tone] || null;
-      if (!palette) {
-        throw new Error(`Unsupported node palette: ${node.palette.tone || "unknown"} ${node.palette.colour || "unknown"}`);
+    if (node.palette !== undefined) {
+      if (typeof node.palette !== "string" || !paletteRoles.includes(node.palette as (typeof paletteRoles)[number])) {
+        throw new Error(`Unsupported node palette: ${String(node.palette || "unknown")}`);
       }
     }
 
@@ -311,11 +308,6 @@ function validateFlowchartDiagram(diagram: FlowchartDiagram, colorScheme = "clas
     assertAllowedStyleFields(edge.style as Record<string, unknown> | undefined, flowchartEdgeStyleFields, `edge "${edge.source || "unknown"}" -> "${edge.target || "unknown"}"`);
   }
 
-  const themeName = diagram.theme || "light";
-  const theme = diagramThemes[themeName];
-  if (!theme) {
-    throw new Error(`Unsupported diagram theme: ${themeName}`);
-  }
 }
 
 function validateSequenceDiagram(diagram: SequenceDiagram, colorScheme = "classic"): void {
@@ -443,18 +435,13 @@ function validateSequenceDiagram(diagram: SequenceDiagram, colorScheme = "classi
     }
   }
 
-  const themeName = diagram.theme || "light";
-  const theme = diagramThemes[themeName];
-  if (!theme) {
-    throw new Error(`Unsupported diagram theme: ${themeName}`);
-  }
 }
 
 function validateSequencePresentation(item: SequencePresentationCandidate, description: string, colorScheme = "classic"): void {
-  if (item.palette) {
-    assertAllowedFields(item.palette, paletteFields, `palette for ${description}`);
-    if (!((nodeColorSchemes[colorScheme]?.[String(item.palette.colour)] as unknown as Record<string, unknown> | undefined)?.[String(item.palette.tone)])) {
-      throw new Error(`Unsupported ${description} palette: ${String(item.palette.tone || "unknown")} ${String(item.palette.colour || "unknown")}`);
+  if (item.palette !== undefined) {
+    const palette = String(item.palette || "");
+    if (!paletteRoles.includes(palette as (typeof paletteRoles)[number])) {
+      throw new Error(`Unsupported ${description} palette: ${palette || "unknown"}`);
     }
   }
   assertAllowedStyleFields(item.style, flowchartNodeStyleFields, description);

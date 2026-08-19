@@ -198,7 +198,7 @@ export function duplicateNode(diagram: FlowchartDiagram, nodeId: string): Flowch
     ...(node.position ? { position: { ...node.position } } : {}),
     ...(node.size ? { size: { ...node.size } } : {}),
     ...(node.style ? { style: { ...node.style } } : {}),
-    ...(node.palette ? { palette: { ...node.palette } } : {}),
+    ...(node.palette ? { palette: node.palette } : {}),
     ...(node.subtitle !== undefined ? { subtitle: node.subtitle } : {}),
     ...(node.textVAlign !== undefined ? { textVAlign: node.textVAlign } : {}),
     ...(node.textHAlign !== undefined ? { textHAlign: node.textHAlign } : {}),
@@ -305,11 +305,10 @@ export function setNodeStyleOverride<T extends { style?: FlowchartNode["style"] 
 
 export function setNodeColorPalette<T extends { style?: FlowchartNode["style"]; palette?: FlowchartNode["palette"] }>(
   node: T,
-  tone: string,
-  colour: string,
+  palette: string,
   colorScheme = "classic"
 ): T {
-  const preset = getNodeColorPalette(colorScheme, tone, colour);
+  const preset = getNodeColorPalette(colorScheme, "light", palette);
   if (!preset) {
     return node;
   }
@@ -320,7 +319,7 @@ export function setNodeColorPalette<T extends { style?: FlowchartNode["style"]; 
   } else {
     delete node.style;
   }
-  node.palette = { tone, colour };
+  node.palette = palette as NonNullable<FlowchartNode["palette"]>;
   return node;
 }
 
