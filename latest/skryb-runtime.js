@@ -415,7 +415,7 @@ ${n}`;let c=!1,l=o.slice(i+1,a).map(u=>{if(!u.trim()||u.trimStart().startsWith("
       position: fixed;
       right: 1rem;
       top: 1rem;
-      width: min(19rem, calc(100vw - 2rem));
+      width: min(21rem, calc(100vw - 2rem));
       z-index: 30;
       font-family: Arial, Helvetica, sans-serif;
       font-size: 1rem;
