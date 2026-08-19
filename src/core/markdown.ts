@@ -1,4 +1,4 @@
-import { calloutKinds, componentColours, gridColumns } from "./diagrams/schema";
+import { calloutKinds, paletteRoles, gridColumns } from "./diagrams/schema";
 import { escapeHtml } from "./diagrams/parser";
 import { getNodeColorPalette, mergeStyle } from "./diagrams/styles";
 
@@ -130,9 +130,9 @@ function isComponentColour(value: string): boolean {
   return /^#[\da-f]{3,8}$/i.test(value);
 }
 
-function getComponentStyle(attributes: Record<string, string>, documentColorScheme = "classic"): string | null {
-  const hasPalette = attributes.tone !== undefined || attributes.colour !== undefined;
-  if (hasPalette && (!["light", "dark"].includes(attributes.tone) || !componentColours.includes(attributes.colour as (typeof componentColours)[number]))) {
+function getComponentStyle(attributes: Record<string, string>, documentColorScheme = "classic", documentTheme = "light"): string | null {
+  const hasPalette = attributes.palette !== undefined;
+  if (hasPalette && !paletteRoles.includes(attributes.palette as (typeof paletteRoles)[number])) {
     return null;
   }
 
@@ -143,7 +143,7 @@ function getComponentStyle(attributes: Record<string, string>, documentColorSche
   }
 
   const palette = hasPalette
-    ? getNodeColorPalette(documentColorScheme, attributes.tone as string, attributes.colour as string)
+    ? getNodeColorPalette(documentColorScheme, documentTheme, attributes.palette as string)
     : null;
   const overrides = Object.fromEntries(
     ["fill", "stroke", "text"]
@@ -213,6 +213,7 @@ export function renderMarkdown(
   options?: {
     renderDiagram?: (source: string, index: number) => string;
     documentColorScheme?: string;
+    documentTheme?: string;
     diagramReferenceRegistry?: DiagramReferenceRegistry;
   }
 ): string {
@@ -221,6 +222,7 @@ export function renderMarkdown(
     throw new Error("renderDiagram callback is required for diagram blocks.");
   });
   const documentColorScheme = options?.documentColorScheme || "classic";
+  const documentTheme = options?.documentTheme || "light";
   const registry = options?.diagramReferenceRegistry || (() => {
     const definitions = new Map<string, DiagramDefinition>();
     const duplicateDefinitionIds = new Set<string>();
@@ -334,9 +336,9 @@ export function renderMarkdown(
 
     const { name, attributes } = directive;
     const allowedAttributes: Record<DirectiveName, string[]> = {
-      section: ["title", "tone", "colour", "fill", "stroke", "text"],
-      panel: ["title", "tone", "colour", "fill", "stroke", "text"],
-      callout: ["kind", "title", "tone", "colour", "fill", "stroke", "text"],
+      section: ["title", "palette", "fill", "stroke", "text"],
+      panel: ["title", "palette", "fill", "stroke", "text"],
+      callout: ["kind", "title", "palette", "fill", "stroke", "text"],
       grid: ["columns"],
       stack: []
     };
@@ -384,7 +386,7 @@ export function renderMarkdown(
       };
     }
 
-    const style = getComponentStyle(attributes, documentColorScheme);
+    const style = getComponentStyle(attributes, documentColorScheme, documentTheme);
     if (style === null || (name === "callout" && attributes.kind !== undefined && !calloutKinds.includes(attributes.kind as (typeof calloutKinds)[number]))) {
       return null;
     }

@@ -3,17 +3,27 @@ import {
   type EdgeStyle,
   type FlowchartEdge,
   type FlowchartNode,
-  type NodePalette,
   type NodeStyle,
+  type PaletteRole,
   type ThemeColors,
+  colourSchemes,
   diagramThemes,
   edgeMarkerDefaults,
   edgeMarkerStyles,
-  nodeColorSchemes
 } from "./schema";
 
-export function getTheme(diagram: { theme?: string }, documentTheme = "light"): ThemeColors {
-  const themeName = diagram.theme || documentTheme;
+export function resolveTheme(theme: string): "light" | "dark" {
+  if (theme === "light" || theme === "dark") {
+    return theme;
+  }
+  if (theme === "auto") {
+    return globalThis.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  throw new Error(`Unsupported document theme: ${theme}`);
+}
+
+export function getTheme(_: { theme?: string }, documentTheme = "light"): ThemeColors {
+  const themeName = resolveTheme(documentTheme);
   const theme = diagramThemes[themeName];
 
   if (!theme) {
@@ -23,9 +33,9 @@ export function getTheme(diagram: { theme?: string }, documentTheme = "light"): 
   return theme;
 }
 
-export function getNodeColorPalette(schemeName: string, tone: string, colour: string): NodeStyle | null {
-  const palette = nodeColorSchemes[schemeName]?.[colour] as unknown as Record<string, NodeStyle> | undefined;
-  return palette?.[tone] || null;
+export function getNodeColorPalette(schemeName: string, theme: string, role: string): NodeStyle | null {
+  const palette = colourSchemes[schemeName]?.[resolveTheme(theme)]?.[role as PaletteRole];
+  return palette || null;
 }
 
 export function mergeStyle<T>(defaults: T, overrides: Partial<T> | undefined | null): T {
@@ -41,20 +51,20 @@ export function getNodeEffectiveStyle(
   const theme = getTheme(diagram, documentTheme);
   const defaults = theme.node;
   const palette = node.palette
-    ? getNodeColorPalette(documentColorScheme, node.palette.tone, node.palette.colour)
+    ? getNodeColorPalette(documentColorScheme, documentTheme, node.palette)
     : null;
   return mergeStyle(mergeStyle(defaults, palette), node.style);
 }
 
 export function getSequenceElementEffectiveStyle(
   diagram: { theme?: string },
-  element: { palette?: NodePalette; style?: NodeStyle },
+  element: { palette?: PaletteRole; style?: NodeStyle },
   documentTheme = "light",
   documentColorScheme = "classic"
 ): NodeStyle {
   const theme = getTheme(diagram, documentTheme);
   const palette = element.palette
-    ? getNodeColorPalette(documentColorScheme, element.palette.tone, element.palette.colour)
+    ? getNodeColorPalette(documentColorScheme, documentTheme, element.palette)
     : null;
   return mergeStyle(mergeStyle(theme.node, palette), element.style);
 }

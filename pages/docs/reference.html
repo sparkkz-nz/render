@@ -94,7 +94,7 @@ including diagrams. The source remains readable when viewed without the
 runtime.
 
 ```markdown
-:::panel { title="Payment lifecycle" tone=light colour=blue }
+:::panel { title="Payment lifecycle" palette=accent }
 This panel contains **ordinary Markdown**.
 ::: (payment lifecycle panel)
 ```
@@ -158,7 +158,7 @@ content:
 
 ````markdown
 :::grid { columns="2fr 1fr" }
-:::panel { title="Architecture" tone=light colour=blue }
+:::panel { title="Architecture" palette=accent }
 The primary explanation and diagram go here.
 
 ```diagram
@@ -172,11 +172,11 @@ edges: []
 ::: (architecture panel)
 
 :::stack
-:::panel { title="Decision" tone=light colour=yellow }
+:::panel { title="Decision" palette=highlight }
 Keep canonical source readable and editable.
 ::: (decision panel)
 
-:::callout { kind=warning title="Review" tone=light colour=orange }
+:::callout { kind=warning title="Review" palette=warning }
 Confirm assumptions before publishing.
 ::: (review callout)
 ::: (supporting stack)
@@ -238,7 +238,7 @@ control placement and geometry. Nodes may contain child nodes at any depth:
   shape: oval
   position: { x: 420, y: 210 }
   size: { width: 220, height: 100 }
-  palette: { tone: light, colour: blue }
+  palette: accent
   style: { stroke: "#1D4ED8", strokeWidth: 3, fill: "#DBEAFE", text: "#17202A" }
   children:
     - id: idempotency-store

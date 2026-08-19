@@ -18,13 +18,13 @@ colourScheme: classic
 This editable example combines a **payment-intent architecture** with the
 Markdown, component, and responsive-layout features available to render.
 
-:::callout { kind=info title="Editing this document" tone=dark colour=cyan }
+:::callout { kind=info title="Editing this document" palette=accent-soft }
 The Markdown in this document is canonical. Diagram controls can change node
 positions, sizes, labels, connectors, and styles; **Save a copy** retains those
 diagram changes in the source.
 ::: (editing information)
 
-:::section { title="Payment intent flow" tone=dark colour=blue }
+:::section { title="Payment intent flow" palette=accent }
 The Payments API owns the payment-intent lifecycle and persists the resulting
 state. Diagram placement is intentional and stored in source, while the SVG
 output remains crisp at any zoom level.
@@ -43,23 +43,23 @@ nodes:
     shape: rounded-rectangle
     position: { x: 60, y: 225 }
     size: { width: 190, height: 90 }
-    palette: { tone: dark, colour: blue }
+    palette: accent
   - id: payments-api
     label: Payments API
-    palette: { tone: dark, colour: green }
+    palette: success
     size: { width: 210, height: 52 }
     shape: oval
     subtitle: "Owns the payment-intent\nlifecycle"
     position: { x: 420, y: 210 }
     size: { width: 220, height: 100 }
-    palette: { tone: dark, colour: green }
+    palette: success
   - id: payments-db
     label: "Payments\nDB"
     shape: database
     subtitle: "Postgres, encrypted\nat rest"
     position: { x: 810, y: 210 }
     size: { width: 200, height: 100 }
-    palette: { tone: dark, colour: purple }
+    palette: accent-strong
 edges:
   - source: web-app
     target: payments-api
@@ -80,7 +80,7 @@ edges:
 ```
 ::: (payment intent flow)
 
-:::section { title="Payment authorisation sequence" tone=dark colour=purple }
+:::section { title="Payment authorisation sequence" palette=accent-strong }
 The interaction view shows the ordered request and response messages that create
 and authorise a payment intent. Sequence diagrams are edited through canonical
 source in the source tray.
@@ -130,7 +130,7 @@ notes:
   - at: payments-api
     after: 2
     label: Validate the idempotency key
-    palette: { tone: light, colour: yellow }
+    palette: highlight
     size: { width: 220, height: 64 }
 groups:
   - from: 2
@@ -142,7 +142,7 @@ groups:
 ---
 
 :::grid { columns=3 }
-:::panel { title="Plan" tone=dark colour=blue }
+:::panel { title="Plan" palette=accent }
 ## Define the contract
 
 1. Accept a payment request.
@@ -153,7 +153,7 @@ groups:
 The public endpoint is [`POST /payments`](https://example.com/api/payments).
 ::: (plan panel)
 
-:::panel { title="Build" tone=dark colour=green }
+:::panel { title="Build" palette=success }
 ## Store state safely
 
 | Component | Responsibility | Status |
@@ -165,7 +165,7 @@ The public endpoint is [`POST /payments`](https://example.com/api/payments).
 Use inline code such as `paymentIntentId` for field names.
 ::: (build panel)
 
-:::callout { kind=success title="Validate before release" tone=dark colour=purple }
+:::callout { kind=success title="Validate before release" palette=accent-strong }
 ## Release checklist
 
 - [x] Diagram has explicit node shapes and edge anchors.
@@ -182,7 +182,7 @@ It collapses to a single column on narrow screens while preserving this source
 order.
 
 :::grid { columns="2fr 1fr" }
-:::panel { title="Request lifecycle" tone=dark colour=cyan }
+:::panel { title="Request lifecycle" palette=accent-soft }
 ### Handling a request
 
 The service creates an intent, records it, and responds to the caller. It may
@@ -205,19 +205,19 @@ nodes:
     shape: rounded-rectangle
     position: { x: 50, y: 110 }
     size: { width: 180, height: 80 }
-    palette: { tone: dark, colour: blue }
+    palette: accent
   - id: intent
     label: Payment intent
     shape: chevron
     position: { x: 320, y: 110 }
     size: { width: 200, height: 80 }
-    palette: { tone: dark, colour: green }
+    palette: success
   - id: ledger
     label: Ledger
     shape: database
     position: { x: 630, y: 100 }
     size: { width: 150, height: 100 }
-    palette: { tone: dark, colour: purple }
+    palette: accent-strong
 edges:
   - source: request
     target: intent
@@ -237,7 +237,7 @@ edges:
 ::: (request lifecycle panel)
 
 :::stack
-:::callout { kind=warning title="Idempotency is required" tone=dark colour=orange }
+:::callout { kind=warning title="Idempotency is required" palette=warning }
 Send the same idempotency key for a retry. A new key can create a separate
 payment intent.
 ::: (idempotency warning)
@@ -252,7 +252,7 @@ payment intent.
 Raw HTML such as `<strong>this</strong>` stays literal for safety.
 ::: (operational notes)
 
-:::callout { kind=note title="Human-readable source" tone=dark colour=grey }
+:::callout { kind=note title="Human-readable source" palette=neutral }
 Closing annotations such as this one make deeply nested directives easier to
 review without changing their meaning.
 ::: (source note)

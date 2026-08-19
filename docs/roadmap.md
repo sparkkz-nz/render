@@ -169,7 +169,7 @@ presentation elements.
    - optional compact summary or key-value blocks where justified by real
      documents.
 3. Reuse the existing diagram tone-and-colour model for component styling. The
-   author or agent chooses both a tone (`light` or `dark`) and a colour:
+   author or agent chooses a semantic palette role:
    `pink`, `red`, `orange`, `yellow`, `green`, `cyan`, `blue`, `purple`,
    `grey`, or `bw`. A light blue component, for example, uses a light-blue
    background with dark-blue text, border, and accents; dark blue reverses that

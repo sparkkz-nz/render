@@ -3,6 +3,7 @@ import {
   documentMinimumNodeSize,
   edgeAnchors,
   minimumNodeSize,
+  colourSchemes,
   type FlowchartDiagram,
   type FlowchartNode
 } from "../core/diagrams/schema";
@@ -62,6 +63,12 @@ export function renderFlowchartDiagram(
   const edgeLabelLineHeight = 16;
   const edgeMarkerDefs: string[] = [];
   const edgeEndpointMarkup: string[] = [];
+  const scheme = colourSchemes[state.documentColorScheme];
+  const palette = scheme?.[state.documentTheme === "dark" ? "dark" : "light"];
+  const paletteDefs = palette ? Object.entries(palette)
+    .filter(([, value]) => value.gradient)
+    .map(([role, value]) => `<linearGradient id="docdiagram-${state.documentColorScheme}-${diagramIndex}-${role}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${escapeHtml(value.gradient || value.fill)}"/><stop offset="1" stop-color="${escapeHtml(value.fill)}"/></linearGradient>`)
+    .join("") : "";
 
   const edgeMarkup = diagram.edges.map((edge, edgeIndex) => {
     const sourceEntry = nodes.get(edge.source);
@@ -149,12 +156,16 @@ export function renderFlowchartDiagram(
     const y = position.y;
     const nodeWidth = Number(node.size?.width) || 190;
     const nodeHeight = Number(node.size?.height) || 80;
-    const style = getNodeEffectiveStyle(
+    const effectiveStyle = getNodeEffectiveStyle(
       diagram,
       node,
       state.documentTheme,
       state.documentColorScheme
     );
+    const paletteRole = node.palette;
+    const style = paletteRole && palette?.[paletteRole]?.gradient
+      ? { ...effectiveStyle, fill: `url(#docdiagram-${state.documentColorScheme}-${diagramIndex}-${paletteRole})` }
+      : effectiveStyle;
     const isSelected = selectedNode?.diagramIndex === diagramIndex && selectedNode.nodeId === node.id;
     const isEditing = isSelected && editingNode?.diagramIndex === diagramIndex && editingNode.nodeId === node.id;
     const strokeWidth = (Number(style.strokeWidth) || 2) + (isSelected ? 2 : 0);
@@ -199,7 +210,7 @@ export function renderFlowchartDiagram(
     `<figure class="docdiagram" data-diagram-index="${diagramIndex}" data-diagram-type="flowchart" data-editing="${isDiagramEditing}"${viewportStyle}>`,
     renderToolbar(diagramIndex, "flowchart", state),
     `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Architecture diagram" data-diagram-index="${diagramIndex}" style="width: ${diagramZooms.get(diagramIndex) || 100}%">`,
-    `<defs>${edgeMarkerDefs.join("")}</defs>`,
+    `<defs>${paletteDefs}${edgeMarkerDefs.join("")}</defs>`,
     nodeMarkup,
     edgeMarkup,
     connectionDrag?.diagramIndex === diagramIndex

@@ -3,8 +3,7 @@ import {
   edgeAnchors,
   edgeMarkerStyles,
   edgeRoutes,
-  nodeColorPalettes,
-  nodeColorSchemes,
+  colourSchemes,
   nodeShapes,
   supportedDiagramTypes,
   type Diagram,
@@ -51,6 +50,7 @@ import {
   getEdgeEffectiveStyle,
   getEdgeMarkerStyle,
   getGridSize,
+  getNodeColorPalette,
   getNodeEffectiveStyle,
   getTheme,
   snapToGrid
@@ -69,6 +69,7 @@ import {
   findSourceTextRange,
   parseDocumentFrontmatter,
   resolveDocument,
+  setFrontmatterColourScheme,
   scrollSourceEditorToRange,
   setFrontmatterTheme,
   validateDocumentSource
@@ -156,7 +157,8 @@ export class BrowserRuntime {
   public renderMarkdown(source: string, state = { diagramIndex: 0 }): string {
     return renderMarkdownCore(source, state, {
       renderDiagram: (diagramSource, index) => this.renderDiagram(diagramSource, index),
-      documentColorScheme: this.state.documentColorScheme
+      documentColorScheme: this.state.documentColorScheme,
+      documentTheme: this.state.documentTheme
     });
   }
 
@@ -207,13 +209,15 @@ export class BrowserRuntime {
     const pageScroll = { x: globalThis.scrollX || 0, y: globalThis.scrollY || 0 };
     const previousModels = [...this.state.diagramModels];
     const previousTheme = this.state.documentTheme;
+    const previousThemeSetting = this.state.documentThemeSetting;
     const previousColorScheme = this.state.documentColorScheme;
     this.state.diagramModels.length = 0;
 
     let markup: string;
     try {
       const parsedDocument = preserveOnError ? validateDocumentSource(source) : resolveDocument(source);
-      this.state.documentTheme = parsedDocument.theme;
+      this.state.documentTheme = parsedDocument.resolvedTheme;
+      this.state.documentThemeSetting = parsedDocument.theme;
       this.state.documentColorScheme = parsedDocument.colourScheme;
       markup = this.renderMarkdown(parsedDocument.content);
     } catch (error) {
@@ -222,6 +226,7 @@ export class BrowserRuntime {
       this.state.diagramModels.push(...previousModels);
       if (preserveOnError) {
         this.state.documentTheme = previousTheme;
+        this.state.documentThemeSetting = previousThemeSetting;
         this.state.documentColorScheme = previousColorScheme;
         this.sourceEditor?.setError(message);
         return false;
@@ -236,12 +241,18 @@ export class BrowserRuntime {
     this.setSource(source);
     this.sourceEditor?.clearError();
     this.outputElement.dataset.theme = this.state.documentTheme;
+    this.outputElement.dataset.colourScheme = this.state.documentColorScheme;
+    this.applyDocumentColourScheme(this.outputElement);
     this.outputElement.dataset.format = this.state.documentFormat;
     this.applyPageTheme(this.state.documentTheme);
     this.outputElement.innerHTML = markup;
     this.removeToolbarChrome();
     this.createToolbar();
     this.sourceEditor?.renderTray();
+    const sourceTray = document.querySelector<HTMLElement>(".docdiagram-source-tray");
+    if (sourceTray) {
+      this.applyDocumentColourScheme(sourceTray);
+    }
     this.diagramEditor?.enableCanvasPanning();
     this.diagramEditor?.enableSequenceSelection();
     if (this.state.editingDiagramIndex !== null) {
@@ -300,6 +311,11 @@ export class BrowserRuntime {
     }
     injectStyles();
     this.state.savedSource = this.getSource();
+    globalThis.matchMedia?.("(prefers-color-scheme: dark)")?.addEventListener("change", () => {
+      if (this.state.documentThemeSetting === "auto") {
+        this.renderDocument();
+      }
+    });
     globalThis.addEventListener("beforeunload", (event) => {
       if (this.getSource() === this.state.savedSource && !this.sourceEditor?.hasUnsavedDraft) {
         return;
@@ -348,9 +364,8 @@ export class BrowserRuntime {
   public getCoreApi() {
     return {
       diagramThemes,
-      nodeColorSchemes,
+      colourSchemes,
       supportedDiagramTypes,
-      nodeColorPalettes,
       nodeShapes,
       edgeAnchors,
       edgeRoutes,
@@ -431,6 +446,7 @@ export class BrowserRuntime {
     toolbar.className = "docdiagram-toolbar";
     toolbar.dataset.editing = String(this.state.editingDiagramIndex !== null);
     toolbar.dataset.theme = this.state.documentTheme;
+    toolbar.dataset.colourScheme = this.state.documentColorScheme;
     toolbar.dataset.format = this.state.documentFormat;
 
     const node = this.getSelectedNode();
@@ -448,9 +464,11 @@ export class BrowserRuntime {
       `<button type="button" class="docdiagram-menu-toggle" aria-label="Document menu" aria-expanded="false" title="Document menu">☰</button>`,
       `<div class="docdiagram-menu" hidden>`,
       `<label class="docdiagram-theme-control">Theme<select class="docdiagram-theme-select">`,
-      `<option value="light"${this.state.documentTheme === "light" ? " selected" : ""}>Light</option>`,
-      `<option value="dark"${this.state.documentTheme === "dark" ? " selected" : ""}>Dark</option>`,
+      `<option value="auto"${this.state.documentThemeSetting === "auto" ? " selected" : ""}>Auto</option>`,
+      `<option value="light"${this.state.documentThemeSetting === "light" ? " selected" : ""}>Light</option>`,
+      `<option value="dark"${this.state.documentThemeSetting === "dark" ? " selected" : ""}>Dark</option>`,
       `</select></label>`,
+      `<label class="docdiagram-theme-control">Colour scheme<select class="docdiagram-colour-scheme-select">${Object.entries(colourSchemes).map(([name, scheme]) => `<option value="${name}"${this.state.documentColorScheme === name ? " selected" : ""}>${scheme.label}</option>`).join("")}</select></label>`,
       `<label class="docdiagram-theme-control">Format<select class="docdiagram-format-select">`,
       `<option value="centered"${this.state.documentFormat === "centered" ? " selected" : ""}>Centered</option>`,
       `<option value="full-width"${this.state.documentFormat === "full-width" ? " selected" : ""}>Full width</option>`,
@@ -460,11 +478,11 @@ export class BrowserRuntime {
       `<button type="button" class="docdiagram-offline-save" disabled>Save for Offline (coming soon)</button>`,
       `</div>`,
       node && inspectorDiagram?.type === "flowchart"
-        ? `<div class="docdiagram-inspector" data-kind="node">${buildNodeInspectorFields(inspectorDiagram, node, this.state.documentColorScheme)}</div>`
+        ? `<div class="docdiagram-inspector" data-kind="node">${buildNodeInspectorFields(inspectorDiagram, node, this.state.documentColorScheme, this.state.documentTheme)}</div>`
         : edge && inspectorDiagram
           ? `<div class="docdiagram-inspector" data-kind="edge">${buildEdgeInspectorFields(inspectorDiagram, edge)}</div>`
           : sequenceElement && inspectorDiagram
-            ? `<div class="docdiagram-inspector" data-kind="sequence">${buildSequenceInspectorFields(inspectorDiagram, this.state.selectedSequenceElement!, sequenceElement, this.state.documentColorScheme)}</div>`
+            ? `<div class="docdiagram-inspector" data-kind="sequence">${buildSequenceInspectorFields(inspectorDiagram, this.state.selectedSequenceElement!, sequenceElement, this.state.documentColorScheme, this.state.documentTheme)}</div>`
             : ""
     ].join("");
     const menuToggle = toolbar.querySelector<HTMLButtonElement>(".docdiagram-menu-toggle");
@@ -486,11 +504,16 @@ export class BrowserRuntime {
       this.setSource(setFrontmatterTheme(this.getSource(), (event.currentTarget as HTMLSelectElement).value));
       this.renderDocument();
     });
+    toolbar.querySelector<HTMLSelectElement>(".docdiagram-colour-scheme-select")?.addEventListener("change", (event) => {
+      this.setSource(setFrontmatterColourScheme(this.getSource(), (event.currentTarget as HTMLSelectElement).value));
+      this.renderDocument();
+    });
     toolbar.querySelector<HTMLSelectElement>(".docdiagram-format-select")?.addEventListener("change", (event) => {
       this.state.documentFormat = (event.currentTarget as HTMLSelectElement).value === "full-width" ? "full-width" : "centered";
       this.renderDocument();
     });
     this.outputElement.before(toolbar);
+    this.applyDocumentColourScheme(toolbar);
 
     if (node && this.state.selectedNode) {
       wireNodeInspector(this, toolbar, this.state.selectedNode.diagramIndex, this.state.selectedNode.nodeId);
@@ -533,6 +556,24 @@ export class BrowserRuntime {
     return selected.kind === "message"
       ? diagram.messages?.[selected.index] || null
       : diagram.notes?.[selected.index] || null;
+  }
+
+  private applyDocumentColourScheme(element: HTMLElement): void {
+    const background = getNodeColorPalette(this.state.documentColorScheme, this.state.documentTheme, "background");
+    const pale = getNodeColorPalette(this.state.documentColorScheme, this.state.documentTheme, "pale");
+    const neutral = getNodeColorPalette(this.state.documentColorScheme, this.state.documentTheme, "neutral");
+    const accent = getNodeColorPalette(this.state.documentColorScheme, this.state.documentTheme, "accent");
+    if (!background || !pale || !neutral || !accent) {
+      return;
+    }
+    element.style.setProperty("--docdiagram-background", background.fill || "");
+    element.style.setProperty("--docdiagram-border", neutral.stroke || "");
+    element.style.setProperty("--docdiagram-control-background", pale.fill || "");
+    element.style.setProperty("--docdiagram-control-hover", neutral.fill || "");
+    element.style.setProperty("--docdiagram-code-background", pale.fill || "");
+    element.style.setProperty("--docdiagram-text", background.text || "");
+    element.style.setProperty("--docdiagram-muted", neutral.text || "");
+    element.style.setProperty("--docdiagram-accent", accent.stroke || "");
   }
 
   private wireChromeControls(): void {
