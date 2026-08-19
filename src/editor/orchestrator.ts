@@ -535,13 +535,10 @@ export class BrowserRuntime {
 
     if (node && this.state.selectedNode) {
       wireNodeInspector(this, toolbar, this.state.selectedNode.diagramIndex, this.state.selectedNode.nodeId);
-      this.positionInspector(this.state.selectedNode.diagramIndex);
     } else if (edge && this.state.selectedEdge) {
       wireEdgeInspector(this, toolbar, this.state.selectedEdge.diagramIndex, this.state.selectedEdge.edgeIndex);
-      this.positionInspector(this.state.selectedEdge.diagramIndex);
     } else if (sequenceElement && this.state.selectedSequenceElement) {
       wireSequenceInspector(this, toolbar, sequenceElement);
-      this.positionInspector(this.state.selectedSequenceElement.diagramIndex);
     }
     this.wireChromeControls();
   }
@@ -663,20 +660,12 @@ export class BrowserRuntime {
     this.renderDocument();
   }
 
-  private positionInspector(diagramIndex: number): void {
-    if (!this.outputElement) {
-      return;
-    }
-    const inspector = document.querySelector<HTMLElement>(".docdiagram-inspector");
-    const diagram = this.outputElement.querySelector<HTMLElement>(`.docdiagram[data-diagram-index="${diagramIndex}"]`);
-    if (!inspector || !diagram) {
-      return;
-    }
-    inspector.style.top = `${Math.max(16, diagram.getBoundingClientRect().top)}px`;
-  }
-
   private applyPageTheme(theme: string): void {
+    const background = getNodeColorPalette(this.state.documentColorScheme, theme, "background");
+    const text = background?.text;
     document.documentElement.dataset.docdiagramTheme = theme;
+    document.documentElement.style.setProperty("--docdiagram-page-background", background?.fill || "");
+    document.documentElement.style.setProperty("--docdiagram-page-text", text || "");
     document.body?.dataset && (document.body.dataset.docdiagramTheme = theme);
   }
 

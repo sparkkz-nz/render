@@ -202,6 +202,31 @@ The parser accepts mappings, lists, and inline mappings such as
 column 1, list entries use two spaces, item fields use four spaces, and nested
 object fields use six spaces. Blank lines and `#` comments are allowed.
 
+### Diagram references
+
+Place a diagram where it should render with a reference directive, then define
+its fenced diagram block elsewhere in the document with the same stable `id`.
+This keeps longer diagram definitions out of the surrounding prose while
+preserving one canonical source:
+
+````markdown
+:::diagram { id=payment-flow }
+
+```diagram
+id: payment-flow
+type: flowchart
+canvas:
+  width: 600
+  height: 300
+nodes: []
+edges: []
+```
+````
+
+A referenced diagram must have exactly one matching definition. When a document
+uses a diagram reference, every diagram fence in that document must declare an
+`id`.
+
 ### Diagram fields
 
 | Field | Required | Description |

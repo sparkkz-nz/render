@@ -262,32 +262,79 @@ export function buildEdgePath(
     startTangent = { x: sourceControl.x - source.x, y: sourceControl.y - source.y };
     endTangent = { x: target.x - targetControl.x, y: target.y - targetControl.y };
   } else {
-    const lead = 40;
-    const sourceLead = {
-      x: source.x + sourceDirection.x * lead,
-      y: source.y + sourceDirection.y * lead
-    };
-    const targetLead = {
-      x: target.x + targetDirection.x * lead,
-      y: target.y + targetDirection.y * lead
-    };
-    const corner = sourceIsHorizontal
-      ? { x: targetLead.x, y: sourceLead.y }
-      : { x: sourceLead.x, y: targetLead.y };
-    const points = [source, sourceLead, corner, targetLead, target];
+    const targetIsHorizontal = targetDirection.x !== 0;
+    const sameAxis = sourceIsHorizontal === targetIsHorizontal;
+    const sameDirection = sourceDirection.x === targetDirection.x && sourceDirection.y === targetDirection.y;
+    const span = Math.max(Math.abs(target.x - source.x), Math.abs(target.y - source.y));
+    let points: Position[];
+
+    if (sameAxis) {
+      const sourceAxis = sourceIsHorizontal ? source.x : source.y;
+      const targetAxis = sourceIsHorizontal ? target.x : target.y;
+      const direction = sourceIsHorizontal ? sourceDirection.x : sourceDirection.y;
+      const targetDirectionAxis = sourceIsHorizontal ? targetDirection.x : targetDirection.y;
+      const bendAxis = sameDirection
+        ? (direction > 0 ? Math.max(sourceAxis, targetAxis) + span / 2 : Math.min(sourceAxis, targetAxis) - span / 2)
+        : (sourceAxis + targetAxis) / 2;
+      const sourceApproach = Math.sign(bendAxis - sourceAxis);
+      const targetApproach = Math.sign(targetAxis - bendAxis);
+      const needsDetour = !sameDirection && (
+        sourceApproach !== direction ||
+        targetApproach !== -targetDirectionAxis
+      );
+
+      if (needsDetour) {
+        const lead = span / 2;
+        const sourceLead = {
+          x: source.x + sourceDirection.x * lead,
+          y: source.y + sourceDirection.y * lead
+        };
+        const targetLead = {
+          x: target.x + targetDirection.x * lead,
+          y: target.y + targetDirection.y * lead
+        };
+        points = sourceIsHorizontal
+          ? [
+            source,
+            sourceLead,
+            { x: sourceLead.x, y: Math.min(source.y, target.y) - lead },
+            { x: targetLead.x, y: Math.min(source.y, target.y) - lead },
+            targetLead,
+            target
+          ]
+          : [
+            source,
+            sourceLead,
+            { x: Math.min(source.x, target.x) - lead, y: sourceLead.y },
+            { x: Math.min(source.x, target.x) - lead, y: targetLead.y },
+            targetLead,
+            target
+          ];
+      } else {
+        points = sourceIsHorizontal
+          ? [source, { x: bendAxis, y: source.y }, { x: bendAxis, y: target.y }, target]
+          : [source, { x: source.x, y: bendAxis }, { x: target.x, y: bendAxis }, target];
+      }
+    } else {
+      const lead = span / 4;
+      const sourceLead = {
+        x: source.x + sourceDirection.x * lead,
+        y: source.y + sourceDirection.y * lead
+      };
+      const targetLead = {
+        x: target.x + targetDirection.x * lead,
+        y: target.y + targetDirection.y * lead
+      };
+      points = sourceIsHorizontal
+        ? [source, sourceLead, { x: targetLead.x, y: sourceLead.y }, targetLead, target]
+        : [source, sourceLead, { x: sourceLead.x, y: targetLead.y }, targetLead, target];
+    }
 
     let distinctPoints = points.filter((point, index) =>
       index === 0 || point.x !== points[index - 1].x || point.y !== points[index - 1].y
     );
     if (distinctPoints.length === 1) {
-      distinctPoints = [
-        source,
-        {
-          x: source.x + sourceDirection.x * 40,
-          y: source.y + sourceDirection.y * 40
-        },
-        target
-      ];
+      distinctPoints = [source, target];
     }
     path = `M ${formatPathPoint(distinctPoints[0])}${distinctPoints.slice(1).map((point) => ` L ${formatPathPoint(point)}`).join("")}`;
     midpoint = getPolylineMidpoint(distinctPoints);
