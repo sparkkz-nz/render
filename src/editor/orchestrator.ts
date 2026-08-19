@@ -295,6 +295,7 @@ export class BrowserRuntime {
     toolbar?.remove();
     sourceTray?.remove();
     output?.replaceChildren();
+    output?.removeAttribute("data-editing-shortcuts-bound");
     const blob = new Blob([`<!doctype html>\n${copy.outerHTML}`], { type: "text/html;charset=utf-8" });
     const link = document.createElement("a");
     const title = document.title.toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, "");
