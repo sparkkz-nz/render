@@ -75,7 +75,6 @@ export function injectStyles(): void {
       display: block;
       max-width: 100%;
       overflow-x: auto;
-      white-space: nowrap;
     }
     #rendered-document th,
     #rendered-document td {
