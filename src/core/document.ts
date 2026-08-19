@@ -54,11 +54,12 @@ export function validateDocumentSource(source: string): { content: string; front
   let hasDiagramReferences = false;
   let referenceFenceOpen = false;
   for (const line of lines) {
-    if (/^```/.test(line)) {
+    const normalizedLine = line.replace(/^(?: {0,3}> ?)+/, "");
+    if (/^```/.test(normalizedLine)) {
       referenceFenceOpen = !referenceFenceOpen;
       continue;
     }
-    if (!referenceFenceOpen && /^:::diagram\s+\{\s*id=/.test(line)) {
+    if (!referenceFenceOpen && /^:::diagram\s+\{\s*id=/.test(normalizedLine)) {
       hasDiagramReferences = true;
       break;
     }
