@@ -19,7 +19,7 @@ Skryb makes portable, editable technical documents from an ordinary HTML file.
 The document source stays in the file as Markdown; the browser runtime renders
 it and can save an updated copy.
 
-:::callout { title="What you need" tone=light colour=blue }
+:::callout { title="What you need" palette=accent }
 A modern browser and this one HTML file. A hosted runtime needs network access;
 your document source and saved edits always remain inside the HTML file.
 :::
@@ -49,13 +49,13 @@ nodes:
     shape: rounded-rectangle
     position: { x: 60, y: 110 }
     size: { width: 180, height: 80 }
-    palette: { tone: light, colour: blue }
+    palette: accent
   - id: api
     label: Orders API
     shape: oval
     position: { x: 450, y: 110 }
     size: { width: 180, height: 80 }
-    palette: { tone: light, colour: green }
+    palette: success
 edges:
   - source: browser
     target: api
@@ -81,7 +81,7 @@ participants:
     kind: actor
   - id: orders
     label: Orders API
-    palette: { tone: light, colour: green }
+    palette: success
 messages:
   - from: shopper
     to: orders
