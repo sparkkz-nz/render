@@ -9,8 +9,8 @@
 <body>
   <template id="source" type="text/markdown">
 ---
-theme: light
-colourScheme: classic
+theme: auto
+colourScheme: ice
 ---
 
 # Skryb quickstart
@@ -18,6 +18,12 @@ colourScheme: classic
 Skryb makes portable, editable technical documents from an ordinary HTML file.
 The document source stays in the file as Markdown; the browser runtime renders
 it and can save an updated copy.
+
+The frontmatter selects the document-wide visual style. `theme: auto` follows
+the viewer's system setting, while `colourScheme` can be `classic`, `ice`,
+`midnight`, or `paper`. Diagrams and components use semantic palette roles such
+as `accent`, `success`, and `warning`, so their treatment stays consistent when
+the document style changes.
 
 :::callout { title="What you need" palette=accent }
 A modern browser and this one HTML file. A hosted runtime needs network access;
