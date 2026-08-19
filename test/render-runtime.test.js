@@ -263,8 +263,19 @@ test("rejects diagrams missing a node identifier or label before source commit",
       "edges:",
       "```"
     ].join("\n")),
-    /Every node requires an id and label/
+    /Every node requires an id and a string label/
   );
+  assert.doesNotThrow(() => validateDocumentSource([
+    "```diagram",
+    "type: flowchart",
+    "canvas:",
+    "nodes:",
+    "  - id: api",
+    '    label: ""',
+    "    shape: rounded-rectangle",
+    "edges:",
+    "```"
+  ].join("\n")));
 });
 
 test("requires a supported diagram type and rejects removed flowchart node.type fields", () => {
@@ -1543,10 +1554,10 @@ test("node inspector helpers mutate the canonical model and round-trip through Y
   assert.equal(reparsed.nodes[0].size.height, 60);
 });
 
-test("setNodeLabel keeps the previous label when the new value is blank", () => {
+test("setNodeLabel permits clearing a node label", () => {
   const node = { id: "api", label: "Payments API" };
   setNodeLabel(node, "   ");
-  assert.equal(node.label, "Payments API");
+  assert.equal(node.label, "");
 });
 
 test("edge inspector helpers mutate the canonical model and round-trip through YAML", () => {

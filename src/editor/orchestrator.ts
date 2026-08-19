@@ -340,6 +340,12 @@ export class BrowserRuntime {
       }
     });
     document.addEventListener("pointerdown", (event) => {
+      const activeInlineEditor = document.activeElement;
+      if (activeInlineEditor instanceof HTMLTextAreaElement &&
+        activeInlineEditor.matches(".docdiagram-inline-editor") &&
+        !(event.target instanceof Node && activeInlineEditor.contains(event.target))) {
+        activeInlineEditor.blur();
+      }
       const toolbar = document.querySelector<HTMLElement>(".docdiagram-toolbar");
       if (toolbar && event.target instanceof Node && !toolbar.contains(event.target)) {
         this.closeDocumentMenu();

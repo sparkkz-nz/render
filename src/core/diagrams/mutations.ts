@@ -274,7 +274,7 @@ export function deleteNode(diagram: FlowchartDiagram, nodeId: string): { node: s
 }
 
 export function setNodeLabel(node: FlowchartNode, label: string): FlowchartNode {
-  node.label = String(label).trim() || node.label;
+  node.label = String(label).trim();
   return node;
 }
 

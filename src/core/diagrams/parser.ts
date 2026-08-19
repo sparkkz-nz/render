@@ -225,8 +225,8 @@ function validateFlowchartDiagram(diagram: FlowchartDiagram, colorScheme = "clas
 
     assertAllowedFields(node as unknown as Record<string, unknown>, flowchartNodeFields, `node "${node.id || "unknown"}"`);
 
-    if (!node.id || !node.label) {
-      throw new Error("Every node requires an id and label.");
+    if (!node.id || typeof node.label !== "string") {
+      throw new Error("Every node requires an id and a string label.");
     }
 
     if (!node.shape) {
