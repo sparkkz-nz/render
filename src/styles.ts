@@ -3,7 +3,11 @@
  * source editor, diagram frames, and editing affordances).
  */
 export function injectStyles(): void {
+  if (document.querySelector("style[data-docdiagram-runtime-styles]")) {
+    return;
+  }
   const styles = document.createElement("style");
+  styles.dataset.docdiagramRuntimeStyles = "true";
   styles.textContent = `
     html,
     body {

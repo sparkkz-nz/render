@@ -294,6 +294,12 @@ export class BrowserRuntime {
     sourceCopy?.content.replaceChildren(document.createTextNode(this.getSource()));
     toolbar?.remove();
     sourceTray?.remove();
+    for (const style of copy.querySelectorAll<HTMLStyleElement>("style")) {
+      if (style.dataset.docdiagramRuntimeStyles === "true" ||
+        (style.textContent?.includes(".docdiagram-inline-editor") && style.textContent.includes(".docdiagram-toolbar"))) {
+        style.remove();
+      }
+    }
     output?.replaceChildren();
     output?.removeAttribute("data-editing-shortcuts-bound");
     const blob = new Blob([`<!doctype html>\n${copy.outerHTML}`], { type: "text/html;charset=utf-8" });
