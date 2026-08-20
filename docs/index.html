@@ -16,31 +16,34 @@ colourScheme: ice
 # Skryb quickstart
 
 Skryb makes portable, editable technical documents from an ordinary HTML file.
-The document source stays in the file as Markdown; the browser runtime renders
-it and can save an updated copy.
-
-The frontmatter selects the document-wide visual style. `theme: auto` follows
-the viewer's system setting, while `colourScheme` can be `classic`, `ice`,
-`midnight`, or `paper`. Diagrams and components use semantic palette roles such
-as `accent`, `success`, and `warning`, so their treatment stays consistent when
-the document style changes.
+The canonical Markdown and diagram YAML stay inside the file; the browser
+runtime renders them into a readable document and saves updated copies.
 
 :::callout { title="What you need" palette=accent }
-A modern browser and this one HTML file. A hosted runtime needs network access;
-your document source and saved edits always remain inside the HTML file.
+A modern browser and one HTML file. Hosted-runtime documents need network
+access when opened; use **Save for Offline** when the recipient must work
+without it.
 :::
 
-## Create your first document
+## Create and open a document
 
-1. Start from a Skryb HTML shell with a `template#source` and an empty
-   `main#rendered-document`.
-2. Put your canonical Markdown and diagram YAML inside the source template.
-3. Open the file in a browser, including through a local `file://` URL.
-4. Use **Edit source** to change Markdown or diagram YAML, then **Save a copy**
-   to download the updated portable document.
+1. Start from the HTML shell in the [reference](reference.html#html-document-shell).
+2. Put Markdown and diagram YAML in `template#source`; keep
+   `main#rendered-document` empty.
+3. Open the file directly in a browser, including through a local `file://`
+   URL.
+4. Choose **Edit source** in the document menu to change canonical source.
 
-This simple flowchart is stored as YAML in the document source. Its prose and
-labels explain that a browser sends a request to an API, which stores a result.
+Frontmatter controls document-wide style. `theme: auto` follows the viewer's
+system setting; `light` and `dark` are fixed choices. Select `classic`, `ice`,
+`midnight`, or `paper` with `colourScheme`. The document menu can change either
+setting and writes the result back to frontmatter when you save.
+
+## Add a flowchart
+
+This flowchart is YAML in the document source. It shows a browser submitting an
+order to an API. Flowchart edit mode can change node and connector presentation,
+resize or duplicate nodes, reconnect edges, and drag a selected edge waypoint.
 
 ```diagram
 type: flowchart
@@ -68,42 +71,54 @@ edges:
     sourceAnchor: right
     targetAnchor: left
     label: POST /orders
-    route: straight
+    route: orthogonal
+    waypoint: { x: 350, y: 80 }
     end: arrow
 ```
 
-## Add a sequence
+Use the diagram toolbar to zoom, fit, or pan. Panning is visual only: it does
+not alter the stored node and waypoint coordinates. Choose **Edit** to make
+flowchart changes, then keep the edit to serialize them into the matching
+diagram fence.
 
-Use a sequence diagram when the order of interactions matters. Participants are
-listed from left to right and messages from top to bottom.
+## Edit canonical source
 
-```diagram
-type: sequence
-version: 1
-id: order-request
-participants:
-  - id: shopper
-    label: Shopper
-    kind: actor
-  - id: orders
-    label: Orders API
-    palette: success
-messages:
-  - from: shopper
-    to: orders
-    label: Place order
-  - from: orders
-    to: shopper
-    label: Order accepted
-    style: dashed
-```
+**Edit source** opens the resizable source tray. It live-renders valid changes,
+while preserving the last valid document and showing a precise error for an
+invalid draft. Double-click rendered text to open the tray at its matching
+source.
+
+The tray menu inserts valid templates for a flowchart, sequence, diagram
+reference, panel, or grid. Use it for document structure and all sequence
+diagram changes; sequence participants appear left to right and messages appear
+top to bottom in source order.
+
+## Save the result
+
+- **Save As** downloads an updated portable HTML document and retains its hosted
+  runtime URL.
+- **Save for Offline** downloads a self-contained HTML document with the
+  selected runtime embedded at the end of its body.
+- Cmd/Ctrl+S saves the latest valid source; Cmd/Ctrl+Shift+E opens or closes the
+  source tray.
 
 ## Keep going
 
-- Use the diagram toolbar to edit flowchart node and connector presentation.
-- Use **Edit source** for all sequence diagram changes.
 - Read the [Skryb reference](reference.html) for the supported document,
   formatting, flowchart, and sequence fields.
+
+## Use Skryb with coding agents
+
+Install the schema-aware `skryb-document` skill to make this authoring contract
+available to every supported local agent:
+
+```sh
+npx skills add sparkkz-nz/skryb --skill skryb-document --agent '*' --global --yes --full-depth
+```
+
+Omit `--global` for a project-only install. Run `npx skills update --global` to
+receive the latest version. The [skill source](https://github.com/sparkkz-nz/skryb/tree/main/.github/skills/skryb-document)
+is versioned alongside Skryb.
   </template>
   <main id="rendered-document"></main>
 </body>
