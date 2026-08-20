@@ -114,6 +114,27 @@ diagram compact and include adjacent prose that explains the flow. Sequence
 diagrams use ordered participants and messages; do not add arbitrary positions
 or Mermaid syntax.
 
+An edge may include one optional `waypoint: { x: number, y: number }` in canvas
+coordinates. The graphical flowchart editor can drag this waypoint; use it only
+when the default route does not communicate the relationship clearly.
+
+For large or detailed diagrams, strongly prefer a `:::diagram { id=... }`
+reference at the intended reading position and place the matching fenced
+definition at the end of the document. This keeps the explanatory source easy
+to edit and review without changing where the diagram renders.
+
+## Editing and saving
+
+Use **Edit source** for canonical Markdown, document structure, and sequence
+diagram changes. The source tray's menu can insert valid flowchart, sequence,
+diagram-reference, panel, and grid templates, and **Help** opens the published
+reference. Flowchart edit mode supports node and connector presentation,
+endpoints, and an optional edge waypoint.
+
+**Save As** keeps a hosted runtime URL in the downloaded portable document.
+**Save for Offline** embeds the selected runtime into a self-contained copy;
+use it when the recipient must open the document without network access.
+
 ## Validation checklist
 
 Before returning a document, verify:
@@ -126,7 +147,7 @@ Before returning a document, verify:
 - The Markdown uses only documented Markdown and formatting directives; grids
   contain only panels, callouts, or stacks as direct children.
 - Every diagram declares its supported type. Every flowchart has explicit shapes
-  and edge anchors and uses only supported palette, route, marker, and style
+  and edge anchors and uses only supported palette, route, marker, waypoint, and style
   values.
 - A reader can understand each diagram from its heading, labels, and nearby
   prose.

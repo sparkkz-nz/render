@@ -227,6 +227,12 @@ A referenced diagram must have exactly one matching definition. When a document
 uses a diagram reference, every diagram fence in that document must declare an
 `id`.
 
+For a large or detailed diagram, strongly prefer this pattern: put the
+`:::diagram` reference beside the explanatory prose and collect its fenced
+definition at the end of the document. Keeping large YAML blocks out of the
+reading flow makes the canonical source substantially easier to edit and
+review, while the reference preserves the diagram's intended rendered position.
+
 ### Diagram fields
 
 | Field | Required | Description |
@@ -239,6 +245,9 @@ uses a diagram reference, every diagram fence in that document must declare an
 | `edges` | Flowchart | List of flowchart connectors. |
 | `participants` | Sequence | Ordered sequence participants. |
 | `messages` | Sequence | Ordered sequence messages. |
+| `activations` | Sequence | Optional participant activation ranges. |
+| `notes` | Sequence | Optional notes anchored after a message. |
+| `groups` | Sequence | Optional labelled ranges of messages. |
 
 `canvas.width` and `canvas.height` are numeric SVG canvas dimensions. A positive
 numeric `canvas.grid` enables snapping while moving or resizing; omit it or use
@@ -312,6 +321,7 @@ Every edge requires both explicit endpoint anchors:
 | `sourceAnchor`, `targetAnchor` | **Required.** `top`, `right`, `bottom`, or `left`. |
 | `label` | Optional edge label; newlines are supported. |
 | `route` | `orthogonal`, `straight`, or `curved`. Omit for the default orthogonal route. |
+| `waypoint` | Optional `{ x: number, y: number }` canvas coordinate. The flowchart editor exposes one draggable waypoint for a selected edge; it splits the route into two segments via that point. |
 | `start`, `end` | `none`, `arrow`, or `circle`. Omit `start` for `none`; omit `end` for `arrow`. |
 | `style` | Optional `stroke`, `strokeWidth`, and `text` overrides. `style.width` is rejected. |
 
@@ -385,10 +395,13 @@ configured lifeline spacing.
 
 ## Editing and serialization
 
-The runtime provides per-diagram zoom and edit controls. In edit mode, authors
-can select nodes and edges, edit supported properties, drag nodes, resize nodes,
-and change connector endpoints. Node and edge label editing supports multiple
-lines: **Enter** adds a line, **Ctrl/Cmd+Enter** commits, and **Escape** cancels.
+The runtime provides per-diagram zoom, fit, pan, and edit controls. Panning can
+move the canvas beyond its visible bounds, and does not change diagram
+coordinates. In edit mode, authors can select nodes and edges, edit supported
+properties, drag nodes, resize nodes, duplicate or delete nodes, change
+connector endpoints, and drag an edge's optional waypoint. Node and edge label
+editing supports multiple lines: **Enter** adds a line, **Ctrl/Cmd+Enter**
+commits, and **Escape** cancels.
 
 Every retained edit serializes the diagram back into its matching `diagram`
 fence in `template#source`. **Save a copy** downloads a complete HTML document
@@ -399,6 +412,11 @@ complete canonical Markdown source. Valid changes are rendered after a short
 debounce and committed directly to `template#source`; the tray stays open and
 keeps focus while the document updates. The runtime preserves the reader and
 diagram scroll positions where possible.
+
+The source tray menu can insert a valid flowchart, sequence diagram, diagram
+reference, panel, or grid template at the cursor. Its **Help** option opens
+this reference. Use the tray for document structure and sequence-diagram
+changes; the graphical editor is for flowchart presentation and connections.
 
 If a draft has a frontmatter or diagram schema error, the last valid rendered
 document and its canonical source remain unchanged. The tray retains the draft
@@ -420,6 +438,13 @@ matching canonical-source occurrence. Generated controls and text with no exact
 source match are ignored. This navigation intentionally runs only from rendered
 content to source; source text does not attempt to infer a rendered location.
 
+The document menu also changes the theme and colour scheme, which writes
+frontmatter into the canonical source. **Save As** downloads a portable HTML
+copy that retains an external runtime URL. **Save for Offline** downloads a
+self-contained copy with the selected runtime embedded at the end of its body.
+The latter reports an error rather than producing a partial document if the
+runtime cannot be obtained.
+
 ## Runtime channels and limitations
 
 Use `/latest/skryb-runtime.js` for normal use, `/dev/skryb-runtime.js` only for
@@ -429,5 +454,4 @@ published documents. See the
 examples.
 
 Current limitations include the intentionally small Markdown subset, flowcharts
-and sequence diagrams, no Mermaid import, and no offline runtime embedding.
-Planned work is listed in the [roadmap](roadmap.md).
+and sequence diagrams, and no Mermaid import.

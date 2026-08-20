@@ -69,7 +69,6 @@ jobs:
           fi
           mkdir -p "$destination"
           cp dist/skryb-runtime.js "$destination/skryb-runtime.js"
-          cp hello-runtime.js "$site_dir/hello-runtime.js"
           mkdir -p "$site_dir/docs"
           cp pages/docs/*.html "$site_dir/docs/"
           cp pages/index.html "$site_dir/index.html"

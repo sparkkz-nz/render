@@ -1274,7 +1274,7 @@ test("expanding a canvas left or up shifts every node into positive coordinates"
 });
 
 test("resolves the actual example document's dark theme", () => {
-  const source = readTemplateSource(path.resolve(__dirname, "..", "example.html"));
+  const source = readTemplateSource(path.resolve(__dirname, "..", "examples", "web-runtime.html"));
   const document = resolveDocument(source);
 
   assert.equal(document.theme, "dark");
