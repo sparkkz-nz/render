@@ -67,9 +67,10 @@ with `v` produces a retained, versioned snapshot. Each branch push updates the
 shared development runtime, so documents must not rely on that URL after
 testing.
 
-For a document that must work without network access, keep a local copy of the
-runtime beside it and use a relative script URL. A future offline-export action
-will embed a pinned runtime in the saved document.
+For a document that must work without network access, choose **Save for
+Offline**. It embeds the selected pinned runtime in the saved document; ordinary
+**Save As** retains a hosted external runtime URL to keep source documents
+small and portable between folders.
 
 ## Documentation
 
