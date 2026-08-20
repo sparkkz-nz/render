@@ -1,9 +1,10 @@
 import { build } from "esbuild";
-import { rm, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 
 const entryPoint = process.env.RENDER_RUNTIME_ENTRY ?? "src/index.ts";
 
 await rm("dist/render-runtime.js", { force: true });
+await mkdir("dist", { recursive: true });
 
 const result = await build({
   bundle: true,
