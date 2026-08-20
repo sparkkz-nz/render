@@ -237,10 +237,11 @@ test("preserves dollar sequences while embedding the runtime before the body clo
   assert.equal(offlineContext.globalThis.runtimeMatch, "$&");
 });
 
-test("published documentation uses the required shell and valid source", () => {
+test("published documentation and starter template use the required shell and valid source", () => {
   const documentationFiles = [
     path.resolve(__dirname, "..", "pages", "docs", "quickstart.html"),
-    path.resolve(__dirname, "..", "pages", "docs", "reference.html")
+    path.resolve(__dirname, "..", "pages", "docs", "reference.html"),
+    path.resolve(__dirname, "..", "pages", "templates", "skryb-document-template.html")
   ];
 
   for (const filePath of documentationFiles) {
@@ -1274,7 +1275,7 @@ test("expanding a canvas left or up shifts every node into positive coordinates"
 });
 
 test("resolves the actual example document's dark theme", () => {
-  const source = readTemplateSource(path.resolve(__dirname, "..", "example.html"));
+  const source = readTemplateSource(path.resolve(__dirname, "..", "examples", "web-runtime.html"));
   const document = resolveDocument(source);
 
   assert.equal(document.theme, "dark");

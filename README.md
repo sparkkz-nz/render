@@ -18,7 +18,12 @@ link/image URLs.
 
 ## Start here
 
-Create an HTML file containing a `template#source`, a
+The fastest way to start by hand is to download
+[the basic Skryb document template](https://sparkkz-nz.github.io/skryb/templates/skryb-document-template.html).
+Open it in a browser, use **Edit source** to replace its title, introductory
+text, and flowchart, then choose **Save As** to create a new document.
+
+To build a document from scratch, create an HTML file containing a `template#source`, a
 `main#rendered-document`, and the hosted runtime:
 
 ```html
@@ -78,16 +83,41 @@ small and portable between folders.
   portable document.
 - [Syntax reference](https://sparkkz-nz.github.io/skryb/docs/reference.html): supported HTML, frontmatter, Markdown,
   flowchart YAML, and editing behaviour.
-- [Agent authoring skill](.github/skills/render-document/SKILL.md): instructions
+- [Agent authoring skill](.github/skills/skryb-document/SKILL.md): instructions
   and checked examples for agents creating valid skryb documents.
-- [Roadmap](docs/roadmap.md): planned compatibility, editing, and diagram work.
-- [Development notes](docs/dev/): implementation plans and handoff material.
+- [Examples](examples/): ready-to-open hosted and local-runtime documents.
+
+## Install the authoring skill
+
+Install the `skryb-document` skill globally to make its schema-aware authoring
+guidance available to every supported local agent:
+
+```sh
+npx skills add sparkkz-nz/skryb \
+  --skill skryb-document \
+  --agent '*' \
+  --global \
+  --yes \
+  --full-depth
+```
+
+Omit `--global` to install it for only the current project. Keep the installed
+skill current with:
+
+```sh
+npx skills update --global
+```
+
+The skill is versioned alongside the runtime. Use a release runtime URL for
+published documents when you need a stable document contract.
 
 ## Development
 
-[example.html](example.html) is the comprehensive local fixture and uses the
-shareable latest runtime URL. Install development dependencies and run the
-runtime tests with:
+[examples/web-runtime.html](examples/web-runtime.html) is the comprehensive
+hosted-runtime demo. [examples/file-runtime.html](examples/file-runtime.html)
+uses the runtime built at `dist/skryb-runtime.js`, so build first and keep the
+example beside the repository's `dist/` directory. Install development
+dependencies and run the runtime tests with:
 
 ```sh
 npm ci

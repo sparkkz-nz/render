@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>New Skryb document</title>
+  <script src="https://sparkkz-nz.github.io/skryb/latest/skryb-runtime.js" defer></script>
+</head>
+<body>
+  <template id="source" type="text/markdown">
+---
+theme: auto
+colourScheme: classic
+---
+
+# Document title
+
+Describe the purpose of this document here.
+
+```diagram
+type: flowchart
+version: 1
+id: document-flow
+canvas:
+  width: 720
+  height: 300
+nodes:
+  - id: start
+    label: Start
+    shape: rounded-rectangle
+    position: { x: 80, y: 110 }
+    size: { width: 180, height: 80 }
+    palette: accent
+  - id: outcome
+    label: Outcome
+    shape: rounded-rectangle
+    position: { x: 460, y: 110 }
+    size: { width: 180, height: 80 }
+    palette: success
+edges:
+  - source: start
+    target: outcome
+    sourceAnchor: right
+    targetAnchor: left
+    label: Describe the flow
+    route: orthogonal
+    end: arrow
+```
+  </template>
+  <main id="rendered-document"></main>
+</body>
+</html>
