@@ -88,6 +88,13 @@ import {
 } from "./inspector";
 import { SourceEditor } from "./source-editor";
 import { clearEditorState, createEditorState, isDiagramEditing, type EditorState } from "./state";
+import {
+  embedRuntimeInDocumentHtml,
+  fetchRuntimeSource,
+  getRuntimeSourceForOfflineExport,
+  getPortableRuntimeUrl,
+  restoreExternalRuntimeForSaveAs
+} from "./offline-document";
 
 type SequenceInspectable = SequenceParticipant | SequenceMessage | SequenceNote;
 
@@ -273,6 +280,32 @@ export class BrowserRuntime {
       !globalThis.confirm("Source has errors. Save the last valid version instead?")) {
       return;
     }
+    const copy = this.createDocumentCopy();
+    try {
+      restoreExternalRuntimeForSaveAs(copy);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("Save As failed.", error);
+      globalThis.alert(`Save As failed: ${message}`);
+      return;
+    }
+    this.downloadHtml(copy.outerHTML, "-edited");
+    this.state.savedSource = this.getSource();
+  }
+
+  public async downloadOfflineDocument(): Promise<void> {
+    this.sourceEditor?.flushRender();
+    if (this.sourceEditor?.hasError && this.sourceEditor.hasUnsavedDraft &&
+      !globalThis.confirm("Source has errors. Save the last valid version instead?")) {
+      return;
+    }
+    const copy = this.createDocumentCopy();
+    const runtime = await getRuntimeSourceForOfflineExport(copy);
+    this.downloadHtml(embedRuntimeInDocumentHtml(copy.outerHTML, runtime.source, runtime.runtimeUrl), "-offline");
+    this.state.savedSource = this.getSource();
+  }
+
+  private createDocumentCopy(): HTMLElement {
     const copy = document.documentElement.cloneNode(true) as HTMLElement;
     const sourceCopy = copy.querySelector<HTMLTemplateElement>("#source");
     const toolbar = copy.querySelector(".docdiagram-toolbar");
@@ -294,14 +327,17 @@ export class BrowserRuntime {
         output?.removeAttribute(attribute.name);
       }
     }
-    const blob = new Blob([`<!doctype html>\n${copy.outerHTML}`], { type: "text/html;charset=utf-8" });
+    return copy;
+  }
+
+  private downloadHtml(documentHtml: string, suffix: string): void {
+    const blob = new Blob([`<!doctype html>\n${documentHtml}`], { type: "text/html;charset=utf-8" });
     const link = document.createElement("a");
     const title = document.title.toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, "");
     link.href = URL.createObjectURL(blob);
-    link.download = `${title || "document"}-edited.html`;
+    link.download = `${title || "document"}${suffix}.html`;
     link.click();
     URL.revokeObjectURL(link.href);
-    this.state.savedSource = this.getSource();
   }
 
   public boot(): void {
@@ -430,6 +466,9 @@ export class BrowserRuntime {
       setEdgeMarkerStart,
       setEdgeMarkerEnd,
       validateDocumentSource,
+      embedRuntimeInDocumentHtml,
+      fetchRuntimeSource,
+      getPortableRuntimeUrl,
       findSourceTextRange,
       scrollSourceEditorToRange,
       splitTextLines,
@@ -480,7 +519,7 @@ export class BrowserRuntime {
       `</select></label>`,
       `<button type="button" class="docdiagram-edit-source">Edit source</button>`,
       `<button type="button" class="docdiagram-save">Save As</button>`,
-      `<button type="button" class="docdiagram-offline-save" disabled>Save for Offline (coming soon)</button>`,
+      `<button type="button" class="docdiagram-offline-save">Save for Offline</button>`,
       `</div>`,
       node && inspectorDiagram?.type === "flowchart"
         ? `<div class="docdiagram-inspector" data-kind="node">${buildNodeInspectorFields(inspectorDiagram, node, this.state.documentColorScheme, this.state.documentTheme)}</div>`
@@ -501,6 +540,19 @@ export class BrowserRuntime {
       menuToggle.setAttribute("aria-expanded", String(open));
     });
     toolbar.querySelector<HTMLButtonElement>(".docdiagram-save")?.addEventListener("click", () => this.downloadDocument());
+    toolbar.querySelector<HTMLButtonElement>(".docdiagram-offline-save")?.addEventListener("click", async (event) => {
+      const button = event.currentTarget as HTMLButtonElement;
+      button.disabled = true;
+      try {
+        await this.downloadOfflineDocument();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("Offline export failed.", error);
+        globalThis.alert(`Save for Offline failed: ${message}`);
+      } finally {
+        button.disabled = false;
+      }
+    });
     toolbar.querySelector<HTMLButtonElement>(".docdiagram-edit-source")?.addEventListener("click", () => {
       this.closeDocumentMenu();
       this.sourceEditor?.open();

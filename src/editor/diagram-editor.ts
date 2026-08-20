@@ -44,6 +44,12 @@ function pointerNumber(value: string | undefined): number {
   return Number(value);
 }
 
+function isViewportResizePointer(frame: HTMLElement, event: PointerEvent): boolean {
+  const rect = frame.getBoundingClientRect();
+  const resizeHandleSize = 18;
+  return event.clientX >= rect.right - resizeHandleSize && event.clientY >= rect.bottom - resizeHandleSize;
+}
+
 export class DiagramEditor {
   private editingShortcutsBound = false;
 
@@ -56,7 +62,7 @@ export class DiagramEditor {
         continue;
       }
       frame.addEventListener("pointerdown", (event) => {
-        if (event.target === frame || event.target === svg) {
+        if ((event.target === frame || event.target === svg) && !isViewportResizePointer(frame, event)) {
           this.beginCanvasPan(svg, event);
         }
       });

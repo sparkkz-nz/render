@@ -67,6 +67,9 @@ const {
   setEdgeMarkerStart,
   setEdgeMarkerEnd,
   validateDocumentSource,
+  embedRuntimeInDocumentHtml,
+  fetchRuntimeSource,
+  getPortableRuntimeUrl,
   findSourceTextRange,
   splitTextLines,
   renderTextBlock,
@@ -128,6 +131,110 @@ test("render authoring skill fixtures use the required shell and valid source", 
       assert.doesNotThrow(() => parseDiagram(diagramSource), `${fixture} has a valid diagram`);
     }
   }
+});
+
+test("creates a portable offline document with the fetched runtime at the end of the body", async () => {
+  const runtimeSource = await fetchRuntimeSource("https://example.test/skryb-runtime.js", async () => ({
+    ok: true,
+    status: 200,
+    text: async () => "globalThis.portableRuntime = true;"
+  }));
+  const exportedDocument = embedRuntimeInDocumentHtml(
+    "<html><head></head><body><main id=\"rendered-document\"></main><script src=\"https://sparkkz-nz.github.io/skryb/releases/v1.2.0/skryb-runtime.js\" data-docdiagram-offline-runtime-placeholder defer></script></body></html>",
+    runtimeSource,
+    "https://sparkkz-nz.github.io/skryb/releases/v1.2.0/skryb-runtime.js"
+  );
+
+  assert.doesNotMatch(exportedDocument, /src="https:\/\/sparkkz-nz\.github\.io\/skryb\/releases\/v1\.2\.0\/skryb-runtime\.js"/);
+  assert.match(exportedDocument, /data-docdiagram-runtime-url="https:\/\/sparkkz-nz\.github\.io\/skryb\/releases\/v1\.2\.0\/skryb-runtime\.js"/);
+  assert.match(exportedDocument, new RegExp(`<script data-docdiagram-runtime="embedded" data-docdiagram-runtime-url="https://sparkkz-nz.github.io/skryb/releases/v1.2.0/skryb-runtime.js">\\n${runtimeSource}\\n</script>\\n</body>`));
+});
+
+test("runtime packages its source for local offline export without fetching", () => {
+  assert.equal(typeof context.globalThis.DocDiagramRuntimeSource, "string");
+  assert.match(context.globalThis.DocDiagramRuntimeSource, /DocDiagramCore/);
+});
+
+test("uses the hosted runtime for a portable Save As when local runtime paths are unavailable", () => {
+  assert.equal(
+    getPortableRuntimeUrl("./dist/skryb-runtime.js"),
+    "https://sparkkz-nz.github.io/skryb/latest/skryb-runtime.js"
+  );
+  assert.equal(
+    getPortableRuntimeUrl("https://sparkkz-nz.github.io/skryb/releases/v1.2.0/skryb-runtime.js"),
+    "https://sparkkz-nz.github.io/skryb/releases/v1.2.0/skryb-runtime.js"
+  );
+});
+
+test("the packaged runtime remains executable after offline HTML embedding", () => {
+  const exportedDocument = embedRuntimeInDocumentHtml(
+    "<html><body><script data-docdiagram-offline-runtime-placeholder></script></body></html>",
+    context.globalThis.DocDiagramRuntimeSource
+  );
+  const embeddedRuntime = exportedDocument.match(/<script data-docdiagram-runtime="embedded">\n([\s\S]*?)\n<\/script>/);
+  const offlineContext = vm.createContext({
+    document: { querySelector: () => null },
+    globalThis: {}
+  });
+
+  assert.ok(embeddedRuntime, "Expected exported document to contain an embedded runtime");
+  assert.doesNotThrow(() => vm.runInContext(embeddedRuntime[1], offlineContext));
+  assert.equal(typeof offlineContext.globalThis.DocDiagramCore, "object");
+});
+
+test("does not export an offline document when runtime fetching fails", async () => {
+  await assert.rejects(
+    () => fetchRuntimeSource("https://example.test/skryb-runtime.js", async () => ({
+      ok: false,
+      status: 503,
+      text: async () => ""
+    })),
+    /Could not fetch the Skryb runtime \(503\)/
+  );
+});
+
+test("reopens an exported offline document without fetching the runtime", () => {
+  const runtimeSource = "globalThis.portableRuntime = true;";
+  const exportedDocument = embedRuntimeInDocumentHtml(
+    "<html><body><script src=\"https://example.test/skryb-runtime.js\" data-docdiagram-offline-runtime-placeholder></script></body></html>",
+    runtimeSource
+  );
+  const embeddedRuntime = exportedDocument.match(/<script data-docdiagram-runtime="embedded">\n([\s\S]*?)\n<\/script>/);
+  const offlineContext = vm.createContext({ globalThis: {} });
+
+  assert.ok(embeddedRuntime, "Expected exported document to contain an embedded runtime");
+  vm.runInContext(embeddedRuntime[1], offlineContext);
+  assert.equal(offlineContext.globalThis.portableRuntime, true);
+});
+
+test("keeps runtime strings containing closing script tags executable offline", () => {
+  const runtimeSource = 'globalThis.runtimeSnippet = "</script>"; globalThis.portableRuntime = true;';
+  const exportedDocument = embedRuntimeInDocumentHtml(
+    "<html><body><script src=\"https://example.test/skryb-runtime.js\" data-docdiagram-offline-runtime-placeholder></script></body></html>",
+    runtimeSource
+  );
+  const embeddedRuntime = exportedDocument.match(/<script data-docdiagram-runtime="embedded">\n([\s\S]*?)\n<\/script>/);
+  const offlineContext = vm.createContext({ globalThis: {} });
+
+  assert.ok(embeddedRuntime, "Expected exported document to contain an embedded runtime");
+  assert.doesNotMatch(embeddedRuntime[1], /<\/script/i);
+  vm.runInContext(embeddedRuntime[1], offlineContext);
+  assert.equal(offlineContext.globalThis.portableRuntime, true);
+});
+
+test("preserves dollar sequences while embedding the runtime before the body close tag", () => {
+  const runtimeSource = "globalThis.runtimeMatch = '$&';";
+  const exportedDocument = embedRuntimeInDocumentHtml(
+    "<html><body><script data-docdiagram-offline-runtime-placeholder></script></body></html>",
+    runtimeSource
+  );
+  const embeddedRuntime = exportedDocument.match(/<script data-docdiagram-runtime="embedded">\n([\s\S]*?)\n<\/script>/);
+  const offlineContext = vm.createContext({ globalThis: {} });
+
+  assert.ok(embeddedRuntime, "Expected exported document to contain an embedded runtime");
+  assert.equal(embeddedRuntime[1], runtimeSource);
+  vm.runInContext(embeddedRuntime[1], offlineContext);
+  assert.equal(offlineContext.globalThis.runtimeMatch, "$&");
 });
 
 test("published documentation uses the required shell and valid source", () => {
@@ -1042,7 +1149,11 @@ test("clampZoom limits diagram zoom to supported discrete bounds", () => {
 });
 
 test("diagram viewports can be vertically resized", () => {
+  const diagramEditor = fs.readFileSync(path.resolve(__dirname, "..", "src", "editor", "diagram-editor.ts"), "utf8");
+
   assert.match(runtime, /\.docdiagram \{[\s\S]*resize: vertical/);
+  assert.match(diagramEditor, /function isViewportResizePointer/);
+  assert.match(diagramEditor, /!isViewportResizePointer\(frame, event\)/);
 });
 
 test("diagram scrollbars are visually hidden while retaining overflow support", () => {
