@@ -16,7 +16,7 @@ import {
 
 const diagramCollectionNames = ["nodes", "edges", "participants", "messages", "activations", "notes", "groups"] as const;
 const flowchartNodeFields = ["id", "label", "shape", "position", "size", "style", "palette", "subtitle", "textVAlign", "textHAlign", "children"] as const;
-const flowchartEdgeFields = ["source", "target", "sourceAnchor", "targetAnchor", "route", "label", "style", "start", "end"] as const;
+const flowchartEdgeFields = ["source", "target", "sourceAnchor", "targetAnchor", "route", "label", "style", "start", "end", "waypoint"] as const;
 const flowchartNodeStyleFields = ["fill", "stroke", "strokeWidth", "text"] as const;
 const flowchartEdgeStyleFields = ["stroke", "strokeWidth", "text"] as const;
 const sequenceParticipantFields = ["id", "label", "kind", "palette", "style", "size"] as const;
@@ -291,6 +291,16 @@ function validateFlowchartDiagram(diagram: FlowchartDiagram, colorScheme = "clas
 
     if (edge.route !== undefined && !edgeRoutes.includes(edge.route as (typeof edgeRoutes)[number])) {
       throw new Error(`Unsupported edge route: ${edge.route}`);
+    }
+    if (edge.waypoint !== undefined) {
+      if (typeof edge.waypoint !== "object" || Array.isArray(edge.waypoint)) {
+        throw new Error(`Edge "${edge.source}" -> "${edge.target}" waypoint must be a mapping.`);
+      }
+      const waypoint = edge.waypoint as { x?: unknown; y?: unknown };
+      if (!Number.isFinite(waypoint.x) || !Number.isFinite(waypoint.y)) {
+        throw new Error(`Edge "${edge.source}" -> "${edge.target}" waypoint requires finite x and y coordinates.`);
+      }
+      assertAllowedFields(edge.waypoint as unknown as ParsedObject, ["x", "y"], `edge "${edge.source}" -> "${edge.target}" waypoint`);
     }
 
     if (edge.start !== undefined && !edgeMarkerStyles.includes(edge.start as (typeof edgeMarkerStyles)[number])) {

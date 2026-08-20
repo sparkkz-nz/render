@@ -197,12 +197,6 @@ export class BrowserRuntime {
     if (!this.outputElement) {
       return false;
     }
-    const scrollPositions = new Map(
-      [...this.outputElement.querySelectorAll<HTMLElement>(".docdiagram")].map((diagram) => [
-        Number(diagram.dataset.diagramIndex),
-        { left: diagram.scrollLeft, top: diagram.scrollTop }
-      ])
-    );
     for (const diagram of this.outputElement.querySelectorAll<HTMLElement>(".docdiagram")) {
       this.state.diagramViewportHeights.set(Number(diagram.dataset.diagramIndex), diagram.offsetHeight);
     }
@@ -259,13 +253,6 @@ export class BrowserRuntime {
       this.diagramEditor?.enableEditing();
     }
 
-    for (const diagram of this.outputElement.querySelectorAll<HTMLElement>(".docdiagram")) {
-      const position = scrollPositions.get(Number(diagram.dataset.diagramIndex));
-      if (position) {
-        diagram.scrollLeft = position.left;
-        diagram.scrollTop = position.top;
-      }
-    }
     globalThis.scrollTo?.(pageScroll.x, pageScroll.y);
     return true;
   }
@@ -363,7 +350,7 @@ export class BrowserRuntime {
         this.closeDocumentMenu();
       }
       if (!(event.target instanceof Element) || event.target.closest(
-        ".docdiagram-toolbar, .docdiagram-node, .docdiagram-edge-group, .docdiagram-connection-port, .docdiagram-edge-endpoint, .docdiagram-inline-editor, .docdiagram-sequence-participant, .docdiagram-sequence-note, .docdiagram-sequence-message"
+        ".docdiagram-toolbar, .docdiagram-node, .docdiagram-edge-group, .docdiagram-connection-port, .docdiagram-edge-endpoint, .docdiagram-edge-waypoint, .docdiagram-inline-editor, .docdiagram-sequence-participant, .docdiagram-sequence-note, .docdiagram-sequence-message"
       ) || (!this.state.selectedNode && !this.state.selectedEdge && !this.state.selectedSequenceElement)) {
         return;
       }
@@ -606,7 +593,9 @@ export class BrowserRuntime {
     }
     for (const button of this.outputElement.querySelectorAll<HTMLButtonElement>(".docdiagram-fit")) {
       button.addEventListener("click", () => {
-        this.state.diagramZooms.set(Number(button.dataset.diagramIndex), 100);
+        const diagramIndex = Number(button.dataset.diagramIndex);
+        this.state.diagramZooms.set(diagramIndex, 100);
+        this.state.diagramCameraOffsets.delete(diagramIndex);
         this.renderDocument();
       });
     }

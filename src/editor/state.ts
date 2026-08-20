@@ -52,6 +52,7 @@ export function createEditorState(): EditorState {
     savedSource: "",
     editSessionDiagram: null,
     diagramZooms: new Map(),
+    diagramCameraOffsets: new Map(),
     diagramViewportHeights: new Map()
   };
 }

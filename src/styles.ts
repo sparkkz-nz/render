@@ -642,13 +642,18 @@ export function injectStyles(): void {
       cursor: nesw-resize;
     }
     .docdiagram-connection-port,
-    .docdiagram-edge-endpoint {
+    .docdiagram-edge-endpoint,
+    .docdiagram-edge-waypoint {
       cursor: crosshair;
       fill: #ffffff;
       stroke: #3574c7;
       stroke-width: 2;
     }
     .docdiagram-connection-target-port {
+      fill: #eaf2ff;
+    }
+    .docdiagram-edge-waypoint {
+      cursor: move;
       fill: #eaf2ff;
     }
     .docdiagram-connection-preview {

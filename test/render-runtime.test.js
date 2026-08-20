@@ -1050,6 +1050,66 @@ test("diagram scrollbars are visually hidden while retaining overflow support", 
   assert.match(runtime, /\.docdiagram::-webkit-scrollbar \{\s*display: none;/);
 });
 
+test("flowchart edge waypoints parse, render, route, and round-trip", () => {
+  const source = flowchartSource([
+    "canvas:",
+    "  width: 600",
+    "  height: 300",
+    "nodes:",
+    "  - id: source",
+    "    label: Source",
+    "    shape: rounded-rectangle",
+    "  - id: target",
+    "    label: Target",
+    "    shape: rounded-rectangle",
+    "    position: { x: 400, y: 160 }",
+    "edges:",
+    "  - source: source",
+    "    target: target",
+    "    sourceAnchor: right",
+    "    targetAnchor: left",
+    "    waypoint: { x: 300, y: 80 }"
+  ].join("\n"));
+  const diagram = parseDiagram(source);
+  const path = buildEdgePath(
+    { x: 190, y: 40 },
+    { x: 400, y: 200 },
+    "right",
+    "left",
+    "orthogonal",
+    diagram.edges[0].waypoint
+  );
+
+  assert.equal(JSON.stringify(diagram.edges[0].waypoint), JSON.stringify({ x: 300, y: 80 }));
+  assert.match(path.path, /L 300 80/);
+  assert.equal(JSON.stringify(parseDiagram(serializeDiagram(diagram))), JSON.stringify(diagram));
+  assert.match(renderDiagram(source, 0), /M 190 40 L 300 40 L 300 80/);
+  assert.throws(
+    () => parseDiagram(source.replace("{ x: 300, y: 80 }", "{ x: 300 }")),
+    /waypoint requires finite x and y coordinates/
+  );
+
+  const behindSource = buildEdgePath(
+    { x: 190, y: 40 },
+    { x: 400, y: 200 },
+    "right",
+    "left",
+    "orthogonal",
+    { x: 120, y: 80 }
+  );
+  assert.match(behindSource.path, /^M 190 40 L 214 40 L 214 80 L 120 80/);
+
+  const behindTarget = buildEdgePath(
+    { x: 190, y: 40 },
+    { x: 400, y: 200 },
+    "right",
+    "left",
+    "orthogonal",
+    { x: 450, y: 80 }
+  );
+  assert.match(behindTarget.path, /L 376 80 L 376 200 L 400 200$/);
+});
+
 test("runtime chrome uses the document colour scheme for the page background", () => {
   assert.match(runtime, /background: var\(--docdiagram-page-background, #ffffff\);/);
   assert.match(runtime, /--docdiagram-page-background/);

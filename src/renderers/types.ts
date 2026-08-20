@@ -37,6 +37,7 @@ export interface DiagramRenderState {
   editingEdge: InlineEdgeEditor | null;
   connectionDrag: ConnectionDrag | null;
   diagramZooms: Map<number, number>;
+  diagramCameraOffsets: Map<number, Position>;
   diagramViewportHeights: Map<number, number>;
 }
 

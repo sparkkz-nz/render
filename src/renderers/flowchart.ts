@@ -55,7 +55,7 @@ export function renderFlowchartDiagram(
   state: DiagramRenderState,
   renderToolbar: DiagramToolbarRenderer
 ): string {
-  const { selectedNode, selectedEdge, editingNode, editingEdge, connectionDrag, diagramZooms } = state;
+  const { selectedNode, selectedEdge, editingNode, editingEdge, connectionDrag, diagramZooms, diagramCameraOffsets } = state;
   const isDiagramEditing = state.editingDiagramIndex === diagramIndex;
   const nodeEntries = flattenFlowchartNodes(diagram);
   const nodes = new Map(nodeEntries.map((entry) => [entry.node.id, entry]));
@@ -99,7 +99,7 @@ export function renderFlowchartDiagram(
     const sourceAnchor = sourceGeometry.anchors[sourceAnchorName];
     const targetAnchor = targetGeometry.anchors[targetAnchorName];
     const route = edge.route || "orthogonal";
-    const edgePath = buildEdgePath(sourceAnchor, targetAnchor, sourceAnchorName, targetAnchorName, route);
+    const edgePath = buildEdgePath(sourceAnchor, targetAnchor, sourceAnchorName, targetAnchorName, route, edge.waypoint);
     const labelX = edgePath.midpoint.x;
     const labelY = edgePath.midpoint.y - 10;
 
@@ -129,7 +129,8 @@ export function renderFlowchartDiagram(
     if (isSelected && isDiagramEditing) {
       edgeEndpointMarkup.push(
         `<circle class="docdiagram-edge-endpoint" data-diagram-index="${diagramIndex}" data-edge-index="${edgeIndex}" data-endpoint="source" cx="${sourceAnchor.x}" cy="${sourceAnchor.y}" r="7"/>`,
-        `<circle class="docdiagram-edge-endpoint" data-diagram-index="${diagramIndex}" data-edge-index="${edgeIndex}" data-endpoint="target" cx="${targetAnchor.x}" cy="${targetAnchor.y}" r="7"/>`
+        `<circle class="docdiagram-edge-endpoint" data-diagram-index="${diagramIndex}" data-edge-index="${edgeIndex}" data-endpoint="target" cx="${targetAnchor.x}" cy="${targetAnchor.y}" r="7"/>`,
+        `<circle class="docdiagram-edge-waypoint" data-diagram-index="${diagramIndex}" data-edge-index="${edgeIndex}" cx="${edge.waypoint?.x ?? edgePath.midpoint.x}" cy="${edge.waypoint?.y ?? edgePath.midpoint.y}" r="8" aria-label="Edge waypoint"/>`
       );
     }
 
@@ -205,11 +206,13 @@ export function renderFlowchartDiagram(
   const height = Number(diagram.canvas.height) || 560;
   const viewportHeight = state.diagramViewportHeights.get(diagramIndex);
   const viewportStyle = viewportHeight ? ` style="box-sizing: border-box; height: ${viewportHeight}px"` : "";
+  const cameraOffset = diagramCameraOffsets.get(diagramIndex) || { x: 0, y: 0 };
+  const cameraStyle = `width: ${diagramZooms.get(diagramIndex) || 100}%; transform: translate(${cameraOffset.x}px, ${cameraOffset.y}px)`;
 
   return [
     `<figure class="docdiagram" data-diagram-index="${diagramIndex}" data-diagram-type="flowchart" data-editing="${isDiagramEditing}"${viewportStyle}>`,
     renderToolbar(diagramIndex, "flowchart", state),
-    `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Architecture diagram" data-diagram-index="${diagramIndex}" style="width: ${diagramZooms.get(diagramIndex) || 100}%">`,
+    `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Architecture diagram" data-diagram-index="${diagramIndex}" style="${cameraStyle}">`,
     `<defs>${paletteDefs}${edgeMarkerDefs.join("")}</defs>`,
     nodeMarkup,
     edgeMarkup,
