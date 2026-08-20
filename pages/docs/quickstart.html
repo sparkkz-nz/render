@@ -27,12 +27,16 @@ without it.
 
 ## Create and open a document
 
-1. Start from the HTML shell in the [reference](reference.html#html-document-shell).
-2. Put Markdown and diagram YAML in `template#source`; keep
+1. [Download the basic document template](../templates/skryb-document-template.html).
+   It has a title, introductory text, and editable flowchart.
+2. Open the downloaded file directly in a browser, including through a local
+   `file://` URL.
+3. Choose **Edit source** in the document menu to replace the template content,
+   then use **Save As** whenever you want a new document.
+4. To start from scratch instead, use the HTML shell in the
+   [reference](reference.html#html-document-shell). Put Markdown and diagram
+   YAML in `template#source`; keep
    `main#rendered-document` empty.
-3. Open the file directly in a browser, including through a local `file://`
-   URL.
-4. Choose **Edit source** in the document menu to change canonical source.
 
 Frontmatter controls document-wide style. `theme: auto` follows the viewer's
 system setting; `light` and `dark` are fixed choices. Select `classic`, `ice`,

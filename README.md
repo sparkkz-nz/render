@@ -18,7 +18,12 @@ link/image URLs.
 
 ## Start here
 
-Create an HTML file containing a `template#source`, a
+The fastest way to start by hand is to download
+[the basic Skryb document template](https://sparkkz-nz.github.io/skryb/templates/skryb-document-template.html).
+Open it in a browser, use **Edit source** to replace its title, introductory
+text, and flowchart, then choose **Save As** to create a new document.
+
+To build a document from scratch, create an HTML file containing a `template#source`, a
 `main#rendered-document`, and the hosted runtime:
 
 ```html

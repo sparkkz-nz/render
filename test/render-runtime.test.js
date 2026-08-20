@@ -237,10 +237,11 @@ test("preserves dollar sequences while embedding the runtime before the body clo
   assert.equal(offlineContext.globalThis.runtimeMatch, "$&");
 });
 
-test("published documentation uses the required shell and valid source", () => {
+test("published documentation and starter template use the required shell and valid source", () => {
   const documentationFiles = [
     path.resolve(__dirname, "..", "pages", "docs", "quickstart.html"),
-    path.resolve(__dirname, "..", "pages", "docs", "reference.html")
+    path.resolve(__dirname, "..", "pages", "docs", "reference.html"),
+    path.resolve(__dirname, "..", "pages", "templates", "skryb-document-template.html")
   ];
 
   for (const filePath of documentationFiles) {
