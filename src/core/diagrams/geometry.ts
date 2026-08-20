@@ -228,17 +228,74 @@ export function buildEdgePath(
   target: Position,
   sourceAnchor: string,
   targetAnchor: string,
-  route = "orthogonal"
+  route = "orthogonal",
+  waypoint?: Position
 ): { path: string; midpoint: Position; startTangent: Position; endTangent: Position; hitPath: string } {
   const sourceDirection = getAnchorDirection(sourceAnchor);
   const targetDirection = getAnchorDirection(targetAnchor);
   const sourceIsHorizontal = sourceDirection.x !== 0;
+  const targetIsHorizontal = targetDirection.x !== 0;
   let path: string;
   let midpoint: Position;
   let startTangent: Position;
   let endTangent: Position;
 
-  if (route === "straight") {
+  if (waypoint) {
+    const anchorClearance = 24;
+    const sourceIsBehind = (waypoint.x - source.x) * sourceDirection.x +
+      (waypoint.y - source.y) * sourceDirection.y <= 0;
+    const targetIsBehind = (waypoint.x - target.x) * targetDirection.x +
+      (waypoint.y - target.y) * targetDirection.y <= 0;
+    const sourceLead = {
+      x: source.x + sourceDirection.x * anchorClearance,
+      y: source.y + sourceDirection.y * anchorClearance
+    };
+    const targetLead = {
+      x: target.x + targetDirection.x * anchorClearance,
+      y: target.y + targetDirection.y * anchorClearance
+    };
+    const sourcePoints = sourceIsBehind
+      ? [
+        source,
+        sourceLead,
+        sourceIsHorizontal
+          ? { x: sourceLead.x, y: waypoint.y }
+          : { x: waypoint.x, y: sourceLead.y },
+        waypoint
+      ]
+      : [
+        source,
+        sourceIsHorizontal
+          ? { x: waypoint.x, y: source.y }
+          : { x: source.x, y: waypoint.y },
+        waypoint
+      ];
+    const targetPoints = targetIsBehind
+      ? [
+        targetIsHorizontal
+          ? { x: targetLead.x, y: waypoint.y }
+          : { x: waypoint.x, y: targetLead.y },
+        targetLead,
+        target
+      ]
+      : [
+        targetIsHorizontal
+          ? { x: waypoint.x, y: target.y }
+          : { x: target.x, y: waypoint.y },
+        target
+      ];
+    const points = [...sourcePoints, ...targetPoints].filter((point, index, entries) =>
+      index === 0 || point.x !== entries[index - 1].x || point.y !== entries[index - 1].y
+    );
+    path = `M ${formatPathPoint(points[0])}${points.slice(1).map((point) => ` L ${formatPathPoint(point)}`).join("")}`;
+    midpoint = getPolylineMidpoint(points);
+    startTangent = { x: points[1].x - points[0].x, y: points[1].y - points[0].y };
+    const finalSegment = points.slice(-2);
+    endTangent = {
+      x: finalSegment[1].x - finalSegment[0].x,
+      y: finalSegment[1].y - finalSegment[0].y
+    };
+  } else if (route === "straight") {
     path = `M ${formatPathPoint(source)} L ${formatPathPoint(target)}`;
     midpoint = { x: (source.x + target.x) / 2, y: (source.y + target.y) / 2 };
     startTangent = { x: target.x - source.x, y: target.y - source.y };

@@ -55,6 +55,7 @@ export interface FlowchartEdge {
   style?: EdgeStyle;
   start?: string;
   end?: string;
+  waypoint?: Position;
 }
 
 export interface Canvas {

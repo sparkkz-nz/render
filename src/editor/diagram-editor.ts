@@ -50,9 +50,13 @@ export class DiagramEditor {
   public constructor(private readonly host: DiagramEditorHost) {}
 
   public enableCanvasPanning(): void {
-    for (const svg of this.host.outputElement.querySelectorAll<SVGSVGElement>(".docdiagram svg")) {
-      svg.addEventListener("pointerdown", (event) => {
-        if (event.target === svg) {
+    for (const frame of this.host.outputElement.querySelectorAll<HTMLElement>(".docdiagram")) {
+      const svg = frame.querySelector<SVGSVGElement>("svg");
+      if (!svg) {
+        continue;
+      }
+      frame.addEventListener("pointerdown", (event) => {
+        if (event.target === frame || event.target === svg) {
           this.beginCanvasPan(svg, event);
         }
       });
@@ -185,6 +189,12 @@ export class DiagramEditor {
   }
 
   private handleDiagramPointerDown(svg: SVGSVGElement, event: PointerEvent): void {
+    const waypoint = closest(event, ".docdiagram-edge-waypoint");
+    if (waypoint) {
+      this.moveEdgeWaypoint(svg, event, waypoint);
+      return;
+    }
+
     const port = closest(event, ".docdiagram-connection-port");
     if (port) {
       const group = port.closest(".docdiagram-node");
@@ -621,17 +631,22 @@ export class DiagramEditor {
       return;
     }
     event.preventDefault();
+    const diagramIndex = pointerNumber(svg.dataset.diagramIndex);
+    const offset = this.host.state.diagramCameraOffsets.get(diagramIndex) || { x: 0, y: 0 };
     const start = {
       clientX: event.clientX,
       clientY: event.clientY,
-      scrollLeft: frame.scrollLeft,
-      scrollTop: frame.scrollTop
+      offset
     };
     frame.classList.add("docdiagram-panning");
     this.capturePointer(svg, event);
     const move = (moveEvent: PointerEvent) => {
-      frame.scrollLeft = start.scrollLeft - (moveEvent.clientX - start.clientX);
-      frame.scrollTop = start.scrollTop - (moveEvent.clientY - start.clientY);
+      const nextOffset = {
+        x: start.offset.x + moveEvent.clientX - start.clientX,
+        y: start.offset.y + moveEvent.clientY - start.clientY
+      };
+      this.host.state.diagramCameraOffsets.set(diagramIndex, nextOffset);
+      svg.style.transform = `translate(${nextOffset.x}px, ${nextOffset.y}px)`;
     };
     const finish = (finishEvent: PointerEvent) => {
       this.releasePointer(svg, finishEvent);
@@ -639,6 +654,58 @@ export class DiagramEditor {
       svg.removeEventListener("pointermove", move);
       svg.removeEventListener("pointerup", finish);
       svg.removeEventListener("pointercancel", finish);
+    };
+    svg.addEventListener("pointermove", move);
+    svg.addEventListener("pointerup", finish);
+    svg.addEventListener("pointercancel", finish);
+  }
+
+  private moveEdgeWaypoint(svg: SVGSVGElement, event: PointerEvent, handle: Element): void {
+    const diagramIndex = pointerNumber(handle.getAttribute("data-diagram-index") || undefined);
+    const edgeIndex = pointerNumber(handle.getAttribute("data-edge-index") || undefined);
+    const diagram = diagramAt(this.host.state, diagramIndex);
+    const edge = diagram?.edges[edgeIndex];
+    if (!diagram || !edge) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    this.capturePointer(svg, event);
+    const move = (moveEvent: PointerEvent) => {
+      const point = this.svgPoint(svg, moveEvent);
+      edge.waypoint = { x: snapToGrid(point.x, getGridSize(diagram)), y: snapToGrid(point.y, getGridSize(diagram)) };
+      const source = findFlowchartNode(diagram, edge.source)?.node;
+      const target = findFlowchartNode(diagram, edge.target)?.node;
+      if (!source || !target) {
+        return;
+      }
+      const sourceAnchorName = edge.sourceAnchor || "right";
+      const targetAnchorName = edge.targetAnchor || "left";
+      const sourceAnchor = this.getNodePortPoint(source, sourceAnchorName);
+      const targetAnchor = this.getNodePortPoint(target, targetAnchorName);
+      const path = buildEdgePath(
+        sourceAnchor,
+        targetAnchor,
+        sourceAnchorName,
+        targetAnchorName,
+        edge.route || "orthogonal",
+        edge.waypoint
+      );
+      handle.setAttribute("cx", String(edge.waypoint.x));
+      handle.setAttribute("cy", String(edge.waypoint.y));
+      const group = svg.querySelector(
+        `.docdiagram-edge-group[data-diagram-index="${diagramIndex}"][data-edge-index="${edgeIndex}"]`
+      );
+      group?.querySelector(".docdiagram-edge")?.setAttribute("d", path.path);
+      group?.querySelector(".docdiagram-edge-hit")?.setAttribute("d", path.hitPath);
+    };
+    const finish = (finishEvent: PointerEvent) => {
+      this.releasePointer(svg, finishEvent);
+      svg.removeEventListener("pointermove", move);
+      svg.removeEventListener("pointerup", finish);
+      svg.removeEventListener("pointercancel", finish);
+      this.host.persistDiagramModels();
+      this.host.renderDocument();
     };
     svg.addEventListener("pointermove", move);
     svg.addEventListener("pointerup", finish);
