@@ -295,6 +295,11 @@ test("Pages home promotes the published guides", () => {
   assert.match(home, /data-carousel-previous/);
   assert.match(home, /data-carousel-next/);
   assert.match(deployment, /cp pages\/index\.html "\$site_dir\/index\.html"/);
+  assert.match(
+    deployment,
+    /rm -rf "\$site_dir\/assets" "\$site_dir\/templates"/,
+    "asset trees are replaced, since cp -R nests into an existing directory"
+  );
   assert.match(deployment, /cp -R pages\/assets "\$site_dir\/assets"/);
   assert.match(deployment, /cp pages\/docs\/quickstart\.html "\$site_dir\/docs\/index\.html"/);
 });
