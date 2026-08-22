@@ -45,7 +45,7 @@
         radial-gradient(circle at 84% 62%, rgba(53, 214, 178, .14), transparent 27%);
       content: ""; inset: 0; pointer-events: none; position: absolute;
     }
-    .hero-grid { align-items: center; display: grid; gap: 58px; grid-template-columns: minmax(0, .88fr) minmax(480px, 1.12fr); position: relative; }
+    .hero-grid { align-items: center; display: grid; gap: 58px; grid-template-columns: minmax(0, 1fr) minmax(0, .82fr); position: relative; }
     .eyebrow {
       color: var(--mint); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: .75rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
@@ -67,27 +67,11 @@
     .button:hover { transform: translateY(-2px); }
     .button.primary { background: var(--blue); border-color: var(--blue); color: #07101f; }
     .button.secondary { background: rgba(15, 25, 47, .7); }
-    .preview {
-      background: linear-gradient(160deg, rgba(28, 42, 73, .88), rgba(10, 18, 35, .88));
-      border: 1px solid var(--border); border-radius: 15px; box-shadow: 0 28px 70px rgba(0, 0, 0, .36);
-      overflow: hidden; transform: perspective(1400px) rotateY(-5deg) rotateX(2deg);
+    .hero-shot { margin: 0; }
+    .hero-shot img {
+      border: 1px solid var(--border); border-radius: 13px; box-shadow: 0 28px 70px rgba(0, 0, 0, .45);
+      display: block; height: auto; max-width: 100%;
     }
-    .window-bar { align-items: center; border-bottom: 1px solid var(--border); display: flex; gap: 6px; padding: 13px 16px; }
-    .dot { background: #fda4af; border-radius: 50%; height: 8px; width: 8px; }
-    .dot:nth-child(2) { background: #fcd34d; } .dot:nth-child(3) { background: #6ee7b7; }
-    .window-title { color: var(--muted); font: .7rem ui-monospace, monospace; margin-left: 8px; }
-    .editor { display: grid; grid-template-columns: .84fr 1.16fr; min-height: 395px; }
-    .source { background: rgba(6, 13, 28, .55); border-right: 1px solid var(--border); color: #c7d5ea; font: .72rem/1.75 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 24px 17px; }
-    .line { display: block; white-space: pre; } .line .key { color: #a5b4fc; } .line .value { color: #86efac; } .line .comment { color: #65748e; }
-    .document { background: #f8fafc; color: #16233a; padding: 25px; }
-    .document h2 { font-size: 1.3rem; letter-spacing: -.04em; margin: 0 0 8px; }
-    .document p { color: #536176; font-size: .73rem; margin: 0 0 17px; }
-    .flow { display: grid; gap: 9px; grid-template-columns: 1fr 28px 1fr 28px 1fr; margin: 24px 0 21px; place-items: center; }
-    .node { background: #dbeafe; border: 1.5px solid #3b82f6; border-radius: 7px; color: #1e3a8a; font-size: .65rem; font-weight: 700; padding: 11px 5px; text-align: center; width: 100%; }
-    .node.api { background: #dcfce7; border-color: #22c55e; color: #166534; border-radius: 50%; padding: 15px 4px; }
-    .node.db { background: #f3e8ff; border-color: #a855f7; color: #6b21a8; border-radius: 48%; }
-    .arrow { color: #64748b; font-size: 1.25rem; }
-    .callout { background: #eef6ff; border: 1px solid #bfdbfe; border-left: 5px solid #3b82f6; border-radius: 5px; color: #1e3a8a; font-size: .65rem; padding: 9px; }
     .proof { border-top: 1px solid var(--border); padding: 24px 0 68px; position: relative; }
     .proof-grid { display: grid; gap: 24px; grid-template-columns: repeat(3, 1fr); }
     .proof-item { color: var(--muted); font-size: .88rem; } .proof-item strong { color: var(--ink); display: block; font-size: 1rem; margin-bottom: 3px; }
@@ -160,7 +144,7 @@
     footer { border-top: 1px solid var(--border); color: var(--muted); font-size: .8rem; padding: 28px 0; }
     @media (max-width: 800px) {
       .nav { display: none; } .hero { padding-top: 54px; } .hero-grid, .comparison { grid-template-columns: 1fr; }
-      .preview { transform: none; } .steps, .proof-grid { grid-template-columns: 1fr; } .editor { grid-template-columns: 1fr; } .source { display: none; }
+      .steps, .proof-grid { grid-template-columns: 1fr; }
       .tour-row, .tour-row:nth-child(even), .why, .install { grid-template-columns: 1fr; gap: 24px; margin-top: 52px; }
       .tour-row:nth-child(even) .tour-media { order: 0; }
       .carousel-image { min-height: 260px; padding: 12px; } .carousel-image img { max-height: 420px; }
@@ -199,31 +183,10 @@
             <a class="button secondary" href="./templates/skryb-document-template.html" download>Download a template</a>
           </div>
         </div>
-        <div class="preview" aria-label="Illustration of a Skryb document editor">
-          <div class="window-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="window-title">architecture.skryb.html</span></div>
-          <div class="editor">
-            <div class="source">
-              <span class="line"><span class="comment">---</span></span>
-              <span class="line"><span class="key">theme</span>: <span class="value">light</span></span>
-              <span class="line"><span class="comment">---</span></span>
-              <span class="line"> </span>
-              <span class="line"># Order architecture</span>
-              <span class="line"> </span>
-              <span class="line">```diagram</span>
-              <span class="line"><span class="key">type</span>: flowchart</span>
-              <span class="line"><span class="key">nodes</span>:</span>
-              <span class="line">  - id: browser</span>
-              <span class="line">    label: Browser</span>
-              <span class="line">```</span>
-            </div>
-            <div class="document">
-              <h2>Order architecture</h2>
-              <p>How a customer order moves from browser to store.</p>
-              <div class="flow"><div class="node">Browser</div><span class="arrow">→</span><div class="node api">Orders<br>API</div><span class="arrow">→</span><div class="node db">Orders<br>store</div></div>
-              <div class="callout"><strong>Info</strong> &nbsp;The source remains embedded and editable.</div>
-            </div>
-          </div>
-        </div>
+        <figure class="hero-shot">
+          <img src="./assets/sample.png" width="763" height="842" fetchpriority="high" decoding="async"
+            alt="A Skryb document open in a browser: a rendered title, Markdown bullet, and styled flowchart above the source tray showing the canonical Markdown and diagram YAML that produced them">
+        </figure>
       </div>
     </section>
 
