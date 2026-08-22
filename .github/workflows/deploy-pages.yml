@@ -72,6 +72,11 @@ jobs:
           mkdir -p "$site_dir/docs"
           cp pages/docs/*.html "$site_dir/docs/"
           cp pages/index.html "$site_dir/index.html"
+          # Replace these trees outright. "cp -R src dst" copies *into* dst when
+          # dst already exists, which nested each publish under assets/assets and
+          # left the top-level copies stale. Removing first also prunes assets
+          # that have been deleted from the repository.
+          rm -rf "$site_dir/assets" "$site_dir/templates"
           cp -R pages/assets "$site_dir/assets"
           cp -R pages/templates "$site_dir/templates"
           cp pages/docs/quickstart.html "$site_dir/docs/index.html"
