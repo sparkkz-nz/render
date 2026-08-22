@@ -68,7 +68,7 @@ being silently removed or converted.
 | Emphasis, strong text, and strikethrough | Supported | Use `*text*`, `**text**`, and `~~text~~`. |
 | Inline code | Supported | Use backticks, such as `` `value` ``. |
 | Links | Supported with safe URLs | Relative URLs, fragments, `http:`, `https:`, and `mailto:` are rendered. Other schemes, including `javascript:`, stay readable Markdown source. |
-| Fenced code blocks | Supported | The fence language produces a `language-&lt;name&gt;` class on `&lt;code&gt;`; scryb does not provide syntax highlighting. |
+| Fenced code blocks | Supported | Three or more backticks open a block; the closing run must be at least as long, so a longer fence can contain a shorter one. The fence language produces a `language-&lt;name&gt;` class on `&lt;code&gt;`; skryb does not provide syntax highlighting. |
 | Tables | Supported | Header rows, left/centre/right alignment, and escaped cell separators (`\|`) are supported. |
 | Task lists | Supported | `- [ ]` and `- [x]` render as disabled checkboxes because prose editing is not available. |
 | Images | Supported with safe URLs | Relative images and safe `http:`, `https:`, or `data:image/(gif\|jpeg\|png\|webp);base64,...` sources render with their Markdown alt text. |
