@@ -282,6 +282,7 @@ test("Pages home promotes the published guides", () => {
   assert.match(home, /<title>Skryb - beautiful documents your agent writes and you can still edit<\/title>/);
   assert.match(home, /href="\.\/docs\/quickstart\.html"/);
   assert.match(home, /href="\.\/docs\/reference\.html"/);
+  assert.match(home, /src="\.\/assets\/sample\.png"/);
   assert.match(home, /src="\.\/assets\/secure-doc-flow\.png"/);
   assert.match(home, /src="\.\/assets\/source-edit\.png"/);
   assert.match(home, /src="\.\/assets\/edit-flowchart\.png"/);
