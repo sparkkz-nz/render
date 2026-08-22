@@ -1,6 +1,7 @@
 import { calloutKinds, paletteRoles, gridColumns } from "./diagrams/schema";
 import { escapeHtml } from "./diagrams/parser";
 import { getNodeColorPalette, mergeStyle } from "./diagrams/styles";
+import { findFenceClose, isFenceClose, parseFenceOpen } from "./fences";
 
 type DirectiveName = "section" | "panel" | "callout" | "grid" | "stack";
 
@@ -105,18 +106,23 @@ function isDirectiveClose(line: string): boolean {
 
 function findDirectiveClose(lines: string[], start: number, end: number): number {
   let depth = 1;
-  let fenceOpen = false;
+  let fenceMarker: string | null = null;
   for (let index = start + 1; index < end; index += 1) {
-    if (/^```/.test(lines[index])) {
-      fenceOpen = !fenceOpen;
+    const line = lines[index];
+    if (fenceMarker) {
+      if (isFenceClose(line, fenceMarker)) {
+        fenceMarker = null;
+      }
       continue;
     }
-    if (fenceOpen) {
+    const fence = parseFenceOpen(line);
+    if (fence) {
+      fenceMarker = fence.marker;
       continue;
     }
-    if (parseDirectiveOpen(lines[index])) {
+    if (parseDirectiveOpen(line)) {
       depth += 1;
-    } else if (isDirectiveClose(lines[index])) {
+    } else if (isDirectiveClose(line)) {
       depth -= 1;
       if (!depth) {
         return index;
@@ -230,36 +236,45 @@ export function renderMarkdown(
     const normalizedLines = lines.map(stripBlockQuotePrefix);
 
     for (let index = 0; index < normalizedLines.length; index += 1) {
-      if (!/^```diagram\s*$/.test(normalizedLines[index])) {
+      const fence = parseFenceOpen(normalizedLines[index]);
+      if (!fence) {
         continue;
       }
-      const closeOffset = normalizedLines.slice(index + 1).findIndex((candidate) => /^```\s*$/.test(candidate));
-      if (closeOffset === -1) {
+      const closeIndex = findFenceClose(normalizedLines, index + 1, fence.marker);
+      if (closeIndex === -1) {
         break;
       }
-      const definitionSource = normalizedLines.slice(index + 1, index + closeOffset + 1).join("\n");
-      const id = getDiagramId(definitionSource);
-      if (id) {
-        if (definitions.has(id)) {
-          duplicateDefinitionIds.add(id);
-        } else {
-          definitions.set(id, { id, source: definitionSource });
+      if (fence.info === "diagram") {
+        const definitionSource = normalizedLines.slice(index + 1, closeIndex).join("\n");
+        const id = getDiagramId(definitionSource);
+        if (id) {
+          if (definitions.has(id)) {
+            duplicateDefinitionIds.add(id);
+          } else {
+            definitions.set(id, { id, source: definitionSource });
+          }
         }
       }
-      index += closeOffset + 1;
+      // Skip the whole block so a fence nested inside a longer one stays inert.
+      index = closeIndex;
     }
 
-    let fenceOpen = false;
+    let fenceMarker: string | null = null;
     for (const line of normalizedLines) {
-      if (/^```/.test(line)) {
-        fenceOpen = !fenceOpen;
+      if (fenceMarker) {
+        if (isFenceClose(line, fenceMarker)) {
+          fenceMarker = null;
+        }
         continue;
       }
-      if (!fenceOpen) {
-        const reference = parseDiagramReference(line);
-        if (reference) {
-          referenceCounts.set(reference.id, (referenceCounts.get(reference.id) || 0) + 1);
-        }
+      const fence = parseFenceOpen(line);
+      if (fence) {
+        fenceMarker = fence.marker;
+        continue;
+      }
+      const reference = parseDiagramReference(line);
+      if (reference) {
+        referenceCounts.set(reference.id, (referenceCounts.get(reference.id) || 0) + 1);
       }
     }
     return { definitions, duplicateDefinitionIds, referenceCounts };
@@ -447,16 +462,16 @@ export function renderMarkdown(
         continue;
       }
 
-      const fence = line.match(/^```([\w-]*)\s*$/);
+      const fence = parseFenceOpen(line);
       if (fence) {
-        const closing = lines.slice(index + 1, end).findIndex((candidate) => /^```\s*$/.test(candidate));
+        const closing = lines.slice(index + 1, end).findIndex((candidate) => isFenceClose(candidate, fence.marker));
         if (closing === -1) {
           output.push(`<section class="docdiagram-error"><strong>Unclosed code block.</strong></section>`);
           break;
         }
         const closeIndex = index + closing + 1;
         const content = lines.slice(index + 1, closeIndex).join("\n");
-        if (fence[1] === "diagram") {
+        if (fence.info === "diagram") {
           const id = getDiagramId(content);
           if (id && duplicateDefinitionIds.has(id)) {
             output.push(`<section class="docdiagram-error"><strong>Diagram "${escapeHtml(id)}" has multiple definitions.</strong></section>`);
@@ -465,7 +480,7 @@ export function renderMarkdown(
             state.diagramIndex += 1;
           }
         } else {
-          const className = fence[1] ? ` class="language-${escapeHtml(fence[1])}"` : "";
+          const className = fence.info ? ` class="language-${escapeHtml(fence.info)}"` : "";
           output.push(`<pre><code${className}>${escapeHtml(content)}</code></pre>`);
         }
         index = closeIndex + 1;

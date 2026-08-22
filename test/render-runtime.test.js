@@ -2450,3 +2450,58 @@ test("the source tray exposes a top-edge resize handle instead of a corner grabb
     "the tray no longer relies on CSS resize, which is inert while its overflow stays visible"
   );
 });
+
+test("a longer fence nests a shorter one and keeps its contents inert", () => {
+  const source = [
+    "# Doc",
+    "",
+    "````markdown",
+    ":::diagram { id=payment-flow }",
+    "",
+    "```diagram",
+    "id: payment-flow",
+    "type: flowchart",
+    "canvas:",
+    "  width: 600",
+    "  height: 300",
+    "nodes: []",
+    "edges: []",
+    "```",
+    "````"
+  ].join("\n");
+
+  const markup = renderMarkdown(source);
+
+  assert.match(markup, /<pre><code class="language-markdown">/, "the outer fence renders as a code block");
+  assert.match(markup, /:::diagram \{ id=payment-flow \}/, "the reference is shown as text");
+  assert.doesNotMatch(markup, /docdiagram-error/, "the example does not raise an error");
+  assert.equal(
+    (markup.match(/<svg/g) || []).length,
+    0,
+    "nothing inside the example renders as a real diagram"
+  );
+  assert.doesNotMatch(markup, /````markdown/, "the fence marker is not left in the output");
+});
+
+test("a four-backtick fence closes on four backticks, not three", () => {
+  const markup = renderMarkdown(["````text", "```", "still inside", "````"].join("\n"));
+
+  assert.match(markup, /<pre><code class="language-text">/);
+  assert.match(markup, /still inside/, "a shorter run does not close the block");
+  assert.doesNotMatch(markup, /Unclosed code block/);
+});
+
+test("validateDocumentSource ignores diagrams nested inside a longer fence", () => {
+  const source = [
+    "# Doc",
+    "",
+    "````markdown",
+    "```diagram",
+    "type: flowchart",
+    "this: would not parse",
+    "```",
+    "````"
+  ].join("\n");
+
+  assert.doesNotThrow(() => validateDocumentSource(source));
+});

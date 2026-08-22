@@ -1,6 +1,7 @@
 import { colourSchemes } from "./diagrams/schema";
 import { parseDiagram, parseScalar } from "./diagrams/parser";
 import { resolveTheme } from "./diagrams/styles";
+import { findFenceClose, isFenceClose, parseFenceOpen, stripFencePrefix } from "./fences";
 
 export function parseDocumentFrontmatter(source: string): { content: string; frontmatter: Record<string, unknown> } {
   const lines = source.replace(/\r\n/g, "\n").split("\n");
@@ -55,39 +56,43 @@ export function validateDocumentSource(source: string): { content: string; front
   let index = 0;
   const diagramIds = new Set<string>();
   let hasDiagramReferences = false;
-  let referenceFenceOpen = false;
+  let referenceFenceMarker: string | null = null;
   for (const line of lines) {
-    const normalizedLine = line.replace(/^(?: {0,3}> ?)+/, "");
-    if (/^```/.test(normalizedLine)) {
-      referenceFenceOpen = !referenceFenceOpen;
+    const normalizedLine = stripFencePrefix(line);
+    if (referenceFenceMarker) {
+      if (isFenceClose(normalizedLine, referenceFenceMarker)) {
+        referenceFenceMarker = null;
+      }
       continue;
     }
-    if (!referenceFenceOpen && /^:::diagram\s+\{\s*id=/.test(normalizedLine)) {
+    const fence = parseFenceOpen(normalizedLine);
+    if (fence) {
+      referenceFenceMarker = fence.marker;
+      continue;
+    }
+    if (/^:::diagram\s+\{\s*id=/.test(normalizedLine)) {
       hasDiagramReferences = true;
       break;
     }
   }
 
   while (index < lines.length) {
-    const line = lines[index].replace(/^(?: {0,3}> ?)+/, "");
-    const fence = line.match(/^```([\w-]*)\s*$/);
+    const line = stripFencePrefix(lines[index]);
+    const fence = parseFenceOpen(line);
     if (!fence) {
       index += 1;
       continue;
     }
 
-    const closeOffset = lines
-      .slice(index + 1)
-      .findIndex((candidate) => /^```\s*$/.test(candidate.replace(/^(?: {0,3}> ?)+/, "")));
-    if (closeOffset === -1) {
+    const closeIndex = findFenceClose(lines, index + 1, fence.marker);
+    if (closeIndex === -1) {
       throw new Error("Unclosed code block.");
     }
 
-    const closeIndex = index + closeOffset + 1;
-    if (fence[1] === "diagram") {
+    if (fence.info === "diagram") {
       const diagramSource = lines
         .slice(index + 1, closeIndex)
-        .map((candidate) => candidate.replace(/^(?: {0,3}> ?)+/, ""))
+        .map((candidate) => stripFencePrefix(candidate))
         .join("\n");
       parseDiagram(diagramSource, document.colourScheme);
       const id = diagramSource.match(/^id:\s*(?:"([^"]+)"|([^\s#]+))\s*$/m)?.slice(1).find(Boolean);
