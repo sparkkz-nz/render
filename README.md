@@ -1,10 +1,22 @@
 # skryb
 
+Finally, your agent can produce beautiful documents that you can still edit
+like Markdown.
+
 skryb turns a portable HTML document containing Markdown, frontmatter, and
-diagram source into readable documentation with interactive SVG flowcharts.
-The Markdown source remains embedded in the HTML file, so a document can be
-opened locally, edited, saved as a new copy, and reopened without a server or
-build tool.
+diagram source into readable documentation with interactive SVG flowcharts and
+sequence diagrams. The Markdown source remains embedded in the HTML file, so a
+document can be opened locally, edited, saved as a new copy, and reopened
+without a server or build tool.
+
+- **Fully Markdown compatible** - the canonical source stays in the file
+- **Beautiful diagrams** with full control over layout and colour
+- **A single portable HTML file** that needs only a browser
+- **Built-in diagram editor** - no other tools needed
+- **Easy for agents to write**, easy for humans to edit
+
+See [the project page](https://sparkkz-nz.github.io/skryb/) for a walkthrough
+of source editing, the diagram editor, themes, and zoom.
 
 skryb is a viewer for agent-generated documentation with targeted editing for
 human corrections. It is not a general-purpose document authoring application.
@@ -54,6 +66,26 @@ Save it as `hello-skryb.html` and open it in a browser. See the
 walkthrough, or the [syntax reference](https://sparkkz-nz.github.io/skryb/docs/reference.html) for the complete
 current document contract.
 
+## Reading and editing
+
+Everything happens inside the open document; there is no separate application.
+
+- **Edit source** (Cmd/Ctrl+Shift+E) opens the source tray over the document. It
+  holds the canonical Markdown and diagram YAML and live-renders valid changes.
+  Drag the tray's top edge to resize it, or focus that edge and use the arrow
+  keys; double-click it to restore the default height.
+- **Diagram editing** selects a node to set its label, subtitle, shape, palette,
+  status colour, fill, stroke, alignment, and size. Nodes can be dragged,
+  resized, duplicated, and reconnected; every change is serialized back into the
+  matching diagram fence.
+- **Theme and colour scheme** are set in frontmatter or from the document menu:
+  `theme` is `auto`, `light`, or `dark`, and `colourScheme` is `classic`, `ice`,
+  `midnight`, or `paper`. Diagrams render as live SVG and follow the theme, and
+  a menu change becomes canonical frontmatter when the document is saved.
+- **Layout and zoom** switch the reading view between centred and full-width,
+  and zoom, fit, or pan a diagram inside its frame. These are view controls:
+  panning and zooming never alter stored coordinates.
+
 ## Runtime URLs
 
 ```html
@@ -82,7 +114,7 @@ small and portable between folders.
 - [Getting started](https://sparkkz-nz.github.io/skryb/docs/quickstart.html): create, open, edit, and save a
   portable document.
 - [Syntax reference](https://sparkkz-nz.github.io/skryb/docs/reference.html): supported HTML, frontmatter, Markdown,
-  flowchart YAML, and editing behaviour.
+  flowchart and sequence diagram YAML, and editing behaviour.
 - [Agent authoring skill](.github/skills/skryb-document/SKILL.md): instructions
   and checked examples for agents creating valid skryb documents.
 - [Examples](examples/): ready-to-open hosted and local-runtime documents.

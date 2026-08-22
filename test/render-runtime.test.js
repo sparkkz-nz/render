@@ -279,13 +279,18 @@ test("Pages home promotes the published guides", () => {
   const home = fs.readFileSync(path.resolve(__dirname, "..", "pages", "index.html"), "utf8");
   const deployment = fs.readFileSync(path.resolve(__dirname, "..", ".github", "workflows", "deploy-pages.yml"), "utf8");
 
-  assert.match(home, /<title>Skryb - portable documents for agents and humans<\/title>/);
+  assert.match(home, /<title>Skryb - beautiful documents your agent writes and you can still edit<\/title>/);
   assert.match(home, /href="\.\/docs\/quickstart\.html"/);
   assert.match(home, /href="\.\/docs\/reference\.html"/);
   assert.match(home, /src="\.\/assets\/secure-doc-flow\.png"/);
   assert.match(home, /src="\.\/assets\/source-edit\.png"/);
   assert.match(home, /src="\.\/assets\/edit-flowchart\.png"/);
   assert.match(home, /src="\.\/assets\/sequence\.png"/);
+  assert.match(home, /src="\.\/assets\/edit-source\.mp4"/);
+  assert.match(home, /src="\.\/assets\/edit-diagram\.mp4"/);
+  assert.match(home, /src="\.\/assets\/themes\.mp4"/);
+  assert.match(home, /src="\.\/assets\/zoom\.mp4"/);
+  assert.match(home, /npx skills add sparkkz-nz\/skryb/);
   assert.match(home, /data-carousel-previous/);
   assert.match(home, /data-carousel-next/);
   assert.match(deployment, /cp pages\/index\.html "\$site_dir\/index\.html"/);
@@ -2421,4 +2426,21 @@ test("setEdgeMarkerStart and setEdgeMarkerEnd normalize unsupported values back 
 
   assert.equal(edge.start, "none");
   assert.equal(edge.end, "arrow");
+});
+
+test("the source tray exposes a top-edge resize handle instead of a corner grabber", () => {
+  const bundle = fs.readFileSync(path.resolve(__dirname, "..", "dist", "skryb-runtime.js"), "utf8");
+  const trayRule = bundle.match(/\.docdiagram-source-tray \{([^}]*)\}/);
+
+  assert.ok(trayRule, "the tray rule is present in the bundled styles");
+  assert.match(bundle, /class="docdiagram-source-resize"/, "the tray renders a resize handle");
+  assert.match(bundle, /role="separator"/, "the handle is exposed as a separator");
+  assert.match(bundle, /aria-label="Resize source editor"/, "the handle is labelled");
+  assert.match(bundle, /tabindex="0"/, "the handle is keyboard reachable");
+  assert.match(bundle, /\.docdiagram-source-resize \{[^}]*cursor: ns-resize/, "the handle shows a vertical resize cursor");
+  assert.doesNotMatch(
+    trayRule[1],
+    /resize:\s*vertical/,
+    "the tray no longer relies on CSS resize, which is inert while its overflow stays visible"
+  );
 });

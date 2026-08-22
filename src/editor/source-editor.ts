@@ -2,6 +2,10 @@ import { findSourceTextRange, scrollSourceEditorToRange } from "../core/document
 
 const referenceUrl = "https://sparkkz-nz.github.io/skryb/docs/reference.html";
 
+const MINIMUM_TRAY_HEIGHT = 192;
+const TRAY_VIEWPORT_MARGIN = 96;
+const TRAY_KEYBOARD_STEP = 24;
+
 const insertTemplates: Record<string, string> = {
   flowchart: [
     "```diagram",
@@ -236,6 +240,7 @@ export class SourceEditor {
     tray.dataset.theme = this.host.getDocumentTheme();
     tray.setAttribute("aria-label", "Document source editor");
     tray.innerHTML = [
+      `<div class="docdiagram-source-resize" role="separator" aria-orientation="horizontal" aria-label="Resize source editor" tabindex="0" title="Drag to resize"></div>`,
       `<header class="docdiagram-source-header">`,
       `<div><strong>Source</strong><span class="docdiagram-source-shortcut">Cmd/Ctrl+Shift+E to close</span></div>`,
       `<div class="docdiagram-source-actions">`,
@@ -304,6 +309,7 @@ export class SourceEditor {
     const syncTrayHeight = () => {
       this.host.outputElement.style.setProperty("--docdiagram-source-tray-height", `${tray?.offsetHeight || 0}px`);
     };
+    this.attachResizeHandle(tray, syncTrayHeight);
     this.resizeObserver?.disconnect();
     if (globalThis.ResizeObserver) {
       this.resizeObserver = new globalThis.ResizeObserver(syncTrayHeight);
@@ -311,6 +317,73 @@ export class SourceEditor {
     }
     syncTrayHeight();
     this.updateStatus();
+  }
+
+  private attachResizeHandle(tray: HTMLElement, syncTrayHeight: () => void): void {
+    const handle = tray.querySelector<HTMLElement>(".docdiagram-source-resize");
+    if (!handle) {
+      return;
+    }
+
+    const clampHeight = (height: number): number => {
+      const viewport = globalThis.innerHeight || 0;
+      const maximum = viewport ? Math.max(MINIMUM_TRAY_HEIGHT, viewport - TRAY_VIEWPORT_MARGIN) : height;
+      return Math.min(Math.max(height, MINIMUM_TRAY_HEIGHT), maximum);
+    };
+    const applyHeight = (height: number): void => {
+      tray.style.height = `${clampHeight(height)}px`;
+      // Keep the document padding in step without waiting on ResizeObserver.
+      syncTrayHeight();
+    };
+
+    handle.addEventListener("pointerdown", (event: PointerEvent) => {
+      if (event.button !== 0) {
+        return;
+      }
+      event.preventDefault();
+      const startY = event.clientY;
+      const startHeight = tray.offsetHeight;
+      tray.dataset.resizing = "true";
+      handle.setPointerCapture?.(event.pointerId);
+
+      const move = (moveEvent: PointerEvent): void => {
+        // The tray is anchored to the bottom, so dragging up must grow it.
+        applyHeight(startHeight - (moveEvent.clientY - startY));
+      };
+      const stop = (): void => {
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", stop);
+        handle.removeEventListener("pointercancel", stop);
+        delete tray.dataset.resizing;
+        handle.releasePointerCapture?.(event.pointerId);
+      };
+
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", stop);
+      handle.addEventListener("pointercancel", stop);
+    });
+
+    handle.addEventListener("keydown", (event: KeyboardEvent) => {
+      const step = event.shiftKey ? TRAY_KEYBOARD_STEP * 4 : TRAY_KEYBOARD_STEP;
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        applyHeight(tray.offsetHeight + step);
+      } else if (event.key === "ArrowDown") {
+        event.preventDefault();
+        applyHeight(tray.offsetHeight - step);
+      } else if (event.key === "Home") {
+        event.preventDefault();
+        applyHeight(Number.MAX_SAFE_INTEGER);
+      } else if (event.key === "End") {
+        event.preventDefault();
+        applyHeight(MINIMUM_TRAY_HEIGHT);
+      }
+    });
+
+    handle.addEventListener("dblclick", () => {
+      tray.style.removeProperty("height");
+      syncTrayHeight();
+    });
   }
 
   private scheduleRender(): void {
