@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Skryb is a portable HTML document format for agent-generated technical documents that people can still edit.">
-  <title>Skryb - portable documents for agents and humans</title>
+  <meta name="description" content="Skryb lets your agent produce beautiful technical documents you can still edit like Markdown: one portable HTML file, editable diagrams, no extra tools.">
+  <title>Skryb - beautiful documents your agent writes and you can still edit</title>
   <style>
     :root {
       color-scheme: dark;
@@ -53,6 +53,12 @@
     h1 { font-size: clamp(3rem, 6vw, 5.55rem); letter-spacing: -.065em; line-height: .96; margin: 17px 0 26px; }
     h1 em { color: var(--blue); font-style: normal; }
     .lede { color: var(--muted); font-size: 1.15rem; max-width: 560px; }
+    .highlights { display: grid; gap: 9px; list-style: none; margin: 24px 0 0; max-width: 560px; padding: 0; }
+    .highlights li { color: var(--muted); font-size: .95rem; padding-left: 26px; position: relative; }
+    .highlights li::before {
+      color: var(--mint); content: "\2713"; font-weight: 700; left: 4px; position: absolute; top: 0;
+    }
+    .highlights strong { color: var(--ink); font-weight: 700; }
     .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
     .button {
       border: 1px solid var(--border); border-radius: 9px; display: inline-flex; font-weight: 700;
@@ -95,8 +101,41 @@
     .contrast { background: linear-gradient(135deg, #0b1830, #10102a); border-block: 1px solid var(--border); }
     .comparison { display: grid; gap: 22px; grid-template-columns: 1fr 1fr; margin-top: 42px; }
     .comparison .card { min-height: 210px; } .comparison code { background: var(--code); border-radius: 5px; color: #bfdbfe; display: block; font: .75rem/1.65 ui-monospace, monospace; padding: 15px; }
-    .cta { padding: 115px 0; text-align: center; } .cta .section-heading { margin: auto; } .cta .actions { justify-content: center; }
-    .gallery { padding-bottom: 112px; padding-top: 0; }
+    .cta { padding: 115px 28px; text-align: center; } .cta .section-heading { margin: auto; } .cta .actions { justify-content: center; }
+    .gallery { padding-bottom: 112px; }
+    section.shell { padding-block: 92px; }
+    section.tour { padding-bottom: 24px; }
+    section.gallery { padding-top: 60px; }
+    .tour-row {
+      align-items: center; display: grid; gap: 46px; grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr);
+      margin-top: 76px;
+    }
+    .tour-row:nth-child(even) { grid-template-columns: minmax(0, .75fr) minmax(0, 1.25fr); }
+    .tour-row:nth-child(even) .tour-media { order: 2; }
+    .tour-media {
+      background: #0b1528; border: 1px solid var(--border); border-radius: 13px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, .38); overflow: hidden;
+    }
+    .tour-media img, .tour-media video { display: block; height: auto; width: 100%; }
+    @media (prefers-reduced-motion: reduce) { .tour-media video { display: none; } .tour-media .motion-fallback { display: block; } }
+    .tour-media .motion-fallback { display: none; }
+    .tour-copy h3 { font-size: 1.55rem; letter-spacing: -.03em; margin: 12px 0 10px; }
+    .tour-copy p { color: var(--muted); margin: 0 0 14px; }
+    .tour-copy ul { color: var(--muted); font-size: .9rem; margin: 0; padding-left: 18px; }
+    .tour-copy li { margin-bottom: 5px; }
+    .tour-copy code { background: var(--code); border-radius: 4px; color: #bfdbfe; font: .82em ui-monospace, monospace; padding: 1px 5px; }
+    .why { display: grid; gap: 18px; grid-template-columns: repeat(2, 1fr); margin-top: 42px; }
+    .install { align-items: start; display: grid; gap: 46px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin-top: 40px; }
+    .install pre {
+      background: var(--code); border: 1px solid var(--border); border-radius: 9px; color: #bfdbfe;
+      font: .8rem/1.75 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 0; overflow-x: auto; padding: 19px;
+    }
+    .install pre .flag { color: #86efac; }
+    .install-note { color: var(--muted); font-size: .85rem; margin: 14px 0 0; }
+    .install-copy p { color: var(--muted); margin: 0 0 14px; }
+    .install-copy ul { color: var(--muted); font-size: .9rem; margin: 0; padding-left: 18px; }
+    .install-copy li { margin-bottom: 5px; }
+    .install code { background: var(--code); border-radius: 4px; color: #bfdbfe; font: .82em ui-monospace, monospace; padding: 1px 5px; }
     .carousel { margin-top: 42px; outline: none; }
     .carousel-viewport { background: var(--surface); border: 1px solid var(--border); border-radius: 13px; overflow: hidden; }
     .carousel-slide { display: none; }
@@ -122,6 +161,8 @@
     @media (max-width: 800px) {
       .nav { display: none; } .hero { padding-top: 54px; } .hero-grid, .comparison { grid-template-columns: 1fr; }
       .preview { transform: none; } .steps, .proof-grid { grid-template-columns: 1fr; } .editor { grid-template-columns: 1fr; } .source { display: none; }
+      .tour-row, .tour-row:nth-child(even), .why, .install { grid-template-columns: 1fr; gap: 24px; margin-top: 52px; }
+      .tour-row:nth-child(even) .tour-media { order: 0; }
       .carousel-image { min-height: 260px; padding: 12px; } .carousel-image img { max-height: 420px; }
     }
   </style>
@@ -131,6 +172,7 @@
     <nav class="topbar" aria-label="Main navigation">
       <a class="brand" href="./"><span class="brand-mark" aria-hidden="true"></span>skryb</a>
       <div class="nav">
+        <a href="#tour">See it work</a>
         <a href="./docs/quickstart.html">Quickstart</a>
         <a href="./docs/reference.html">Reference</a>
         <a href="./latest/skryb-runtime.js">Runtime</a>
@@ -143,12 +185,18 @@
       <div class="shell hero-grid">
         <div>
           <div class="eyebrow">Portable technical documents</div>
-          <h1>Markdown meets HTML.<br>Humans meet <em>agents.</em></h1>
-          <p class="lede">Skryb gives AI agents a durable format for producing beautiful technical documents: a single HTML file with canonical Markdown, diagrams, and a human-friendly editor built in.</p>
+          <h1>Beautiful docs.<br>Still just <em>Markdown.</em></h1>
+          <p class="lede">Finally, your agent can produce beautiful documents that you can still edit like Markdown.</p>
+          <ul class="highlights">
+            <li><strong>Fully Markdown compatible</strong> - the canonical source stays in the file</li>
+            <li><strong>Beautiful diagrams</strong> with full control over layout and colour</li>
+            <li><strong>A single portable HTML file</strong> that needs only a browser</li>
+            <li><strong>Built-in diagram editor</strong> - no other tools needed</li>
+            <li><strong>Easy for agents to write</strong>, easy for humans to edit</li>
+          </ul>
           <div class="actions">
-            <a class="button primary" href="./templates/skryb-document-template.html" download>Download a template</a>
-            <a class="button secondary" href="./docs/quickstart.html">Start building</a>
-            <a class="button secondary" href="./docs/reference.html">Read the reference</a>
+            <a class="button primary" href="#tour">See it work</a>
+            <a class="button secondary" href="./templates/skryb-document-template.html" download>Download a template</a>
           </div>
         </div>
         <div class="preview" aria-label="Illustration of a Skryb document editor">
@@ -181,22 +229,120 @@
 
     <div class="shell proof">
       <div class="proof-grid">
-        <div class="proof-item"><strong>One portable file</strong>Source and saved edits travel together; use a local runtime beside it for offline work.</div>
-        <div class="proof-item"><strong>Deterministic diagrams</strong>Explicit YAML produces predictable layouts that remain editable, rather than a static image or opaque export.</div>
-        <div class="proof-item"><strong>Browser-only editing</strong>Drag nodes, adjust supported diagrams, edit source, and save a copy - no external authoring app required.</div>
+        <div class="proof-item"><strong>One file, nothing to install</strong>Source, diagrams, and saved edits travel together in a single HTML file. Email it, commit it, open it from disk - it just works in a browser.</div>
+        <div class="proof-item"><strong>Diagrams you can actually change</strong>Explicit YAML gives deterministic layouts, and anything you drag or restyle is written straight back into that source.</div>
+        <div class="proof-item"><strong>No dead exports</strong>Not a screenshot, not a PDF, not a rendering-service link that rots. The document stays editable long after the agent that wrote it has gone.</div>
       </div>
     </div>
 
+    <section class="shell tour" id="tour">
+      <div class="section-heading">
+        <div class="eyebrow">See it work</div>
+        <h2>Everything happens in the document.</h2>
+        <p>Reading, editing, restyling, and saving all happen in the open file. There is no app to launch, no export step, and no separate diagram tool.</p>
+      </div>
+
+      <div class="tour-row">
+        <div class="tour-media">
+          <video src="./assets/edit-source.mp4" poster="./assets/edit-source-poster.jpg" width="1126" height="978"
+            autoplay muted loop playsinline preload="metadata"
+            aria-label="Screen recording: editing the canonical Markdown in the source tray to add a heading and author a new diagram, with the document re-rendering live"></video>
+          <img class="motion-fallback" src="./assets/edit-source-poster.jpg" alt="The Skryb source tray open beneath a rendered document, showing the canonical Markdown being edited" width="1126" height="978">
+        </div>
+        <div class="tour-copy">
+          <div class="eyebrow">Markdown, unchanged</div>
+          <h3>Edit the source you already know</h3>
+          <p>Press <code>Cmd/Ctrl+Shift+E</code> to open the source tray. Inside is ordinary Markdown with YAML frontmatter - headings, lists, tables, links, code fences, callouts. Type a new section or a whole new diagram and the document re-renders as you go.</p>
+          <ul>
+            <li>Canonical Markdown is the stored truth, not a lossy round trip</li>
+            <li>Readable in a diff, so documents review like code</li>
+            <li>Nothing proprietary to learn before you can fix a typo</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="tour-row">
+        <div class="tour-media">
+          <video src="./assets/edit-diagram.mp4" poster="./assets/edit-diagram-poster.jpg" width="1126" height="978"
+            autoplay muted loop playsinline preload="none"
+            aria-label="Screen recording: selecting a flowchart node, changing its label, palette, fill colour and size in the inspector, then duplicating it and routing a new edge"></video>
+          <img class="motion-fallback" src="./assets/edit-diagram-poster.jpg" alt="The Skryb diagram inspector open beside a selected flowchart node, showing label, palette, shape, fill, alignment and size controls" width="1126" height="978">
+        </div>
+        <div class="tour-copy">
+          <div class="eyebrow">Built-in diagram editor</div>
+          <h3>Full control over layout and colour</h3>
+          <p>Select a node to open the inspector: label, subtitle, shape, palette, status colour, custom fill and stroke, alignment, and exact size. Drag to reposition, resize with handles, duplicate a node, and route new edges between them.</p>
+          <ul>
+            <li>Every change is written back into the diagram YAML</li>
+            <li>Semantic palettes and statuses keep a document visually consistent</li>
+            <li>No Visio, no draw.io, no exported PNG that drifts out of date</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="tour-row">
+        <div class="tour-media">
+          <video src="./assets/themes.mp4" poster="./assets/themes-poster.jpg" width="1090" height="978"
+            autoplay muted loop playsinline preload="none"
+            aria-label="Screen recording: using the document menu to switch theme between light and dark and cycle through colour schemes, with prose, callouts and the diagram all re-theming together"></video>
+          <img class="motion-fallback" src="./assets/themes-poster.jpg" alt="The Skryb document menu open, showing theme, colour scheme, format, and save options beside a dark-themed document" width="1090" height="978">
+        </div>
+        <div class="tour-copy">
+          <div class="eyebrow">Themes and colour schemes</div>
+          <h3>Beautiful in whichever mode you read in</h3>
+          <p>The document menu switches <code>theme</code> between <code>auto</code>, <code>light</code>, and <code>dark</code>, and picks a colour scheme - <code>classic</code>, <code>ice</code>, <code>midnight</code>, or <code>paper</code>. Prose, callouts, and diagrams all re-theme together.</p>
+          <ul>
+            <li>Diagrams are live SVG, so they follow the theme instead of fighting it</li>
+            <li><code>auto</code> follows the reader's system preference</li>
+            <li>A menu change becomes canonical frontmatter when you save</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="tour-row">
+        <div class="tour-media">
+          <video src="./assets/zoom.mp4" poster="./assets/zoom-poster.jpg" width="1630" height="978"
+            autoplay muted loop playsinline preload="none"
+            aria-label="Screen recording: switching a document to full-width layout, then zooming and fitting a large flowchart inside its frame"></video>
+          <img class="motion-fallback" src="./assets/zoom-poster.jpg" alt="A Skryb document in full-width layout with a large flowchart zoomed to fit its frame" width="1630" height="978">
+        </div>
+        <div class="tour-copy">
+          <div class="eyebrow">Big diagrams, small screens</div>
+          <h3>Zoom in without losing the thread</h3>
+          <p>Switch to full-width layout to give a complex system more room, then zoom in, zoom out, or fit the diagram to its frame. Because the diagram is vector, detail stays crisp at any magnification and the surrounding prose stays where it was.</p>
+          <ul>
+            <li>Centred or full-width layout, switched as you read</li>
+            <li>Sharp on a laptop, a 4K monitor, or in print</li>
+            <li>Panning is visual only - stored coordinates stay untouched</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
     <section class="shell">
       <div class="section-heading">
-        <div class="eyebrow">A better handoff</div>
-        <h2>From structured intent to a document worth sharing.</h2>
-        <p>Skryb keeps the machine-readable source, deterministic diagram layout, and reader-ready experience in the same place. No separate CMS, build pipeline, external authoring app, or fragile handoff format required.</p>
+        <div class="eyebrow">Why it matters</div>
+        <h2>Agent output that survives contact with a team.</h2>
+        <p>Most agent-written documentation dies on delivery: the diagram is an image, the formatting is bespoke, and the only way to change anything is to ask the agent again.</p>
+      </div>
+      <div class="why">
+        <article class="card"><h3>Correct it yourself</h3><p>Spotted a wrong label or a missing step? Fix it in the source tray or drag the node. You do not need the original agent, its context, or its environment.</p></article>
+        <article class="card"><h3>Keep it in version control</h3><p>The document is text: Markdown plus YAML inside one HTML file. Diffs are readable, reviews are meaningful, and history stays honest.</p></article>
+        <article class="card"><h3>Share it anywhere</h3><p><strong>Save As</strong> keeps the file small against the hosted runtime. <strong>Save for Offline</strong> embeds a pinned runtime so the document works with no network at all.</p></article>
+        <article class="card"><h3>Cheap for agents to produce</h3><p>Agents write plain Markdown and explicit diagram YAML - no image generation, no headless browser, no rendering service. <a href="#agents">One install</a> keeps them on-contract.</p></article>
+      </div>
+    </section>
+
+    <section class="shell">
+      <div class="section-heading">
+        <div class="eyebrow">The workflow</div>
+        <h2>Three steps, no pipeline.</h2>
+        <p>No CMS, no build step, no diagram service, no export dance. An agent writes a file, a browser renders it, a person improves it.</p>
       </div>
       <div class="steps">
         <article class="card"><div class="number">01 / AUTHOR</div><h3>Describe the system</h3><p>Agents write standard Markdown and explicit diagram YAML. The source is readable, reviewable, and versionable.</p></article>
         <article class="card"><div class="number">02 / RENDER</div><h3>Open anywhere</h3><p>The browser runtime turns the source into responsive documentation with deterministic, interactive SVG diagrams.</p></article>
-        <article class="card"><div class="number">03 / REFINE</div><h3>Keep humans in the loop</h3><p>People can edit source, drag and rearrange supported diagrams, and download a complete updated document without leaving the browser.</p></article>
+        <article class="card"><div class="number">03 / REFINE</div><h3>Keep humans in the loop</h3><p>People edit the source, drag and restyle diagrams, and save an updated document without leaving the browser.</p></article>
       </div>
     </section>
 
@@ -204,8 +350,8 @@
       <div class="shell">
         <div class="section-heading">
           <div class="eyebrow">The contract</div>
-          <h2>Not a screenshot. Not a dead export.</h2>
-          <p>Skryb documents remain alive after an agent creates them.</p>
+          <h2>One source. Two audiences.</h2>
+          <p>The same file is structured enough for an agent to write and pleasant enough for a person to read.</p>
         </div>
         <div class="comparison">
           <article class="card"><h3>What agents write</h3><code>type: sequence
@@ -221,54 +367,85 @@ messages:
       </div>
     </section>
 
-    <section class="shell cta">
-      <div class="section-heading">
-        <div class="eyebrow">Start with the format</div>
-        <h2>Make technical knowledge portable.</h2>
-        <p>Learn the document shell, create a diagram, and save a document your team can keep improving.</p>
-      </div>
-      <div class="actions">
-        <a class="button primary" href="./templates/skryb-document-template.html" download>Download a template</a>
-        <a class="button primary" href="./docs/quickstart.html">Open the quickstart</a>
-        <a class="button secondary" href="./docs/reference.html">Browse the schema</a>
-      </div>
-    </section>
-
     <section class="shell gallery">
       <div class="section-heading">
         <div class="eyebrow">Made to be used</div>
-        <h2>Beautiful to read. Practical to refine.</h2>
-        <p>Skryb starts with structured source but does not stop there. Documents can present rich technical context, expose their canonical source, and let people refine diagrams directly in the browser.</p>
+        <h2>What a finished document looks like.</h2>
+        <p>Prose, callouts, tables, and diagrams in one file - technical context with the explanation around it, not a diagram dropped into a wiki page without a story.</p>
       </div>
       <div class="carousel" aria-label="Skryb feature screenshots" tabindex="0">
         <div class="carousel-viewport">
           <article class="carousel-slide" data-active="true">
-            <div class="carousel-image"><img src="./assets/secure-doc-flow.png" alt="A rendered Skryb document showing a secure ingestion workflow, callouts, and an editable flowchart"></div>
+            <div class="carousel-image"><img src="./assets/secure-doc-flow.png" alt="A rendered Skryb document showing a secure ingestion workflow, callouts, and an editable flowchart" loading="lazy" decoding="async"></div>
             <div class="showcase-copy"><h3>Reader-ready technical context</h3><p>Combine prose, callouts, and diagrams in one portable document that gives a system its surrounding explanation.</p></div>
           </article>
           <article class="carousel-slide" data-active="false">
-            <div class="carousel-image"><img src="./assets/source-edit.png" alt="The Skryb source editor open beneath a rendered sequence diagram"></div>
-            <div class="showcase-copy"><h3>Canonical source, always close</h3><p>Open the source tray to inspect or edit the Markdown and YAML that defines the document.</p></div>
-          </article>
-          <article class="carousel-slide" data-active="false">
-            <div class="carousel-image"><img src="./assets/edit-flowchart.png" alt="The Skryb diagram inspector adjusting a selected flowchart node"></div>
-            <div class="showcase-copy"><h3>Refine diagrams in place</h3><p>Select, drag, resize, and restyle supported flowchart elements without a separate diagramming tool.</p></div>
-          </article>
-          <article class="carousel-slide" data-active="false">
-            <div class="carousel-image"><img src="./assets/sequence.png" alt="A rendered Skryb sequence diagram with styled callouts and participants"></div>
+            <div class="carousel-image"><img src="./assets/sequence.png" alt="A rendered Skryb sequence diagram with styled callouts and participants" loading="lazy" decoding="async"></div>
             <div class="showcase-copy"><h3>Sequence diagrams with intent</h3><p>Express ordered interactions as canonical YAML and render a rich, deterministic view with no external diagram service.</p></div>
+          </article>
+          <article class="carousel-slide" data-active="false">
+            <div class="carousel-image"><img src="./assets/edit-flowchart.png" alt="The Skryb diagram inspector adjusting a selected flowchart node" loading="lazy" decoding="async"></div>
+            <div class="showcase-copy"><h3>Refine diagrams in place</h3><p>Select, drag, resize, and restyle flowchart elements without a separate diagramming tool.</p></div>
+          </article>
+          <article class="carousel-slide" data-active="false">
+            <div class="carousel-image"><img src="./assets/source-edit.png" alt="The Skryb source editor open beneath a rendered sequence diagram" loading="lazy" decoding="async"></div>
+            <div class="showcase-copy"><h3>Canonical source, always close</h3><p>Open the source tray to inspect or edit the Markdown and YAML that defines the document.</p></div>
           </article>
         </div>
         <div class="carousel-controls">
           <button class="carousel-button" type="button" data-carousel-previous>Previous</button>
           <div class="carousel-dots" aria-label="Choose screenshot">
             <button class="carousel-dot" type="button" aria-label="Show reader-ready document" aria-current="true"></button>
-            <button class="carousel-dot" type="button" aria-label="Show source editor" aria-current="false"></button>
-            <button class="carousel-dot" type="button" aria-label="Show diagram inspector" aria-current="false"></button>
             <button class="carousel-dot" type="button" aria-label="Show sequence diagram" aria-current="false"></button>
+            <button class="carousel-dot" type="button" aria-label="Show diagram inspector" aria-current="false"></button>
+            <button class="carousel-dot" type="button" aria-label="Show source editor" aria-current="false"></button>
           </div>
           <button class="carousel-button" type="button" data-carousel-next>Next</button>
         </div>
+      </div>
+    </section>
+
+    <section class="shell" id="agents">
+      <div class="section-heading">
+        <div class="eyebrow">For agents</div>
+        <h2>One command and your agent knows the format.</h2>
+        <p>Install the <code>skryb-document</code> skill and any supported local agent gets the schema-aware authoring contract - the HTML shell, the Markdown subset, and every diagram field it is allowed to use.</p>
+      </div>
+      <div class="install">
+        <div>
+          <pre><code>npx skills add sparkkz-nz/skryb <span class="flag">\
+  --skill</span> skryb-document <span class="flag">\
+  --agent</span> '*' <span class="flag">\
+  --global \
+  --yes \
+  --full-depth</span></code></pre>
+          <p class="install-note">Omit <code>--global</code> to install it for the current project only. Keep it current with <code>npx skills update --global</code>.</p>
+        </div>
+        <div class="install-copy">
+          <p>The skill is versioned alongside the runtime, so an agent writes documents that match the runtime rendering them.</p>
+          <ul>
+            <li>No image generation, headless browser, or rendering service in the loop</li>
+            <li>Agents write plain Markdown and explicit diagram YAML, and nothing else</li>
+            <li>Invented frontmatter keys, fields, and diagram types are ruled out by contract</li>
+            <li>Pin a release runtime URL when a document has to keep rendering the same way</li>
+          </ul>
+          <div class="actions">
+            <a class="button secondary" href="./docs/reference.html">Read the schema</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="shell cta">
+      <div class="section-heading">
+        <div class="eyebrow">Start with the format</div>
+        <h2>Give your agent a format worth keeping.</h2>
+        <p>Download a template and edit it, install the authoring skill so your agent writes valid documents first time, or read the schema behind it all.</p>
+      </div>
+      <div class="actions">
+        <a class="button primary" href="./templates/skryb-document-template.html" download>Download a template</a>
+        <a class="button primary" href="./docs/quickstart.html">Open the quickstart</a>
+        <a class="button secondary" href="./docs/reference.html">Browse the schema</a>
       </div>
     </section>
   </main>
