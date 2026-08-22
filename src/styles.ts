@@ -269,12 +269,43 @@ export function injectStyles(): void {
       min-height: 12rem;
       padding: .75rem 1rem 1rem;
       position: fixed;
-      resize: vertical;
       bottom: 0;
       left: 0;
       right: 0;
       z-index: 40;
       font-family: Arial, Helvetica, sans-serif;
+    }
+    .docdiagram-source-resize {
+      cursor: ns-resize;
+      height: .75rem;
+      left: 0;
+      position: absolute;
+      right: 0;
+      top: -.25rem;
+      touch-action: none;
+    }
+    .docdiagram-source-resize::before {
+      background: var(--docdiagram-border);
+      border-radius: 999px;
+      content: "";
+      display: block;
+      height: .25rem;
+      margin: .25rem auto 0;
+      transition: background .15s, width .15s;
+      width: 3rem;
+    }
+    .docdiagram-source-resize:hover::before,
+    .docdiagram-source-resize:focus-visible::before,
+    .docdiagram-source-tray[data-resizing="true"] .docdiagram-source-resize::before {
+      background: var(--docdiagram-text);
+      width: 5rem;
+    }
+    .docdiagram-source-resize:focus-visible {
+      outline: 2px solid var(--docdiagram-text);
+      outline-offset: 2px;
+    }
+    .docdiagram-source-tray[data-resizing="true"] {
+      user-select: none;
     }
     .docdiagram-source-header {
       align-items: center;
